@@ -1,0 +1,8 @@
+{
+  "name": "@fal-works/lint-js-global",
+  "version": "0.1.0",
+  "dependencies": {
+    "oxfmt": "^0.44.0",
+    "oxlint": "^1.59.0"
+  }
+}
