@@ -1,6 +1,21 @@
 {
   "name": "@fal-works/lint-js-global",
   "version": "0.1.0",
+  "bin": {
+    "lint-js": "src/cli.js"
+  },
+  "files": [
+    "src",
+    "cfg"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "tsc --noEmit"
+  },
   "dependencies": {
     "oxfmt": "^0.44.0",
     "oxlint": "^1.59.0"
@@ -8,5 +23,8 @@
   "devDependencies": {
     "@types/node": "^22",
     "typescript": "^6.0.2"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
