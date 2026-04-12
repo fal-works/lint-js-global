@@ -1,7 +1,8 @@
 {
   "$schema": "../node_modules/oxlint/configuration_schema.json",
   "categories": {
-    "correctness": "error"
+    "correctness": "error",
+    "suspicious": "error"
   },
   "rules": {
     "no-await-in-loop": "error",
@@ -15,7 +16,9 @@
     "@typescript-eslint/no-unsafe-type-assertion": "error",
     "@typescript-eslint/prefer-for-of": "error",
     "@typescript-eslint/use-unknown-in-catch-callback-variable": "error",
-    "unicorn/prefer-node-protocol": "error"
+    "unicorn/prefer-node-protocol": "error",
+    "@typescript-eslint/prefer-optional-chain": "error",
+    "@typescript-eslint/prefer-nullish-coalescing": "error"
   },
   "overrides": [
     {
