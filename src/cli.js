@@ -37,7 +37,7 @@ if (fmtResult.error) {
 
 // Step 2: lint + fix
 console.log("lint-js: linting (with auto-fix)...");
-const lintResult = spawnSync(oxlintBin, ["-c", oxlintConfig, "--fix", "."], {
+const lintResult = spawnSync(oxlintBin, ["-c", oxlintConfig, "--format=unix", "--fix", "."], {
   stdio: "inherit",
 });
 if (lintResult.error) {
