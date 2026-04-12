@@ -28,6 +28,7 @@ const oxfmtConfig = packagePath("cfg", "oxfmtrc.json");
 const oxlintConfig = packagePath("cfg", "oxlintrc.json");
 
 // Step 1: format
+console.log("lint-js: formatting...");
 const fmtResult = spawnSync(oxfmtBin, ["-c", oxfmtConfig, "."], { stdio: "inherit" });
 if (fmtResult.error) {
   console.error("lint-js: failed to launch oxfmt:", fmtResult.error.message);
@@ -35,6 +36,7 @@ if (fmtResult.error) {
 }
 
 // Step 2: lint + fix
+console.log("lint-js: linting (with auto-fix)...");
 const lintResult = spawnSync(oxlintBin, ["-c", oxlintConfig, "--fix", "."], {
   stdio: "inherit",
 });
