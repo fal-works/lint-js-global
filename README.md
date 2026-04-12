@@ -16,3 +16,5 @@ Then run from a project root (requires `package.json`):
 ```sh
 lint-js
 ```
+
+`node_modules` is skipped automatically, even if the project does not define `.gitignore` / `.eslintignore`.

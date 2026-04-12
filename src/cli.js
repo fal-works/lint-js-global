@@ -2,9 +2,12 @@
 // @ts-check
 
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+
+const require = createRequire(import.meta.url);
 
 /**
  * Resolve a path relative to this package's root (not the cwd).
@@ -16,20 +19,44 @@ function packagePath(...segments) {
   return join(dirname(fileURLToPath(import.meta.url)), "..", ...segments);
 }
 
+/**
+ * Resolve the bin script path for a dependency package.
+ *
+ * Running the script with `process.execPath` avoids relying on platform-specific
+ * shims in `node_modules/.bin`.
+ *
+ * @param {string} packageName
+ * @param {string} binName
+ * @returns {string}
+ */
+function resolvePackageBin(packageName, binName) {
+  const packageJsonPath = require.resolve(`${packageName}/package.json`);
+  const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+  const binPath = packageJson.bin?.[binName];
+
+  if (typeof binPath !== "string") {
+    throw new Error(`Missing "${binName}" bin in ${packageName}/package.json.`);
+  }
+
+  return join(dirname(packageJsonPath), binPath);
+}
+
 if (!existsSync("package.json")) {
   console.error("lint-js: no package.json found in current directory.");
   console.error("Run lint-js from the root of a JS/TS project.");
   process.exit(1);
 }
 
-const oxfmtBin = packagePath("node_modules", ".bin", "oxfmt");
-const oxlintBin = packagePath("node_modules", ".bin", "oxlint");
+const oxfmtBin = resolvePackageBin("oxfmt", "oxfmt");
+const oxlintBin = resolvePackageBin("oxlint", "oxlint");
 const oxfmtConfig = packagePath("cfg", "oxfmtrc.json");
 const oxlintConfig = packagePath("cfg", "oxlintrc.json");
 
 // Step 1: format
 console.log("lint-js: formatting...");
-const fmtResult = spawnSync(oxfmtBin, ["-c", oxfmtConfig, "."], { stdio: "inherit" });
+const fmtResult = spawnSync(process.execPath, [oxfmtBin, "-c", oxfmtConfig, "."], {
+  stdio: "inherit",
+});
 if (fmtResult.error) {
   console.error("lint-js: failed to launch oxfmt:", fmtResult.error.message);
   process.exit(1);
@@ -37,9 +64,13 @@ if (fmtResult.error) {
 
 // Step 2: lint + fix
 console.log("lint-js: linting (with auto-fix)...");
-const lintResult = spawnSync(oxlintBin, ["-c", oxlintConfig, "--format=unix", "--fix", "."], {
-  stdio: "inherit",
-});
+const lintResult = spawnSync(
+  process.execPath,
+  [oxlintBin, "-c", oxlintConfig, "--format=unix", "--fix", "--ignore-pattern", "node_modules", "."],
+  {
+    stdio: "inherit",
+  },
+);
 if (lintResult.error) {
   console.error("lint-js: failed to launch oxlint:", lintResult.error.message);
   process.exit(1);
