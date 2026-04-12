@@ -1,0 +1,16 @@
+{
+  "sortImports": true,
+  "jsdoc": {
+    "commentLineStrategy": "keep",
+    "lineWrappingStyle": "balance",
+    "capitalizeDescriptions": false
+  },
+  "overrides": [
+    {
+      "files": ["**/*.md"],
+      "options": {
+        "tabWidth": 4
+      }
+    }
+  ]
+}

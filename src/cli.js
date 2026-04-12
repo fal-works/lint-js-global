@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // @ts-check
 
-import { existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { join, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /**
  * Resolve a path relative to this package's root (not the cwd).
+ *
  * @param {...string} segments
  * @returns {string}
  */
@@ -23,10 +24,11 @@ if (!existsSync("package.json")) {
 
 const oxfmtBin = packagePath("node_modules", ".bin", "oxfmt");
 const oxlintBin = packagePath("node_modules", ".bin", "oxlint");
+const oxfmtConfig = packagePath("cfg", "oxfmtrc.json");
 const oxlintConfig = packagePath("cfg", "oxlintrc.json");
 
 // Step 1: format
-const fmtResult = spawnSync(oxfmtBin, ["."], { stdio: "inherit" });
+const fmtResult = spawnSync(oxfmtBin, ["-c", oxfmtConfig, "."], { stdio: "inherit" });
 if (fmtResult.error) {
   console.error("lint-js: failed to launch oxfmt:", fmtResult.error.message);
   process.exit(1);
