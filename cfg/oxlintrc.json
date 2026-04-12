@@ -2,5 +2,28 @@
   "$schema": "../node_modules/oxlint/configuration_schema.json",
   "categories": {
     "correctness": "error"
-  }
+  },
+  "rules": {
+    "no-await-in-loop": "error",
+    "no-duplicate-imports": "error",
+    "@typescript-eslint/consistent-type-definitions": "error",
+    "@typescript-eslint/consistent-type-imports": "error",
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/no-non-null-assertion": "error",
+    "@typescript-eslint/no-unnecessary-template-expression": "error",
+    "@typescript-eslint/no-unnecessary-type-assertion": "error",
+    "@typescript-eslint/no-unsafe-type-assertion": "error",
+    "@typescript-eslint/prefer-for-of": "error",
+    "@typescript-eslint/use-unknown-in-catch-callback-variable": "error",
+    "unicorn/prefer-node-protocol": "error"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.test.js", "**/*.test.ts"],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-non-null-assertion": "off"
+      }
+    }
+  ]
 }
