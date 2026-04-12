@@ -18,3 +18,7 @@ lint-js
 ```
 
 `node_modules` is skipped automatically, even if the project does not define `.gitignore` / `.eslintignore`.
+
+## Notes
+
+Not yet implemented: `--check` flag, per-project config override, subcommands, type-aware linting.
