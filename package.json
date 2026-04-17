@@ -1,12 +1,17 @@
 {
   "name": "@fal-works/lint-js-global",
   "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fal-works/lint-js-global.git"
+  },
   "bin": {
     "lint-js": "src/cli.js"
   },
   "files": [
     "src",
-    "cfg"
+    "cfg",
+    "docs"
   ],
   "type": "module",
   "publishConfig": {
@@ -15,7 +20,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "node --test test/smoke.test.js",
-    "prepublishOnly": "tsc --noEmit"
+    "prepublishOnly": "pnpm typecheck && pnpm test"
   },
   "dependencies": {
     "oxfmt": "^0.44.0",
