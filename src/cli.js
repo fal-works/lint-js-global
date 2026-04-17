@@ -81,29 +81,40 @@ function getSystemIgnorePatterns() {
   return [];
 }
 
+/**
+ * Launches a tool via `process.execPath` with stdio inherited from the parent.
+ * On launch failure (e.g. bin not found) prints a diagnostic and exits the process.
+ *
+ * @param {object} options
+ * @param {string} options.action Phrase for the progress log (e.g. `"formatting"`).
+ * @param {string} options.name Tool name used in launch-failure diagnostics.
+ * @param {string} options.bin Absolute path to the tool's JS entry point.
+ * @param {string[]} options.args Arguments passed to the tool, excluding `bin`.
+ * @param {NodeJS.ProcessEnv} [options.env] Env for child process. Defaults to inherited.
+ * @returns {ReturnType<typeof spawnSync>}
+ */
+function runTool({ action, name, bin, args, env }) {
+  console.log(`lint-js: ${action}...`);
+  const result = spawnSync(process.execPath, [bin, ...args], {
+    stdio: "inherit",
+    env,
+  });
+  if (result.error) {
+    console.error(`lint-js: failed to launch ${name}:`, result.error.message);
+    process.exit(1);
+  }
+  return result;
+}
+
 const systemIgnorePatterns = getSystemIgnorePatterns();
 
 // Step 1: format
-console.log("lint-js: formatting...");
-const oxfmtArgs = [oxfmtBin, "-c", oxfmtConfig, "."];
+const oxfmtArgs = ["-c", oxfmtConfig, "."];
 for (const pattern of systemIgnorePatterns) oxfmtArgs.push(`!${pattern}`);
-const fmtResult = spawnSync(process.execPath, oxfmtArgs, {
-  stdio: "inherit",
-});
-if (fmtResult.error) {
-  console.error("lint-js: failed to launch oxfmt:", fmtResult.error.message);
-  process.exit(1);
-}
+runTool({ action: "formatting", name: "oxfmt", bin: oxfmtBin, args: oxfmtArgs });
 
 // Step 2: lint + fix (type-aware)
-// oxlint spawns the `tsgolint` binary via PATH lookup. For globally-installed
-// lint-js, inject our own node_modules/.bin at the head of PATH so the bundled
-// oxlint-tsgolint shim is found regardless of the user project's layout.
-console.log("lint-js: linting (with auto-fix)...");
-const binDir = packagePath("node_modules", ".bin");
-const pathKey = process.platform === "win32" ? "Path" : "PATH";
 const oxlintArgs = [
-  oxlintBin,
   "-c",
   oxlintConfig,
   "--format=unix",
@@ -117,16 +128,22 @@ for (const pattern of systemIgnorePatterns) {
   oxlintArgs.push("--ignore-pattern", pattern);
 }
 oxlintArgs.push(".");
-const lintResult = spawnSync(process.execPath, oxlintArgs, {
-  stdio: "inherit",
+
+// oxlint spawns the `tsgolint` binary via PATH lookup. For globally-installed
+// lint-js, inject our own node_modules/.bin at the head of PATH so the bundled
+// oxlint-tsgolint shim is found regardless of the user project's layout.
+const binDir = packagePath("node_modules", ".bin");
+const pathKey = process.platform === "win32" ? "Path" : "PATH";
+const pathSep = process.platform === "win32" ? ";" : ":";
+const lintResult = runTool({
+  action: "linting (with auto-fix)",
+  name: "oxlint",
+  bin: oxlintBin,
+  args: oxlintArgs,
   env: {
     ...process.env,
-    [pathKey]: `${binDir}${process.platform === "win32" ? ";" : ":"}${process.env[pathKey] ?? ""}`,
+    [pathKey]: `${binDir}${pathSep}${process.env[pathKey] ?? ""}`,
   },
 });
-if (lintResult.error) {
-  console.error("lint-js: failed to launch oxlint:", lintResult.error.message);
-  process.exit(1);
-}
 
 process.exit(lintResult.status ?? 1);
