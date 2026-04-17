@@ -162,6 +162,30 @@ void test("nonexistent target fails fast with diagnostic", (t) => {
   }
 });
 
+void test("--check: does not modify files and reports both fmt and lint violations", (t) => {
+  const dir = copyFixture("basic");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const target = join(dir, "src", "index.ts");
+  const before = readFileSync(target, "utf8");
+
+  const result = runCli(dir, ["--check"]);
+
+  assert.equal(result.status, 1, "expected exit 1 from fmt or lint violations");
+  assert.equal(readFileSync(target, "utf8"), before, "sources must not be rewritten in check mode");
+  assert.match(result.stdout, /Format issues found/, "oxfmt --check must report format violations");
+  assert.match(result.stdout, /no-floating-promises/, "lint violation should still be reported");
+});
+
+void test("--check: clean project exits 0", (t) => {
+  const dir = copyFixture("with-node-modules");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const result = runCli(dir, ["--check"]);
+
+  assert.equal(result.status, 0, "expected exit 0 on clean project under --check");
+});
+
 void test("node_modules is ignored", (t) => {
   const dir = copyFixture("with-node-modules");
   t.after(() => rmSync(dir, { recursive: true, force: true }));

@@ -111,9 +111,10 @@ function runTool({ action, name, bin, args, env }) {
  * @param {string} config Path to the oxfmt config file.
  * @param {string[]} ignorePatterns Gitignore-style patterns.
  * @param {string[]} targets Positional paths to process.
+ * @param {boolean} check Verify only; do not rewrite files.
  * @returns {string[]}
  */
-function buildOxfmtArgs(config, ignorePatterns, targets) {
+function buildOxfmtArgs(config, ignorePatterns, targets, check) {
   return [
     "-c",
     config,
@@ -121,6 +122,7 @@ function buildOxfmtArgs(config, ignorePatterns, targets) {
     // (e.g. fully excluded by `.prettierignore`).
     // Typos are caught separately by lint-js's own existence check.
     "--no-error-on-unmatched-pattern",
+    ...(check ? ["--check"] : []),
     ...targets,
     ...ignorePatterns.map((pattern) => `!${pattern}`),
   ];
@@ -132,15 +134,16 @@ function buildOxfmtArgs(config, ignorePatterns, targets) {
  * @param {string} config Path to the oxlint config file.
  * @param {string[]} ignorePatterns Gitignore-style patterns.
  * @param {string[]} targets Positional paths to process.
+ * @param {boolean} check Report only; do not apply auto-fix.
  * @returns {string[]}
  */
-function buildOxlintArgs(config, ignorePatterns, targets) {
+function buildOxlintArgs(config, ignorePatterns, targets, check) {
   const ignoreFlags = ignorePatterns.flatMap((pattern) => ["--ignore-pattern", pattern]);
   return [
     "-c",
     config,
     "--format=unix",
-    "--fix",
+    ...(check ? [] : ["--fix"]),
     "--type-aware",
     "--type-check",
     ...ignoreFlags,
@@ -184,12 +187,15 @@ function main() {
   const oxfmtConfig = packagePath("cfg", "oxfmtrc.json");
   const oxlintConfig = packagePath("cfg", "oxlintrc.json");
   const ignorePatterns = getSystemIgnorePatterns();
-  const { positionals } = parseArgs({
+  const { values, positionals } = parseArgs({
     args: process.argv.slice(2),
-    options: {},
+    options: {
+      check: { type: "boolean" },
+    },
     allowPositionals: true,
     strict: true,
   });
+  const check = values.check === true;
   const targets = positionals.length > 0 ? positionals : ["."];
 
   for (const target of targets) {
@@ -200,17 +206,17 @@ function main() {
   }
 
   const fmtResult = runTool({
-    action: "formatting",
+    action: check ? "checking format" : "formatting",
     name: "oxfmt",
     bin: oxfmtBin,
-    args: buildOxfmtArgs(oxfmtConfig, ignorePatterns, targets),
+    args: buildOxfmtArgs(oxfmtConfig, ignorePatterns, targets, check),
   });
 
   const lintResult = runTool({
-    action: "linting (with auto-fix)",
+    action: check ? "linting (no auto-fix)" : "linting (with auto-fix)",
     name: "oxlint",
     bin: oxlintBin,
-    args: buildOxlintArgs(oxlintConfig, ignorePatterns, targets),
+    args: buildOxlintArgs(oxlintConfig, ignorePatterns, targets, check),
     env: buildPathInjectedEnv(packagePath("node_modules", ".bin")),
   });
 
