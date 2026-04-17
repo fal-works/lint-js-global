@@ -85,8 +85,8 @@ function getSystemIgnorePatterns() {
  *
  * @param {object} options
  * @param {string} [options.progressLabel] Gerund (e.g. `"formatting"`);
- *   when given, logs `"<label>..."` at start and `"<label>: clean."`
- *   after a zero-exit run (subject to `logCompletion`).
+ *   when given, logs `"<label>..."` at start and, after a zero-exit run
+ *   (subject to `logCompletion`), a blank line followed by `"<label>: clean."`.
  * @param {boolean} [options.logCompletion=true] Pass `false` to suppress the
  *   completion line — use when the tool already prints its own summary. Default is `true`
  * @param {string} options.name Tool name for launch-failure diagnostics.
