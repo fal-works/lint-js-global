@@ -173,7 +173,7 @@ function main() {
   const oxlintConfig = packagePath("cfg", "oxlintrc.json");
   const ignorePatterns = getSystemIgnorePatterns();
 
-  runTool({
+  const fmtResult = runTool({
     action: "formatting",
     name: "oxfmt",
     bin: oxfmtBin,
@@ -188,7 +188,7 @@ function main() {
     env: buildPathInjectedEnv(packagePath("node_modules", ".bin")),
   });
 
-  return lintResult.status ?? 1;
+  return Math.max(fmtResult.status ?? 1, lintResult.status ?? 1);
 }
 
 process.exitCode = main();

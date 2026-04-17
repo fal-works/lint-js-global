@@ -2,7 +2,15 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -79,6 +87,24 @@ void test("missing package.json: exits 1 with diagnostic", (t) => {
     /no package\.json found/,
     "diagnostic should not leak to stdout",
   );
+});
+
+void test("oxfmt failure propagates to exit code even when lint is clean", (t) => {
+  const dir = copyFixture("with-node-modules");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const unreadable = join(dir, "secret.md");
+  writeFileSync(unreadable, "# secret\n");
+  chmodSync(unreadable, 0o000);
+  t.after(() => {
+    try {
+      chmodSync(unreadable, 0o644);
+    } catch {}
+  });
+
+  const result = runCli(dir);
+
+  assert.notEqual(result.status, 0, "oxfmt failure must not be swallowed");
 });
 
 void test("node_modules is ignored", (t) => {
