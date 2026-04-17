@@ -4,13 +4,11 @@ Runs Oxfmt and Oxlint (+ auto-fix).
 
 Intended as a globally-installed alternative to adding linter devDependencies to every small project.
 
-
 ## Install
 
 ```sh
 pnpm install -g @fal-works/lint-js-global
 ```
-
 
 ## Usage
 
@@ -31,7 +29,6 @@ Each path must be an existing file or directory.
 
 `node_modules` is always skipped.  
 Standard ignore files (`.gitignore`, `.eslintignore`, `.prettierignore`) are respected if present.
-
 
 ## Notes
 
