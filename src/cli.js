@@ -3,11 +3,8 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { createRequire } from "node:module";
-import { join, dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-
-const require = createRequire(import.meta.url);
 
 /**
  * Resolve a path relative to this package's root (not the cwd).
@@ -16,7 +13,7 @@ const require = createRequire(import.meta.url);
  * @returns {string}
  */
 function packagePath(...segments) {
-  return join(dirname(fileURLToPath(import.meta.url)), "..", ...segments);
+  return join(import.meta.dirname, "..", ...segments);
 }
 
 /**
@@ -40,7 +37,7 @@ function isRecord(value) {
  * @returns {string}
  */
 function resolvePackageBin(packageName, binName) {
-  const packageJsonPath = require.resolve(`${packageName}/package.json`);
+  const packageJsonPath = fileURLToPath(import.meta.resolve(`${packageName}/package.json`));
   /** @type {unknown} */
   const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8"));
   if (!isRecord(pkg) || !isRecord(pkg.bin)) {
@@ -52,17 +49,6 @@ function resolvePackageBin(packageName, binName) {
   }
   return join(dirname(packageJsonPath), binPath);
 }
-
-if (!existsSync("package.json")) {
-  console.error("lint-js: no package.json found in current directory.");
-  console.error("Run lint-js from the root of a JS/TS project.");
-  process.exit(1);
-}
-
-const oxfmtBin = resolvePackageBin("oxfmt", "oxfmt");
-const oxlintBin = resolvePackageBin("oxlint", "oxlint");
-const oxfmtConfig = packagePath("cfg", "oxfmtrc.json");
-const oxlintConfig = packagePath("cfg", "oxlintrc.json");
 
 /**
  * Returns ignore patterns that apply regardless of project configuration.
@@ -94,7 +80,7 @@ function getSystemIgnorePatterns() {
 
 /**
  * Launches a tool via `process.execPath` with stdio inherited from the parent.
- * On launch failure (e.g. bin not found) prints a diagnostic and exits the process.
+ * Throws on launch failure (e.g. bin not found) so Node surfaces the stack trace.
  *
  * @param {object} options
  * @param {string} options.action Phrase for the progress log (e.g. `"formatting"`).
@@ -111,41 +97,98 @@ function runTool({ action, name, bin, args, env }) {
     env,
   });
   if (result.error) {
-    console.error(`lint-js: failed to launch ${name}:`, result.error.message);
-    process.exit(1);
+    throw new Error(`lint-js: failed to launch ${name}: ${result.error.message}`, {
+      cause: result.error,
+    });
   }
   return result;
 }
 
-const systemIgnorePatterns = getSystemIgnorePatterns();
-
-// Step 1: format
-const oxfmtArgs = ["-c", oxfmtConfig, "."];
-for (const pattern of systemIgnorePatterns) oxfmtArgs.push(`!${pattern}`);
-runTool({ action: "formatting", name: "oxfmt", bin: oxfmtBin, args: oxfmtArgs });
-
-// Step 2: lint + fix (type-aware)
-const oxlintArgs = ["-c", oxlintConfig, "--format=unix", "--fix", "--type-aware", "--type-check"];
-for (const pattern of systemIgnorePatterns) {
-  oxlintArgs.push("--ignore-pattern", pattern);
+/**
+ * Build CLI args for oxfmt.
+ *
+ * @param {string} config Path to the oxfmt config file.
+ * @param {string[]} ignorePatterns Gitignore-style patterns.
+ * @returns {string[]}
+ */
+function buildOxfmtArgs(config, ignorePatterns) {
+  return ["-c", config, ".", ...ignorePatterns.map((pattern) => `!${pattern}`)];
 }
-oxlintArgs.push(".");
 
-// oxlint spawns the `tsgolint` binary via PATH lookup. For globally-installed
-// lint-js, inject our own node_modules/.bin at the head of PATH so the bundled
-// oxlint-tsgolint shim is found regardless of the user project's layout.
-const binDir = packagePath("node_modules", ".bin");
-const pathKey = process.platform === "win32" ? "Path" : "PATH";
-const pathSep = process.platform === "win32" ? ";" : ":";
-const lintResult = runTool({
-  action: "linting (with auto-fix)",
-  name: "oxlint",
-  bin: oxlintBin,
-  args: oxlintArgs,
-  env: {
+/**
+ * Build CLI args for oxlint.
+ *
+ * @param {string} config Path to the oxlint config file.
+ * @param {string[]} ignorePatterns Gitignore-style patterns.
+ * @returns {string[]}
+ */
+function buildOxlintArgs(config, ignorePatterns) {
+  const ignoreFlags = ignorePatterns.flatMap((pattern) => ["--ignore-pattern", pattern]);
+  return [
+    "-c",
+    config,
+    "--format=unix",
+    "--fix",
+    "--type-aware",
+    "--type-check",
+    ...ignoreFlags,
+    ".",
+  ];
+}
+
+/**
+ * Returns a copy of `process.env` with `binDir` prepended to `PATH`.
+ *
+ * oxlint spawns the `tsgolint` binary via PATH lookup. For globally-installed
+ * lint-js, inject our own node_modules/.bin at the head of PATH so the bundled
+ * oxlint-tsgolint shim is found regardless of the user project's layout.
+ *
+ * @param {string} binDir Directory to prepend to PATH.
+ * @returns {NodeJS.ProcessEnv}
+ */
+function buildPathInjectedEnv(binDir) {
+  const pathKey = process.platform === "win32" ? "Path" : "PATH";
+  const pathSep = process.platform === "win32" ? ";" : ":";
+  return {
     ...process.env,
     [pathKey]: `${binDir}${pathSep}${process.env[pathKey] ?? ""}`,
-  },
-});
+  };
+}
 
-process.exit(lintResult.status ?? 1);
+/**
+ * CLI entry point. Returns the process exit code.
+ *
+ * @returns {number}
+ */
+function main() {
+  if (!existsSync("package.json")) {
+    console.error("lint-js: no package.json found in current directory.");
+    console.error("Run lint-js from the root of a JS/TS project.");
+    return 1;
+  }
+
+  const oxfmtBin = resolvePackageBin("oxfmt", "oxfmt");
+  const oxlintBin = resolvePackageBin("oxlint", "oxlint");
+  const oxfmtConfig = packagePath("cfg", "oxfmtrc.json");
+  const oxlintConfig = packagePath("cfg", "oxlintrc.json");
+  const ignorePatterns = getSystemIgnorePatterns();
+
+  runTool({
+    action: "formatting",
+    name: "oxfmt",
+    bin: oxfmtBin,
+    args: buildOxfmtArgs(oxfmtConfig, ignorePatterns),
+  });
+
+  const lintResult = runTool({
+    action: "linting (with auto-fix)",
+    name: "oxlint",
+    bin: oxlintBin,
+    args: buildOxlintArgs(oxlintConfig, ignorePatterns),
+    env: buildPathInjectedEnv(packagePath("node_modules", ".bin")),
+  });
+
+  return lintResult.status ?? 1;
+}
+
+process.exitCode = main();
