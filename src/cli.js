@@ -62,13 +62,33 @@ if (fmtResult.error) {
   process.exit(1);
 }
 
-// Step 2: lint + fix
+// Step 2: lint + fix (type-aware)
+// oxlint spawns the `tsgolint` binary via PATH lookup. For globally-installed
+// lint-js, inject our own node_modules/.bin at the head of PATH so the bundled
+// oxlint-tsgolint shim is found regardless of the user project's layout.
 console.log("lint-js: linting (with auto-fix)...");
+const binDir = packagePath("node_modules", ".bin");
+const pathKey = process.platform === "win32" ? "Path" : "PATH";
 const lintResult = spawnSync(
   process.execPath,
-  [oxlintBin, "-c", oxlintConfig, "--format=unix", "--fix", "--ignore-pattern", "node_modules", "."],
+  [
+    oxlintBin,
+    "-c",
+    oxlintConfig,
+    "--format=unix",
+    "--fix",
+    "--type-aware",
+    "--type-check",
+    "--ignore-pattern",
+    "node_modules",
+    ".",
+  ],
   {
     stdio: "inherit",
+    env: {
+      ...process.env,
+      [pathKey]: `${binDir}${process.platform === "win32" ? ";" : ":"}${process.env[pathKey] ?? ""}`,
+    },
   },
 );
 if (lintResult.error) {

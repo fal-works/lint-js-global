@@ -21,4 +21,7 @@ lint-js
 
 ## Notes
 
-Not yet implemented: `--check` flag, per-project config override, subcommands, type-aware linting.
+Type-aware linting is always on. Strict rules including `no-floating-promises` and `no-unsafe-*` are enforced.
+See [docs/type-aware-linting.md](docs/type-aware-linting.md) for rule list and escape hatches.
+
+Not yet implemented: `--check` flag, per-project config override, subcommands.
