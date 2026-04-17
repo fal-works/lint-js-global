@@ -80,19 +80,25 @@ function getSystemIgnorePatterns() {
 }
 
 /**
- * Launches a tool via `process.execPath` with stdio inherited from the parent.
- * Throws on launch failure (e.g. bin not found) so Node surfaces the stack trace.
+ * Launches a tool via `process.execPath` with stdio inherited.
+ * Throws on launch failure so Node surfaces the stack trace.
  *
  * @param {object} options
- * @param {string} options.action Phrase for the progress log (e.g. `"formatting"`).
- * @param {string} options.name Tool name used in launch-failure diagnostics.
+ * @param {string} [options.progressLabel] Gerund (e.g. `"formatting"`);
+ *   when given, logs `"<label>..."` at start and `"<label>: clean."`
+ *   after a zero-exit run (subject to `logCompletion`).
+ * @param {boolean} [options.logCompletion=true] Pass `false` to suppress the
+ *   completion line — use when the tool already prints its own summary. Default is `true`
+ * @param {string} options.name Tool name for launch-failure diagnostics.
  * @param {string} options.bin Absolute path to the tool's JS entry point.
  * @param {string[]} options.args Arguments passed to the tool, excluding `bin`.
- * @param {NodeJS.ProcessEnv} [options.env] Env for child process. Defaults to inherited.
+ * @param {NodeJS.ProcessEnv} [options.env] Env for the child. Defaults to inherited.
  * @returns {ReturnType<typeof spawnSync>}
  */
-function runTool({ action, name, bin, args, env }) {
-  console.log(`lint-js: ${action}...`);
+function runTool({ progressLabel, logCompletion = true, name, bin, args, env }) {
+  const hasLabel = (progressLabel?.length ?? 0) > 0;
+
+  if (hasLabel) console.log(`${progressLabel}...`);
   const result = spawnSync(process.execPath, [bin, ...args], {
     stdio: "inherit",
     env,
@@ -102,6 +108,11 @@ function runTool({ action, name, bin, args, env }) {
       cause: result.error,
     });
   }
+
+  if (hasLabel && logCompletion && result.status === 0) {
+    console.log(`\n${progressLabel}: clean.`);
+  }
+
   return result;
 }
 
@@ -142,7 +153,7 @@ function buildOxlintArgs(config, ignorePatterns, targets, check) {
   return [
     "-c",
     config,
-    "--format=unix",
+    "--format=unix", // should be LLM-friendly
     ...(check ? [] : ["--fix"]),
     "--type-aware",
     "--type-check",
@@ -206,14 +217,20 @@ function main() {
   }
 
   const fmtResult = runTool({
-    action: check ? "checking format" : "formatting",
+    // Always emit the phase label — oxfmt's own opener is absent for zero-match runs,
+    // so without this line stdout would show no trace of the fmt phase at all.
+    progressLabel: "formatting",
+    // oxfmt prints its own summary; our completion line would only duplicate.
+    logCompletion: false,
     name: "oxfmt",
     bin: oxfmtBin,
     args: buildOxfmtArgs(oxfmtConfig, ignorePatterns, targets, check),
   });
 
+  console.log();
+
   const lintResult = runTool({
-    action: check ? "linting (no auto-fix)" : "linting (with auto-fix)",
+    progressLabel: check ? "linting (no auto-fix)" : "linting (with auto-fix)",
     name: "oxlint",
     bin: oxlintBin,
     args: buildOxlintArgs(oxlintConfig, ignorePatterns, targets, check),
