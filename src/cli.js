@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseArgs } from "node:util";
 
 /**
  * Resolve a path relative to this package's root (not the cwd).
@@ -109,10 +110,20 @@ function runTool({ action, name, bin, args, env }) {
  *
  * @param {string} config Path to the oxfmt config file.
  * @param {string[]} ignorePatterns Gitignore-style patterns.
+ * @param {string[]} targets Positional paths to process.
  * @returns {string[]}
  */
-function buildOxfmtArgs(config, ignorePatterns) {
-  return ["-c", config, ".", ...ignorePatterns.map((pattern) => `!${pattern}`)];
+function buildOxfmtArgs(config, ignorePatterns, targets) {
+  return [
+    "-c",
+    config,
+    // Suppress oxfmt's exit-2 when a positional target resolves to no files
+    // (e.g. fully excluded by `.prettierignore`).
+    // Typos are caught separately by lint-js's own existence check.
+    "--no-error-on-unmatched-pattern",
+    ...targets,
+    ...ignorePatterns.map((pattern) => `!${pattern}`),
+  ];
 }
 
 /**
@@ -120,9 +131,10 @@ function buildOxfmtArgs(config, ignorePatterns) {
  *
  * @param {string} config Path to the oxlint config file.
  * @param {string[]} ignorePatterns Gitignore-style patterns.
+ * @param {string[]} targets Positional paths to process.
  * @returns {string[]}
  */
-function buildOxlintArgs(config, ignorePatterns) {
+function buildOxlintArgs(config, ignorePatterns, targets) {
   const ignoreFlags = ignorePatterns.flatMap((pattern) => ["--ignore-pattern", pattern]);
   return [
     "-c",
@@ -132,7 +144,7 @@ function buildOxlintArgs(config, ignorePatterns) {
     "--type-aware",
     "--type-check",
     ...ignoreFlags,
-    ".",
+    ...targets,
   ];
 }
 
@@ -172,19 +184,33 @@ function main() {
   const oxfmtConfig = packagePath("cfg", "oxfmtrc.json");
   const oxlintConfig = packagePath("cfg", "oxlintrc.json");
   const ignorePatterns = getSystemIgnorePatterns();
+  const { positionals } = parseArgs({
+    args: process.argv.slice(2),
+    options: {},
+    allowPositionals: true,
+    strict: true,
+  });
+  const targets = positionals.length > 0 ? positionals : ["."];
+
+  for (const target of targets) {
+    if (!existsSync(target)) {
+      console.error(`lint-js: target not found: ${target}`);
+      return 1;
+    }
+  }
 
   const fmtResult = runTool({
     action: "formatting",
     name: "oxfmt",
     bin: oxfmtBin,
-    args: buildOxfmtArgs(oxfmtConfig, ignorePatterns),
+    args: buildOxfmtArgs(oxfmtConfig, ignorePatterns, targets),
   });
 
   const lintResult = runTool({
     action: "linting (with auto-fix)",
     name: "oxlint",
     bin: oxlintBin,
-    args: buildOxlintArgs(oxlintConfig, ignorePatterns),
+    args: buildOxlintArgs(oxlintConfig, ignorePatterns, targets),
     env: buildPathInjectedEnv(packagePath("node_modules", ".bin")),
   });
 

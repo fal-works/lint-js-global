@@ -40,9 +40,10 @@ function copyFixture(fixtureName) {
 
 /**
  * @param {string} cwd
+ * @param {string[]} [args]
  */
-function runCli(cwd) {
-  return spawnSync(process.execPath, [cliPath], { cwd, encoding: "utf8" });
+function runCli(cwd, args = []) {
+  return spawnSync(process.execPath, [cliPath, ...args], { cwd, encoding: "utf8" });
 }
 
 void test("basic: reformats sources and reports floating promise", (t) => {
@@ -105,6 +106,60 @@ void test("oxfmt failure propagates to exit code even when lint is clean", (t) =
   const result = runCli(dir);
 
   assert.notEqual(result.status, 0, "oxfmt failure must not be swallowed");
+});
+
+void test("positional path narrows scope but still honors ignore files", (t) => {
+  const dir = copyFixture("basic");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const dirty = "const x  =  1;debugger\n";
+
+  const outside = join(dir, "outside.ts");
+  writeFileSync(outside, dirty);
+
+  const ignored = join(dir, "src", "ignored.ts");
+  writeFileSync(ignored, dirty);
+  writeFileSync(join(dir, ".prettierignore"), "ignored.ts\n");
+  writeFileSync(join(dir, ".eslintignore"), "ignored.ts\n");
+
+  const result = runCli(dir, ["src"]);
+
+  assert.equal(result.status, 1, "expected exit 1 from unfixed lint error in src/index.ts");
+  assert.equal(readFileSync(outside, "utf8"), dirty, "outside target must not be touched");
+  assert.equal(readFileSync(ignored, "utf8"), dirty, "ignored file must not be touched");
+  assert.doesNotMatch(
+    result.stdout,
+    /no-debugger/,
+    "oxlint must skip files listed in .eslintignore",
+  );
+});
+
+void test("fully-ignored single-file target exits cleanly", (t) => {
+  const dir = copyFixture("basic");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const dirty = "const x  =  1;debugger\n";
+  const ignored = join(dir, "src", "ignored.ts");
+  writeFileSync(ignored, dirty);
+  writeFileSync(join(dir, ".prettierignore"), "ignored.ts\n");
+  writeFileSync(join(dir, ".eslintignore"), "ignored.ts\n");
+
+  const result = runCli(dir, ["src/ignored.ts"]);
+
+  assert.equal(result.status, 0, "expected exit 0 when the only target is ignored");
+  assert.equal(readFileSync(ignored, "utf8"), dirty, "ignored file must not be touched");
+});
+
+void test("nonexistent target fails fast with diagnostic", (t) => {
+  const dir = copyFixture("basic");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const result = runCli(dir, ["src/does-not-exist.ts"]);
+
+  assert.equal(result.status, 1);
+  if (result.stderr !== "") {
+    assert.match(result.stderr, /target not found/);
+  }
 });
 
 void test("node_modules is ignored", (t) => {

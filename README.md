@@ -15,8 +15,11 @@ pnpm install -g @fal-works/lint-js-global
 Then run from a project root (requires `package.json`):
 
 ```sh
-lint-js
+lint-js [path...]
 ```
+
+Paths are optional; without them the whole project is processed.  
+Each path must be an existing file or directory.
 
 `node_modules` is always skipped.  
 Standard ignore files (`.gitignore`, `.eslintignore`, `.prettierignore`) are respected if present.
