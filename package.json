@@ -20,9 +20,10 @@
     "access": "public"
   },
   "scripts": {
+    "lint": "node src/cli.js",
     "typecheck": "tsc --noEmit",
     "test": "node --test test/smoke.test.js",
-    "prepublishOnly": "pnpm typecheck && pnpm test"
+    "prepublishOnly": "pnpm lint --check && pnpm typecheck && pnpm test"
   },
   "dependencies": {
     "oxfmt": "^0.44.0",
