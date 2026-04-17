@@ -37,6 +37,6 @@ Standard ignore files (`.gitignore`, `.eslintignore`, `.prettierignore`) are res
 
 Type-aware linting is always on.  
 Strict rules including `no-floating-promises` and `no-unsafe-*` are enforced.  
-See [docs/type-aware-linting.md](docs/type-aware-linting.md) for rule list and escape hatches.
+See [docs/type-aware-linting.md](docs/type-aware-linting.md) for escape hatches.
 
 Rule config is currently fixed and not per-project configurable.
