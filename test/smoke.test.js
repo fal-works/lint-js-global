@@ -153,6 +153,36 @@ void test("basic: reformats sources and reports floating promise", (t) => {
   });
 });
 
+void test("--help: prints usage and exits 0 without requiring package.json", (t) => {
+  const dir = makeTempDir("help");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  for (const flag of ["--help", "-h"]) {
+    const result = runCli(dir, [flag]);
+    assert.equal(result.status, 0, `${flag}: expected exit 0`);
+    if (result.stdout !== "") {
+      assert.match(result.stdout, /Usage: lint-js/, `${flag}: expected usage on stdout`);
+    }
+  }
+});
+
+void test("--version: prints semver and exits 0 without requiring package.json", (t) => {
+  const dir = makeTempDir("version");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  for (const flag of ["--version", "-v"]) {
+    const result = runCli(dir, [flag]);
+    assert.equal(result.status, 0, `${flag}: expected exit 0`);
+    if (result.stdout !== "") {
+      assert.match(
+        result.stdout,
+        /^lint-js \d+\.\d+\.\d+/,
+        `${flag}: expected "lint-js <semver>" on stdout`,
+      );
+    }
+  }
+});
+
 void test("missing package.json: exits 1 with diagnostic", (t) => {
   const dir = makeTempDir("no-pkg");
   t.after(() => rmSync(dir, { recursive: true, force: true }));

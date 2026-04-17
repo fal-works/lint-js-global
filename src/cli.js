@@ -52,6 +52,20 @@ function resolvePackageBin(packageName, binName) {
 }
 
 /**
+ * Read the version field from this package's own `package.json`.
+ *
+ * @returns {string}
+ */
+function getPackageVersion() {
+  /** @type {unknown} */
+  const pkg = JSON.parse(readFileSync(packagePath("package.json"), "utf8"));
+  if (!isRecord(pkg) || typeof pkg.version !== "string") {
+    throw new Error('Missing or malformed "version" in package.json.');
+  }
+  return pkg.version;
+}
+
+/**
  * Returns ignore patterns that apply regardless of project configuration.
  *
  * - `node_modules` (unanchored, any depth) — oxlint does not skip it unless an `.eslintignore` is
@@ -181,12 +195,45 @@ function buildPathInjectedEnv(binDir) {
   };
 }
 
+const HELP_TEXT = `Usage: lint-js [--check] [path...]
+
+Runs oxfmt and oxlint (+ auto-fix) on a JS/TS project.
+Must be run from a project root (package.json required).
+
+Options:
+  --check         Verify only; do not rewrite files.
+  -h, --help      Show this help.
+  -v, --version   Show version.
+
+Without paths, the whole project is processed.
+node_modules is always skipped; .gitignore, .eslintignore, .prettierignore are respected.`;
+
 /**
  * CLI entry point. Returns the process exit code.
  *
  * @returns {number}
  */
 function main() {
+  const { values, positionals } = parseArgs({
+    args: process.argv.slice(2),
+    options: {
+      check: { type: "boolean" },
+      help: { type: "boolean", short: "h" },
+      version: { type: "boolean", short: "v" },
+    },
+    allowPositionals: true,
+    strict: true,
+  });
+
+  if (values.help === true) {
+    console.log(HELP_TEXT);
+    return 0;
+  }
+  if (values.version === true) {
+    console.log(`lint-js ${getPackageVersion()}`);
+    return 0;
+  }
+
   if (!existsSync("package.json")) {
     console.error("lint-js: no package.json in current directory.");
     console.error("Run lint-js from the root of a JS/TS project.");
@@ -199,14 +246,6 @@ function main() {
   const oxfmtConfig = packagePath("cfg", "oxfmtrc.json");
   const oxlintConfig = packagePath("cfg", "oxlintrc.json");
   const ignorePatterns = getSystemIgnorePatterns();
-  const { values, positionals } = parseArgs({
-    args: process.argv.slice(2),
-    options: {
-      check: { type: "boolean" },
-    },
-    allowPositionals: true,
-    strict: true,
-  });
   const check = values.check === true;
   const targets = positionals.length > 0 ? positionals : ["."];
 
