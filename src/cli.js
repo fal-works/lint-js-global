@@ -57,16 +57,18 @@ const oxlintConfig = packagePath("cfg", "oxlintrc.json");
 /**
  * Returns ignore patterns that apply regardless of project configuration.
  *
- * Currently handles Claude Code's sandbox, which bind-mounts user config files
- * (`.mcp.json`, `.claude/`) to `/dev/null` at the project root to block accidental writes.
- * Without these ignores, oxfmt / oxlint fail with `Failed to read` / `EROFS` on those paths.
+ * - `node_modules` (unanchored, any depth) — oxlint does not skip it unless an `.eslintignore` is
+ *   present. oxfmt already skips it by default, so the pattern is a no-op there.
+ * - `/.mcp.json`, `/.claude` (root-anchored) — Claude Code's sandbox bind-mounts these to `/dev/null`
+ *   at the project root, causing oxfmt / oxlint to fail with `Failed to read` / `EROFS`. Detected
+ *   via `$HOME` dotfiles shadowed as character devices at the project root: always shadowed inside
+ *   the sandbox, never legitimate in a JS/TS project root.
  *
- * Detection uses `$HOME` dotfiles shadowed as character devices at the project root:
- * they are always shadowed inside the sandbox and never legitimate files in a JS/TS project root.
- *
- * @returns {string[]} Root-anchored patterns so same-name files in sub-trees are not affected.
+ * @returns {string[]} Gitignore-style patterns.
  */
 function getSystemIgnorePatterns() {
+  const patterns = ["node_modules"];
+
   const claudeSandboxSentinels = [".bashrc", ".gitconfig"];
   const inClaudeSandbox = claudeSandboxSentinels.some((path) => {
     try {
@@ -75,10 +77,9 @@ function getSystemIgnorePatterns() {
       return false;
     }
   });
+  if (inClaudeSandbox) patterns.push("/.mcp.json", "/.claude");
 
-  if (inClaudeSandbox) return ["/.mcp.json", "/.claude"];
-
-  return [];
+  return patterns;
 }
 
 /**
@@ -114,16 +115,7 @@ for (const pattern of systemIgnorePatterns) oxfmtArgs.push(`!${pattern}`);
 runTool({ action: "formatting", name: "oxfmt", bin: oxfmtBin, args: oxfmtArgs });
 
 // Step 2: lint + fix (type-aware)
-const oxlintArgs = [
-  "-c",
-  oxlintConfig,
-  "--format=unix",
-  "--fix",
-  "--type-aware",
-  "--type-check",
-  "--ignore-pattern",
-  "node_modules",
-];
+const oxlintArgs = ["-c", oxlintConfig, "--format=unix", "--fix", "--type-aware", "--type-check"];
 for (const pattern of systemIgnorePatterns) {
   oxlintArgs.push("--ignore-pattern", pattern);
 }
