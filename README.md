@@ -12,11 +12,14 @@ pnpm install -g @fal-works/lint-js-global
 
 ## Usage
 
-Run from a project root (requires `package.json`):
+Run from a project root:
 
 ```sh
 lint-js [--check] [path...]
 ```
+
+The current directory must contain `package.json`  
+(only as a guard against accidental runs; contents are not read).
 
 ### Options
 

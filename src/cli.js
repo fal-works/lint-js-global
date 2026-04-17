@@ -188,8 +188,9 @@ function buildPathInjectedEnv(binDir) {
  */
 function main() {
   if (!existsSync("package.json")) {
-    console.error("lint-js: no package.json found in current directory.");
+    console.error("lint-js: no package.json in current directory.");
     console.error("Run lint-js from the root of a JS/TS project.");
+    console.error("(Required as a guard against accidental runs)");
     return 1;
   }
 

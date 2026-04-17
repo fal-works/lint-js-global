@@ -166,7 +166,7 @@ void test("missing package.json: exits 1 with diagnostic", (t) => {
   if (result.stderr !== "") {
     assert.match(
       result.stderr,
-      /no package\.json found/,
+      /no package\.json/,
       "expected diagnostic about missing package.json",
     );
   }
