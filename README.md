@@ -1,6 +1,7 @@
 # @fal-works/lint-js-global
 
 Runs Oxfmt and Oxlint (+ auto-fix).
+
 Intended as a globally-installed alternative to adding linter devDependencies to every small project.
 
 ## Usage
@@ -17,11 +18,15 @@ Then run from a project root (requires `package.json`):
 lint-js
 ```
 
-`node_modules` is skipped automatically, even if the project does not define `.gitignore` / `.eslintignore`.
+`node_modules` is always skipped.  
+Standard ignore files (`.gitignore`, `.eslintignore`, `.prettierignore`) are respected if present.
 
 ## Notes
 
-Type-aware linting is always on. Strict rules including `no-floating-promises` and `no-unsafe-*` are enforced.
+Type-aware linting is always on.  
+Strict rules including `no-floating-promises` and `no-unsafe-*` are enforced.  
 See [docs/type-aware-linting.md](docs/type-aware-linting.md) for rule list and escape hatches.
 
-Not yet implemented: `--check` flag, per-project config override, subcommands.
+Rule config is currently fixed and not per-project configurable.
+
+Not yet implemented: `--check` flag, subcommands.
