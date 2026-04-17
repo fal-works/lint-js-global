@@ -20,6 +20,16 @@ function packagePath(...segments) {
 }
 
 /**
+ * Type predicate narrowing an arbitrary value to a string-keyed record.
+ *
+ * @param {unknown} value
+ * @returns {value is Record<string, unknown>}
+ */
+function isRecord(value) {
+  return value !== null && typeof value === "object";
+}
+
+/**
  * Resolve the bin script path for a dependency package.
  *
  * Running the script with `process.execPath` avoids relying on platform-specific
@@ -31,15 +41,15 @@ function packagePath(...segments) {
  */
 function resolvePackageBin(packageName, binName) {
   const packageJsonPath = require.resolve(`${packageName}/package.json`);
-  const packageJsonText = readFileSync(packageJsonPath, "utf8");
-  // oxlint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
-  const packageJson = /** @type {{ bin?: Record<string, string> }} */ (JSON.parse(packageJsonText));
-  const binPath = packageJson.bin?.[binName];
-
+  /** @type {unknown} */
+  const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+  if (!isRecord(pkg) || !isRecord(pkg.bin)) {
+    throw new Error(`Missing or malformed "bin" in ${packageName}/package.json.`);
+  }
+  const binPath = pkg.bin[binName];
   if (typeof binPath !== "string") {
     throw new Error(`Missing "${binName}" bin in ${packageName}/package.json.`);
   }
-
   return join(dirname(packageJsonPath), binPath);
 }
 
