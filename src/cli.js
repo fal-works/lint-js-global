@@ -31,7 +31,9 @@ function packagePath(...segments) {
  */
 function resolvePackageBin(packageName, binName) {
   const packageJsonPath = require.resolve(`${packageName}/package.json`);
-  const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+  const packageJsonText = readFileSync(packageJsonPath, "utf8");
+  // oxlint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const packageJson = /** @type {{ bin?: Record<string, string> }} */ (JSON.parse(packageJsonText));
   const binPath = packageJson.bin?.[binName];
 
   if (typeof binPath !== "string") {
