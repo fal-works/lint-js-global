@@ -2,7 +2,7 @@
 // @ts-check
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,9 +54,40 @@ const oxlintBin = resolvePackageBin("oxlint", "oxlint");
 const oxfmtConfig = packagePath("cfg", "oxfmtrc.json");
 const oxlintConfig = packagePath("cfg", "oxlintrc.json");
 
+/**
+ * Returns ignore patterns that apply regardless of project configuration.
+ *
+ * Currently handles Claude Code's sandbox, which bind-mounts user config files
+ * (`.mcp.json`, `.claude/`) to `/dev/null` at the project root to block accidental writes.
+ * Without these ignores, oxfmt / oxlint fail with `Failed to read` / `EROFS` on those paths.
+ *
+ * Detection uses `$HOME` dotfiles shadowed as character devices at the project root:
+ * they are always shadowed inside the sandbox and never legitimate files in a JS/TS project root.
+ *
+ * @returns {string[]} Root-anchored patterns so same-name files in sub-trees are not affected.
+ */
+function getSystemIgnorePatterns() {
+  const claudeSandboxSentinels = [".bashrc", ".gitconfig"];
+  const inClaudeSandbox = claudeSandboxSentinels.some((path) => {
+    try {
+      return statSync(path).isCharacterDevice();
+    } catch {
+      return false;
+    }
+  });
+
+  if (inClaudeSandbox) return ["/.mcp.json", "/.claude"];
+
+  return [];
+}
+
+const systemIgnorePatterns = getSystemIgnorePatterns();
+
 // Step 1: format
 console.log("lint-js: formatting...");
-const fmtResult = spawnSync(process.execPath, [oxfmtBin, "-c", oxfmtConfig, "."], {
+const oxfmtArgs = [oxfmtBin, "-c", oxfmtConfig, "."];
+for (const pattern of systemIgnorePatterns) oxfmtArgs.push(`!${pattern}`);
+const fmtResult = spawnSync(process.execPath, oxfmtArgs, {
   stdio: "inherit",
 });
 if (fmtResult.error) {
@@ -71,28 +102,28 @@ if (fmtResult.error) {
 console.log("lint-js: linting (with auto-fix)...");
 const binDir = packagePath("node_modules", ".bin");
 const pathKey = process.platform === "win32" ? "Path" : "PATH";
-const lintResult = spawnSync(
-  process.execPath,
-  [
-    oxlintBin,
-    "-c",
-    oxlintConfig,
-    "--format=unix",
-    "--fix",
-    "--type-aware",
-    "--type-check",
-    "--ignore-pattern",
-    "node_modules",
-    ".",
-  ],
-  {
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      [pathKey]: `${binDir}${process.platform === "win32" ? ";" : ":"}${process.env[pathKey] ?? ""}`,
-    },
+const oxlintArgs = [
+  oxlintBin,
+  "-c",
+  oxlintConfig,
+  "--format=unix",
+  "--fix",
+  "--type-aware",
+  "--type-check",
+  "--ignore-pattern",
+  "node_modules",
+];
+for (const pattern of systemIgnorePatterns) {
+  oxlintArgs.push("--ignore-pattern", pattern);
+}
+oxlintArgs.push(".");
+const lintResult = spawnSync(process.execPath, oxlintArgs, {
+  stdio: "inherit",
+  env: {
+    ...process.env,
+    [pathKey]: `${binDir}${process.platform === "win32" ? ";" : ":"}${process.env[pathKey] ?? ""}`,
   },
-);
+});
 if (lintResult.error) {
   console.error("lint-js: failed to launch oxlint:", lintResult.error.message);
   process.exit(1);
