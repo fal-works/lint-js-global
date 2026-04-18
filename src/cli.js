@@ -9,6 +9,11 @@ import { parseArgs } from "node:util";
 
 const LOG_PREFIX = "lint-js:";
 
+/** Error raised by lint-js itself (not a wrapped child-process or tool error). */
+class LintJsError extends Error {
+  name = "LintJsError";
+}
+
 /**
  * Plain stdout line. Used for help, version, phase banners, blank separators.
  *
@@ -73,11 +78,11 @@ function resolvePackageBin(packageName, binName) {
   /** @type {unknown} */
   const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8"));
   if (!isRecord(pkg) || !isRecord(pkg.bin)) {
-    throw new Error(`Missing or malformed "bin" in ${packageName}/package.json.`);
+    throw new LintJsError(`Missing or malformed "bin" in ${packageName}/package.json.`);
   }
   const binPath = pkg.bin[binName];
   if (typeof binPath !== "string") {
-    throw new Error(`Missing "${binName}" bin in ${packageName}/package.json.`);
+    throw new LintJsError(`Missing "${binName}" bin in ${packageName}/package.json.`);
   }
   return join(dirname(packageJsonPath), binPath);
 }
@@ -91,7 +96,7 @@ function getPackageVersion() {
   /** @type {unknown} */
   const pkg = JSON.parse(readFileSync(packagePath("package.json"), "utf8"));
   if (!isRecord(pkg) || typeof pkg.version !== "string") {
-    throw new Error('Missing or malformed "version" in package.json.');
+    throw new LintJsError('Missing or malformed "version" in package.json.');
   }
   return pkg.version;
 }
@@ -141,7 +146,7 @@ function runTool({ name, bin, args, env }) {
     env,
   });
   if (result.error) {
-    throw new Error(`lint-js: failed to launch ${name}: ${result.error.message}`, {
+    throw new LintJsError(`failed to launch ${name}: ${result.error.message}`, {
       cause: result.error,
     });
   }
