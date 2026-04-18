@@ -1,0 +1,5 @@
+{
+  "name": "unsafe-any-fixture",
+  "private": true,
+  "type": "module"
+}

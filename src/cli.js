@@ -2,7 +2,16 @@
 // @ts-check
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  statSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -154,6 +163,59 @@ function runTool({ name, bin, args, env }) {
 }
 
 /**
+ * Like {@link runTool} but also captures stdout and stderr for post-run inspection.
+ *
+ * File-backed stdio (not pipes): workaround for https://github.com/openai/codex/issues/18473,
+ * where captured pipe-backed output from a nested Node child can be dropped in the Codex sandbox.
+ * Side effect: the child's output is batched until exit instead of streaming;
+ * both streams are captured symmetrically so the caller can flush them in a deterministic order.
+ *
+ * @param {object} options
+ * @param {string} options.name
+ * @param {string} options.bin
+ * @param {string[]} options.args
+ * @param {NodeJS.ProcessEnv} [options.env]
+ * @returns {{
+ *   result: ReturnType<typeof spawnSync>;
+ *   capturedStdout: string;
+ *   capturedStderr: string;
+ * }}
+ */
+function runToolCapturingOutput({ name, bin, args, env }) {
+  const dir = mkdtempSync(join(tmpdir(), "lint-js-"));
+  const stdoutPath = join(dir, "stdout");
+  const stderrPath = join(dir, "stderr");
+  let stdoutFd = -1;
+  let stderrFd = -1;
+  try {
+    stdoutFd = openSync(stdoutPath, "w");
+    stderrFd = openSync(stderrPath, "w");
+    const result = spawnSync(process.execPath, [bin, ...args], {
+      stdio: ["inherit", stdoutFd, stderrFd],
+      env,
+    });
+    closeSync(stdoutFd);
+    stdoutFd = -1;
+    closeSync(stderrFd);
+    stderrFd = -1;
+    if (result.error) {
+      throw new LintJsError(`failed to launch ${name}: ${result.error.message}`, {
+        cause: result.error,
+      });
+    }
+    return {
+      result,
+      capturedStdout: readFileSync(stdoutPath, "utf8"),
+      capturedStderr: readFileSync(stderrPath, "utf8"),
+    };
+  } finally {
+    if (stdoutFd !== -1) closeSync(stdoutFd);
+    if (stderrFd !== -1) closeSync(stderrFd);
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
  * Build CLI args for oxfmt.
  *
  * @param {string} config Path to the oxfmt config file.
@@ -225,6 +287,27 @@ function buildPathInjectedEnv(binDir) {
   }
   env[pathKey] = `${binDir}${pathSep}${process.env[pathKey] ?? ""}`;
   return env;
+}
+
+/**
+ * Match an oxlint `--format=unix` diagnostic from any rule in the `no-unsafe-*` family.
+ * Loose `[\w-]+` so future additions to the family are picked up automatically.
+ */
+const UNSAFE_ANY_DIAGNOSTIC_PATTERN = /typescript-eslint\(no-unsafe-[\w-]+\)/;
+
+/**
+ * Print a pointer to `docs/weak-typings.md`.
+ * Call after the lint phase on a `no-unsafe-*` hit.
+ */
+function printWeakTypingsHint() {
+  print("Hint on the `no-unsafe-*` diagnostics:");
+  print(
+    "- Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary module with typed wrappers.",
+  );
+  print(
+    "- Inline disable (`// oxlint-disable-next-line`) is not a fix; use only when explicitly permitted by the project maintainer.",
+  );
+  print(`- See: ${packagePath("docs", "weak-typings.md")}`);
 }
 
 /**
@@ -334,13 +417,25 @@ function main() {
 
   const lintLabel = check ? "linting (no auto-fix)" : "linting (with auto-fix)";
   print(`${lintLabel}...`);
-  const lintResult = runTool({
+  const {
+    result: lintResult,
+    capturedStdout: lintStdout,
+    capturedStderr: lintStderr,
+  } = runToolCapturingOutput({
     name: "oxlint",
     bin: oxlintBin,
     args: buildOxlintArgs(oxlintConfig, ignorePatterns, targets, check),
     env: buildPathInjectedEnv(packagePath("node_modules", ".bin")),
   });
+  // Replay stderr first, then stdout. Both are batched (Codex-sandbox workaround)
+  // so emission timing is lost; this fixed order keeps the relayed sequence deterministic.
+  process.stderr.write(lintStderr);
+  process.stdout.write(lintStdout);
   if (lintResult.status === 0) print(`${lintLabel}: clean.`);
+  if (UNSAFE_ANY_DIAGNOSTIC_PATTERN.test(lintStdout)) {
+    print("");
+    printWeakTypingsHint();
+  }
 
   print("");
   printTagged(buildSummary({ check, fmtStatus: fmtResult.status, lintStatus: lintResult.status }));
