@@ -1,0 +1,9 @@
+{
+  "fileSuggestion": {
+    "type": "command",
+    "command": ".claude/file-suggestion.sh"
+  },
+  "permissions": {
+    "allow": ["WebFetch(domain:oxc.rs)"]
+  }
+}
