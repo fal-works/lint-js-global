@@ -182,20 +182,29 @@ function buildOxlintArgs(config, ignorePatterns, targets, check) {
 /**
  * Returns a copy of `process.env` with `binDir` prepended to `PATH`.
  *
- * oxlint spawns the `tsgolint` binary via PATH lookup. For globally-installed
- * lint-js, inject our own node_modules/.bin at the head of PATH so the bundled
- * oxlint-tsgolint shim is found regardless of the user project's layout.
+ * oxlint spawns the `tsgolint` binary via PATH lookup.
+ * For globally-installed lint-js, inject our own `node_modules/.bin` at the head of PATH
+ * so the bundled oxlint-tsgolint shim is found regardless of the user project's layout.
  *
  * @param {string} binDir Directory to prepend to PATH.
  * @returns {NodeJS.ProcessEnv}
  */
 function buildPathInjectedEnv(binDir) {
-  const pathKey = process.platform === "win32" ? "Path" : "PATH";
-  const pathSep = process.platform === "win32" ? ";" : ":";
-  return {
-    ...process.env,
-    [pathKey]: `${binDir}${pathSep}${process.env[pathKey] ?? ""}`,
-  };
+  const isWindows = process.platform === "win32";
+  const pathKey = isWindows ? "Path" : "PATH";
+  const pathSep = isWindows ? ";" : ":";
+  const env = { ...process.env };
+
+  // On Windows, env keys are case-insensitive but spreading preserves the parent's spelling.
+  // Remove other variants so Node doesn't pick an earlier entry ("PATH" < "Path" lexicographically)
+  // and drop the prepended bin dir.
+  if (isWindows) {
+    for (const key of Object.keys(env)) {
+      if (key !== pathKey && key.toUpperCase() === "PATH") delete env[key];
+    }
+  }
+  env[pathKey] = `${binDir}${pathSep}${process.env[pathKey] ?? ""}`;
+  return env;
 }
 
 /**
