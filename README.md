@@ -33,10 +33,15 @@ Each path must be an existing file or directory.
 `node_modules` is always skipped.  
 Standard ignore files (`.gitignore`, `.eslintignore`, `.prettierignore`) are respected if present.
 
-## Notes
+## Type-aware linting
 
 Type-aware linting is always on.  
+`lint-js` runs `oxlint --type-aware --type-check` with `oxlint-tsgolint` bundled.  
+`tsconfig.json` is auto-detected per file; sub-directory tsconfigs are respected.
+
 Strict rules including `no-floating-promises` and `no-unsafe-*` are enforced.  
-See [docs/type-aware-linting.md](docs/type-aware-linting.md) for escape hatches.
+See [docs/weak-typings.md](docs/weak-typings.md) for escape hatches.
+
+## Notes
 
 Rule config is currently fixed and not per-project configurable.
