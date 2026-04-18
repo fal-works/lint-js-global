@@ -70,6 +70,7 @@ function runCli(cwd, args = []) {
  *
  * @param {string} stdout
  * @param {{
+ *   fmtMode: "default" | "check-only";
  *   fmtStart: boolean;
  *   fmtCompletion: boolean;
  *   lintMode: "with auto-fix" | "no auto-fix";
@@ -80,10 +81,11 @@ function runCli(cwd, args = []) {
  */
 function assertProgressLines(stdout, expected) {
   const lines = stdout.split("\n");
+  const fmtLabel = expected.fmtMode === "check-only" ? "formatting (check-only)" : "formatting";
   /** @type {[string, string, boolean][]} name, line text, expected-present */
   const specs = [
-    ["fmt start", "formatting...", expected.fmtStart],
-    ["fmt completion", "formatting: clean.", expected.fmtCompletion],
+    ["fmt start", `${fmtLabel}...`, expected.fmtStart],
+    ["fmt completion", `${fmtLabel}: clean.`, expected.fmtCompletion],
     ["lint start", `linting (${expected.lintMode})...`, expected.lintStart],
     ["lint completion", `linting (${expected.lintMode}): clean.`, expected.lintCompletion],
     ["summary", expected.summary, true],
@@ -160,6 +162,7 @@ void test("basic: reformats sources and reports floating promise", (t) => {
   );
   // Scenario: default mode + not clean (unfixable lint remains).
   assertProgressLines(result.stdout, {
+    fmtMode: "default",
     fmtStart: true,
     fmtCompletion: false,
     lintMode: "with auto-fix",
@@ -276,6 +279,7 @@ void test("fully-ignored single-file target exits cleanly", (t) => {
   // oxfmt emits no stdout in this case ("No files found ..." goes to stderr),
   // so the "formatting..." label is what marks the fmt phase on stdout.
   assertProgressLines(result.stdout, {
+    fmtMode: "default",
     fmtStart: true,
     fmtCompletion: false,
     lintMode: "with auto-fix",
@@ -299,6 +303,7 @@ void test("--check + fully-ignored target: fmt phase label still fires", (t) => 
   // Without an unconditional fmt phase label, --check zero-match would leave no fmt-phase marker
   // on stdout at all (oxfmt's "No files found ..." goes to stderr). Verify the label fires.
   assertProgressLines(result.stdout, {
+    fmtMode: "check-only",
     fmtStart: true,
     fmtCompletion: false,
     lintMode: "no auto-fix",
@@ -335,6 +340,7 @@ void test("--check: does not modify files and reports both fmt and lint violatio
   assert.match(result.stdout, /no-floating-promises/, "lint violation should still be reported");
   // Scenario: --check + not clean.
   assertProgressLines(result.stdout, {
+    fmtMode: "check-only",
     fmtStart: true,
     fmtCompletion: false,
     lintMode: "no auto-fix",
@@ -353,6 +359,7 @@ void test("--check: clean project exits 0", (t) => {
   assert.equal(result.status, 0, "expected exit 0 on clean project under --check");
   // Scenario: --check + clean.
   assertProgressLines(result.stdout, {
+    fmtMode: "check-only",
     fmtStart: true,
     fmtCompletion: false,
     lintMode: "no auto-fix",
@@ -382,6 +389,7 @@ void test("node_modules is ignored", (t) => {
   );
   // Scenario: default mode + clean.
   assertProgressLines(result.stdout, {
+    fmtMode: "default",
     fmtStart: true,
     fmtCompletion: false,
     lintMode: "with auto-fix",

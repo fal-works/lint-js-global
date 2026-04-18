@@ -280,9 +280,11 @@ function main() {
   // Phase banners deliberately omit the `lint-js:` prefix used elsewhere for CLI diagnostics.
   // They sit inline with oxfmt/oxlint's own output; prefixing would break visual cohesion.
 
-  // Fmt start banner is unconditional: oxfmt's own opener is absent for zero-match runs,
+  // Fmt start banner is unconditional although oxfmt itself prints "Checking formatting..." in check mode.
+  // oxfmt's own opener is absent for zero-match runs,
   // so without this line stdout would show no trace of the fmt phase at all.
-  console.log("formatting...");
+  const fmtLabel = check ? "formatting (check-only)" : "formatting";
+  console.log(`${fmtLabel}...`);
   const fmtResult = runTool({
     name: "oxfmt",
     bin: oxfmtBin,
