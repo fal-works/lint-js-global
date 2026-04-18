@@ -98,24 +98,13 @@ function getSystemIgnorePatterns() {
  * Throws on launch failure so Node surfaces the stack trace.
  *
  * @param {object} options
- * @param {string} [options.progressLabel] Gerund (e.g. `"formatting"`);
- *   when given, logs `"<label>..."` at start and, after a zero-exit run
- *   (subject to `logCompletion`), `"<label>: clean."`.
- * @param {boolean} [options.logCompletion=true] Pass `false` to suppress the
- *   completion line — use when the tool already prints its own summary. Default is `true`
  * @param {string} options.name Tool name for launch-failure diagnostics.
  * @param {string} options.bin Absolute path to the tool's JS entry point.
  * @param {string[]} options.args Arguments passed to the tool, excluding `bin`.
  * @param {NodeJS.ProcessEnv} [options.env] Env for the child. Defaults to inherited.
  * @returns {ReturnType<typeof spawnSync>}
  */
-function runTool({ progressLabel, logCompletion = true, name, bin, args, env }) {
-  const hasLabel = (progressLabel?.length ?? 0) > 0;
-
-  // Phase labels and completion banners deliberately omit the `lint-js:` prefix used elsewhere.
-  // They sit inline with oxfmt/oxlint's own output and appear conditionally;
-  // prefixing would break visual cohesion with the surrounding tool output.
-  if (hasLabel) console.log(`${progressLabel}...`);
+function runTool({ name, bin, args, env }) {
   const result = spawnSync(process.execPath, [bin, ...args], {
     stdio: "inherit",
     env,
@@ -125,11 +114,6 @@ function runTool({ progressLabel, logCompletion = true, name, bin, args, env }) 
       cause: result.error,
     });
   }
-
-  if (hasLabel && logCompletion && result.status === 0) {
-    console.log(`${progressLabel}: clean.`);
-  }
-
   return result;
 }
 
@@ -293,26 +277,30 @@ function main() {
     }
   }
 
+  // Phase banners deliberately omit the `lint-js:` prefix used elsewhere for CLI diagnostics.
+  // They sit inline with oxfmt/oxlint's own output; prefixing would break visual cohesion.
+
+  // Fmt start banner is unconditional: oxfmt's own opener is absent for zero-match runs,
+  // so without this line stdout would show no trace of the fmt phase at all.
+  console.log("formatting...");
   const fmtResult = runTool({
-    // Always emit the phase label — oxfmt's own opener is absent for zero-match runs,
-    // so without this line stdout would show no trace of the fmt phase at all.
-    progressLabel: "formatting",
-    // oxfmt prints its own summary; our completion line would only duplicate.
-    logCompletion: false,
     name: "oxfmt",
     bin: oxfmtBin,
     args: buildOxfmtArgs(oxfmtConfig, ignorePatterns, targets, check),
   });
+  // No fmt completion banner: oxfmt prints its own summary and ours would duplicate.
 
   console.log();
 
+  const lintLabel = check ? "linting (no auto-fix)" : "linting (with auto-fix)";
+  console.log(`${lintLabel}...`);
   const lintResult = runTool({
-    progressLabel: check ? "linting (no auto-fix)" : "linting (with auto-fix)",
     name: "oxlint",
     bin: oxlintBin,
     args: buildOxlintArgs(oxlintConfig, ignorePatterns, targets, check),
     env: buildPathInjectedEnv(packagePath("node_modules", ".bin")),
   });
+  if (lintResult.status === 0) console.log(`${lintLabel}: clean.`);
 
   console.log();
   console.log(buildSummary({ check, fmtStatus: fmtResult.status, lintStatus: lintResult.status }));

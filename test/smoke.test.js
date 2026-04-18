@@ -12,6 +12,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const cliPath = join(here, "..", "src", "cli.js");
 const fixtureRoot = join(here, "fixtures");
 
+/** Fixture source with both fmt (double spaces) and lint (no-debugger) violations. */
+const DIRTY_SOURCE = "const x  =  1;debugger\n";
+
 /**
  * @param {string} label
  * @returns {string}
@@ -28,6 +31,17 @@ function copyFixture(fixtureName) {
   const dest = makeTempDir(fixtureName);
   cpSync(join(fixtureRoot, fixtureName), dest, { recursive: true });
   return dest;
+}
+
+/**
+ * Write a matching pattern into both `.prettierignore` and `.eslintignore` at `dir`.
+ *
+ * @param {string} dir
+ * @param {string} pattern
+ */
+function writeIgnoreFiles(dir, pattern) {
+  writeFileSync(join(dir, ".prettierignore"), `${pattern}\n`);
+  writeFileSync(join(dir, ".eslintignore"), `${pattern}\n`);
 }
 
 /**
@@ -81,10 +95,8 @@ function assertProgressLines(stdout, expected) {
   const sawAnyProgressLine = specs.some(([_, line]) => lines.includes(line));
   if (!sawAnyProgressLine) return;
 
-  /** @type {number[]} positions of present lines, in the order declared above */
-  const presentPositions = [];
-  /** @type {string[]} names of present lines, aligned with presentPositions */
-  const presentNames = [];
+  /** @type {{ name: string; idx: number }[]} present lines, in the order declared above */
+  const present = [];
 
   for (const [name, line, expectPresent] of specs) {
     const positions = lines.flatMap((l, i) => (l === line ? [i] : []));
@@ -108,8 +120,7 @@ function assertProgressLines(stdout, expected) {
           `${name}: expected non-blank line immediately above ${JSON.stringify(line)} (line ${idx}) — completion banner should follow tool output directly`,
         );
       }
-      presentPositions.push(idx);
-      presentNames.push(name);
+      present.push({ name, idx });
     } else {
       assert.equal(
         positions.length,
@@ -119,10 +130,12 @@ function assertProgressLines(stdout, expected) {
     }
   }
 
-  for (let i = 1; i < presentPositions.length; i++) {
+  for (let i = 1; i < present.length; i++) {
+    const prev = present[i - 1];
+    const curr = present[i];
     assert.ok(
-      presentPositions[i - 1] < presentPositions[i],
-      `order: ${presentNames[i - 1]} (line ${presentPositions[i - 1]}) must precede ${presentNames[i]} (line ${presentPositions[i]})`,
+      prev.idx < curr.idx,
+      `order: ${prev.name} (line ${prev.idx}) must precede ${curr.name} (line ${curr.idx})`,
     );
   }
 }
@@ -228,21 +241,18 @@ void test("positional path narrows scope but still honors ignore files", (t) => 
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
-  const dirty = "const x  =  1;debugger\n";
-
   const outside = join(dir, "outside.ts");
-  writeFileSync(outside, dirty);
+  writeFileSync(outside, DIRTY_SOURCE);
 
   const ignored = join(dir, "src", "ignored.ts");
-  writeFileSync(ignored, dirty);
-  writeFileSync(join(dir, ".prettierignore"), "ignored.ts\n");
-  writeFileSync(join(dir, ".eslintignore"), "ignored.ts\n");
+  writeFileSync(ignored, DIRTY_SOURCE);
+  writeIgnoreFiles(dir, "ignored.ts");
 
   const result = runCli(dir, ["src"]);
 
   assert.equal(result.status, 1, "expected exit 1 from unfixed lint error in src/index.ts");
-  assert.equal(readFileSync(outside, "utf8"), dirty, "outside target must not be touched");
-  assert.equal(readFileSync(ignored, "utf8"), dirty, "ignored file must not be touched");
+  assert.equal(readFileSync(outside, "utf8"), DIRTY_SOURCE, "outside target must not be touched");
+  assert.equal(readFileSync(ignored, "utf8"), DIRTY_SOURCE, "ignored file must not be touched");
   assert.doesNotMatch(
     result.stdout,
     /no-debugger/,
@@ -254,16 +264,14 @@ void test("fully-ignored single-file target exits cleanly", (t) => {
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
-  const dirty = "const x  =  1;debugger\n";
   const ignored = join(dir, "src", "ignored.ts");
-  writeFileSync(ignored, dirty);
-  writeFileSync(join(dir, ".prettierignore"), "ignored.ts\n");
-  writeFileSync(join(dir, ".eslintignore"), "ignored.ts\n");
+  writeFileSync(ignored, DIRTY_SOURCE);
+  writeIgnoreFiles(dir, "ignored.ts");
 
   const result = runCli(dir, ["src/ignored.ts"]);
 
   assert.equal(result.status, 0, "expected exit 0 when the only target is ignored");
-  assert.equal(readFileSync(ignored, "utf8"), dirty, "ignored file must not be touched");
+  assert.equal(readFileSync(ignored, "utf8"), DIRTY_SOURCE, "ignored file must not be touched");
   // Scenario: default + fully-ignored target.
   // oxfmt emits no stdout in this case ("No files found ..." goes to stderr),
   // so the "formatting..." label is what marks the fmt phase on stdout.
@@ -282,9 +290,8 @@ void test("--check + fully-ignored target: fmt phase label still fires", (t) => 
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
   const ignored = join(dir, "src", "ignored.ts");
-  writeFileSync(ignored, "const x  =  1;debugger\n");
-  writeFileSync(join(dir, ".prettierignore"), "ignored.ts\n");
-  writeFileSync(join(dir, ".eslintignore"), "ignored.ts\n");
+  writeFileSync(ignored, DIRTY_SOURCE);
+  writeIgnoreFiles(dir, "ignored.ts");
 
   const result = runCli(dir, ["--check", "src/ignored.ts"]);
 
