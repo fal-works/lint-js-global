@@ -7,6 +7,37 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
+const LOG_PREFIX = "lint-js:";
+
+/**
+ * Plain stdout line. Used for help, version, phase banners, blank separators.
+ *
+ * @param {string} msg
+ */
+function print(msg) {
+  console.log(msg);
+}
+
+/**
+ * Tagged stdout line. Used for the end-of-run outcome.
+ *
+ * @param {string} msg
+ */
+function printTagged(msg) {
+  console.log(`${LOG_PREFIX} ${msg}`);
+}
+
+/**
+ * Tagged stderr headline followed by plain-text detail lines.
+ *
+ * @param {string} headline
+ * @param {...string} details
+ */
+function errorTagged(headline, ...details) {
+  console.error(`${LOG_PREFIX} ${headline}`);
+  for (const line of details) console.error(`  ${line}`);
+}
+
 /**
  * Resolve a path relative to this package's root (not the cwd).
  *
@@ -208,12 +239,12 @@ function buildSummary({ check, fmtStatus, lintStatus }) {
   const ok = fmtStatus === 0 && lintStatus === 0;
   if (check) {
     return ok
-      ? "lint-js: Completed successfully. No issues found."
-      : "lint-js: Failed. Issues found; fixes required.";
+      ? "Completed successfully. No issues found."
+      : "Failed. Issues found; fixes required.";
   }
   return ok
-    ? "lint-js: Completed successfully. Issues fixed where possible."
-    : "lint-js: Failed. Issues fixed where possible; unfixable issues remain.";
+    ? "Completed successfully. Issues fixed where possible."
+    : "Failed. Issues fixed where possible; unfixable issues remain.";
 }
 
 const HELP_TEXT = `Usage: lint-js [--check] [path...]
@@ -247,18 +278,20 @@ function main() {
   });
 
   if (values.help === true) {
-    console.log(HELP_TEXT);
+    print(HELP_TEXT);
     return 0;
   }
   if (values.version === true) {
-    console.log(`lint-js ${getPackageVersion()}`);
+    print(`lint-js ${getPackageVersion()}`);
     return 0;
   }
 
   if (!existsSync("package.json")) {
-    console.error("lint-js: no package.json in current directory.");
-    console.error("Run lint-js from the root of a JS/TS project.");
-    console.error("(Required as a guard against accidental runs)");
+    errorTagged(
+      "no package.json in current directory.",
+      "Run lint-js from the root of a JS/TS project.",
+      "(Required as a guard against accidental runs)",
+    );
     return 1;
   }
 
@@ -272,7 +305,7 @@ function main() {
 
   for (const target of targets) {
     if (!existsSync(target)) {
-      console.error(`lint-js: target not found: ${target}`);
+      errorTagged(`target not found: ${target}`);
       return 1;
     }
   }
@@ -284,7 +317,7 @@ function main() {
   // oxfmt's own opener is absent for zero-match runs,
   // so without this line stdout would show no trace of the fmt phase at all.
   const fmtLabel = check ? "formatting (check-only)" : "formatting";
-  console.log(`${fmtLabel}...`);
+  print(`${fmtLabel}...`);
   const fmtResult = runTool({
     name: "oxfmt",
     bin: oxfmtBin,
@@ -292,20 +325,20 @@ function main() {
   });
   // No fmt completion banner: oxfmt prints its own summary and ours would duplicate.
 
-  console.log();
+  print("");
 
   const lintLabel = check ? "linting (no auto-fix)" : "linting (with auto-fix)";
-  console.log(`${lintLabel}...`);
+  print(`${lintLabel}...`);
   const lintResult = runTool({
     name: "oxlint",
     bin: oxlintBin,
     args: buildOxlintArgs(oxlintConfig, ignorePatterns, targets, check),
     env: buildPathInjectedEnv(packagePath("node_modules", ".bin")),
   });
-  if (lintResult.status === 0) console.log(`${lintLabel}: clean.`);
+  if (lintResult.status === 0) print(`${lintLabel}: clean.`);
 
-  console.log();
-  console.log(buildSummary({ check, fmtStatus: fmtResult.status, lintStatus: lintResult.status }));
+  print("");
+  printTagged(buildSummary({ check, fmtStatus: fmtResult.status, lintStatus: lintResult.status }));
 
   return Math.max(fmtResult.status ?? 1, lintResult.status ?? 1);
 }
