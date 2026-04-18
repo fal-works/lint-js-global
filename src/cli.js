@@ -100,7 +100,7 @@ function getSystemIgnorePatterns() {
  * @param {object} options
  * @param {string} [options.progressLabel] Gerund (e.g. `"formatting"`);
  *   when given, logs `"<label>..."` at start and, after a zero-exit run
- *   (subject to `logCompletion`), a blank line followed by `"<label>: clean."`.
+ *   (subject to `logCompletion`), `"<label>: clean."`.
  * @param {boolean} [options.logCompletion=true] Pass `false` to suppress the
  *   completion line — use when the tool already prints its own summary. Default is `true`
  * @param {string} options.name Tool name for launch-failure diagnostics.
@@ -112,6 +112,9 @@ function getSystemIgnorePatterns() {
 function runTool({ progressLabel, logCompletion = true, name, bin, args, env }) {
   const hasLabel = (progressLabel?.length ?? 0) > 0;
 
+  // Phase labels and completion banners deliberately omit the `lint-js:` prefix used elsewhere.
+  // They sit inline with oxfmt/oxlint's own output and appear conditionally;
+  // prefixing would break visual cohesion with the surrounding tool output.
   if (hasLabel) console.log(`${progressLabel}...`);
   const result = spawnSync(process.execPath, [bin, ...args], {
     stdio: "inherit",
@@ -124,7 +127,7 @@ function runTool({ progressLabel, logCompletion = true, name, bin, args, env }) 
   }
 
   if (hasLabel && logCompletion && result.status === 0) {
-    console.log(`\n${progressLabel}: clean.`);
+    console.log(`${progressLabel}: clean.`);
   }
 
   return result;
@@ -193,6 +196,31 @@ function buildPathInjectedEnv(binDir) {
     ...process.env,
     [pathKey]: `${binDir}${pathSep}${process.env[pathKey] ?? ""}`,
   };
+}
+
+/**
+ * Pick the one-line summary emitted after both phases finish.
+ *
+ * Binary verdict (success/failure) — which phase failed is readable from the
+ * tool output above, so the summary only needs to convey overall outcome and
+ * whether fixes may have been applied.
+ *
+ * @param {object} options
+ * @param {boolean} options.check
+ * @param {number | null} options.fmtStatus
+ * @param {number | null} options.lintStatus
+ * @returns {string}
+ */
+function buildSummary({ check, fmtStatus, lintStatus }) {
+  const ok = fmtStatus === 0 && lintStatus === 0;
+  if (check) {
+    return ok
+      ? "lint-js: Completed successfully. No issues found."
+      : "lint-js: Failed. Issues found; fixes required.";
+  }
+  return ok
+    ? "lint-js: Completed successfully. Issues fixed where possible."
+    : "lint-js: Failed. Issues fixed where possible; unfixable issues remain.";
 }
 
 const HELP_TEXT = `Usage: lint-js [--check] [path...]
@@ -276,6 +304,9 @@ function main() {
     args: buildOxlintArgs(oxlintConfig, ignorePatterns, targets, check),
     env: buildPathInjectedEnv(packagePath("node_modules", ".bin")),
   });
+
+  console.log();
+  console.log(buildSummary({ check, fmtStatus: fmtResult.status, lintStatus: lintResult.status }));
 
   return Math.max(fmtResult.status ?? 1, lintResult.status ?? 1);
 }

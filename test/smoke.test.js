@@ -53,9 +53,11 @@ function runCli(cwd, args = []) {
  *
  * - **count**: each expected line must appear exactly once (catches dupes)
  * - **order**: present lines must appear in fmt-start → fmt-completion → lint-start → lint-completion
- *   order
- * - **blank anchor**: each completion line must be directly preceded by a blank line (pins the `\n`
- *   separator runTool emits between tool output and the completion banner)
+ *   → summary order
+ * - **no leading blank on completion**: a completion line is emitted directly after tool output with
+ *   no intervening blank (exit 0 for oxlint is silent under our config, so there's nothing to
+ *   separate from — see dev/records/003)
+ * - **summary anchor**: the summary line appears exactly once, with a blank line immediately above
  *
  * Internal tool output (oxfmt / oxlint stdout between our banners) is not
  * checked — only lint-js's own lines are.
@@ -67,16 +69,18 @@ function runCli(cwd, args = []) {
  *   lintMode: "with auto-fix" | "no auto-fix";
  *   lintStart: boolean;
  *   lintCompletion: boolean;
+ *   summary: string;
  * }} expected
  */
 function assertProgressLines(stdout, expected) {
   const lines = stdout.split("\n");
-  /** @type {[string, string, boolean, boolean][]} name, line text, expected-present, is-completion */
+  /** @type {[string, string, boolean][]} name, line text, expected-present */
   const specs = [
-    ["fmt start", "formatting...", expected.fmtStart, false],
-    ["fmt completion", "formatting: clean.", expected.fmtCompletion, true],
-    ["lint start", `linting (${expected.lintMode})...`, expected.lintStart, false],
-    ["lint completion", `linting (${expected.lintMode}): clean.`, expected.lintCompletion, true],
+    ["fmt start", "formatting...", expected.fmtStart],
+    ["fmt completion", "formatting: clean.", expected.fmtCompletion],
+    ["lint start", `linting (${expected.lintMode})...`, expected.lintStart],
+    ["lint completion", `linting (${expected.lintMode}): clean.`, expected.lintCompletion],
+    ["summary", expected.summary, true],
   ];
 
   // Some sandboxes do not reliably capture output written by the spawned Node process itself.
@@ -90,7 +94,7 @@ function assertProgressLines(stdout, expected) {
   /** @type {string[]} names of present lines, aligned with presentPositions */
   const presentNames = [];
 
-  for (const [name, line, expectPresent, isCompletion] of specs) {
+  for (const [name, line, expectPresent] of specs) {
     const positions = lines.flatMap((l, i) => (l === line ? [i] : []));
     if (expectPresent) {
       assert.equal(
@@ -99,11 +103,17 @@ function assertProgressLines(stdout, expected) {
         `${name}: expected exactly 1 occurrence of ${JSON.stringify(line)}, got ${positions.length}`,
       );
       const [idx] = positions;
-      if (isCompletion) {
+      if (name === "summary") {
         assert.equal(
           lines[idx - 1],
           "",
           `${name}: expected blank line immediately above ${JSON.stringify(line)} (line ${idx}), got ${JSON.stringify(lines[idx - 1])}`,
+        );
+      } else if (name === "lint completion" || name === "fmt completion") {
+        assert.notEqual(
+          lines[idx - 1],
+          "",
+          `${name}: expected non-blank line immediately above ${JSON.stringify(line)} (line ${idx}) — completion banner should follow tool output directly`,
         );
       }
       presentPositions.push(idx);
@@ -150,6 +160,7 @@ void test("basic: reformats sources and reports floating promise", (t) => {
     lintMode: "with auto-fix",
     lintStart: true,
     lintCompletion: false,
+    summary: "lint-js: Failed. Issues fixed where possible; unfixable issues remain.",
   });
 });
 
@@ -274,6 +285,7 @@ void test("fully-ignored single-file target exits cleanly", (t) => {
     lintMode: "with auto-fix",
     lintStart: true,
     lintCompletion: true,
+    summary: "lint-js: Completed successfully. Issues fixed where possible.",
   });
 });
 
@@ -297,6 +309,7 @@ void test("--check + fully-ignored target: fmt phase label still fires", (t) => 
     lintMode: "no auto-fix",
     lintStart: true,
     lintCompletion: true,
+    summary: "lint-js: Completed successfully. No issues found.",
   });
 });
 
@@ -332,6 +345,7 @@ void test("--check: does not modify files and reports both fmt and lint violatio
     lintMode: "no auto-fix",
     lintStart: true,
     lintCompletion: false,
+    summary: "lint-js: Failed. Issues found; fixes required.",
   });
 });
 
@@ -349,6 +363,7 @@ void test("--check: clean project exits 0", (t) => {
     lintMode: "no auto-fix",
     lintStart: true,
     lintCompletion: true,
+    summary: "lint-js: Completed successfully. No issues found.",
   });
 });
 
@@ -377,5 +392,6 @@ void test("node_modules is ignored", (t) => {
     lintMode: "with auto-fix",
     lintStart: true,
     lintCompletion: true,
+    summary: "lint-js: Completed successfully. Issues fixed where possible.",
   });
 });
