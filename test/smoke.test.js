@@ -2,7 +2,16 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -49,7 +58,35 @@ function writeIgnoreFiles(dir, pattern) {
  * @param {string[]} [args]
  */
 function runCli(cwd, args = []) {
-  return spawnSync(process.execPath, [cliPath, ...args], { cwd, encoding: "utf8" });
+  const captureDir = makeTempDir("stdio");
+  const stdoutPath = join(captureDir, "stdout.txt");
+  const stderrPath = join(captureDir, "stderr.txt");
+  let stdoutFd = -1;
+  let stderrFd = -1;
+
+  try {
+    // Work around openai/codex#18473: in the Codex sandbox, nested Node child output captured
+    // through pipe-backed stdout/stderr can disappear. File-backed stdio stays reliable.
+    stdoutFd = openSync(stdoutPath, "w");
+    stderrFd = openSync(stderrPath, "w");
+    const result = spawnSync(process.execPath, [cliPath, ...args], {
+      cwd,
+      stdio: ["ignore", stdoutFd, stderrFd],
+    });
+    closeSync(stdoutFd);
+    closeSync(stderrFd);
+    stdoutFd = -1;
+    stderrFd = -1;
+    return {
+      ...result,
+      stdout: readFileSync(stdoutPath, "utf8"),
+      stderr: readFileSync(stderrPath, "utf8"),
+    };
+  } finally {
+    if (stdoutFd !== -1) closeSync(stdoutFd);
+    if (stderrFd !== -1) closeSync(stderrFd);
+    rmSync(captureDir, { recursive: true, force: true });
+  }
 }
 
 /**
@@ -90,12 +127,6 @@ function assertProgressLines(stdout, expected) {
     ["lint completion", `linting (${expected.lintMode}): clean.`, expected.lintCompletion],
     ["summary", expected.summary, true],
   ];
-
-  // Some sandboxes do not reliably capture output written by the spawned Node process itself.
-  // If none of the progress lines relevant to this scenario were captured,
-  // treat that as an environment artifact and skip this assertion block.
-  const sawAnyProgressLine = specs.some(([_, line]) => lines.includes(line));
-  if (!sawAnyProgressLine) return;
 
   /** @type {{ name: string; idx: number }[]} present lines, in the order declared above */
   const present = [];
@@ -179,9 +210,7 @@ void test("--help: prints usage and exits 0 without requiring package.json", (t)
   for (const flag of ["--help", "-h"]) {
     const result = runCli(dir, [flag]);
     assert.equal(result.status, 0, `${flag}: expected exit 0`);
-    if (result.stdout !== "") {
-      assert.match(result.stdout, /Usage: lint-js/, `${flag}: expected usage on stdout`);
-    }
+    assert.match(result.stdout, /Usage: lint-js/, `${flag}: expected usage on stdout`);
   }
 });
 
@@ -192,13 +221,11 @@ void test("--version: prints semver and exits 0 without requiring package.json",
   for (const flag of ["--version", "-v"]) {
     const result = runCli(dir, [flag]);
     assert.equal(result.status, 0, `${flag}: expected exit 0`);
-    if (result.stdout !== "") {
-      assert.match(
-        result.stdout,
-        /^lint-js \d+\.\d+\.\d+/,
-        `${flag}: expected "lint-js <semver>" on stdout`,
-      );
-    }
+    assert.match(
+      result.stdout,
+      /^lint-js \d+\.\d+\.\d+/,
+      `${flag}: expected "lint-js <semver>" on stdout`,
+    );
   }
 });
 
@@ -209,16 +236,7 @@ void test("missing package.json: exits 1 with diagnostic", (t) => {
   const result = runCli(dir);
 
   assert.equal(result.status, 1);
-
-  // Some sandboxes do not reliably capture output written by the spawned Node process itself.
-  // Only assert the diagnostic when stderr was actually captured.
-  if (result.stderr !== "") {
-    assert.match(
-      result.stderr,
-      /no package\.json/,
-      "expected diagnostic about missing package.json",
-    );
-  }
+  assert.match(result.stderr, /no package\.json/, "expected diagnostic about missing package.json");
   assert.doesNotMatch(
     result.stdout,
     /no package\.json found/,
@@ -320,9 +338,7 @@ void test("nonexistent target fails fast with diagnostic", (t) => {
   const result = runCli(dir, ["src/does-not-exist.ts"]);
 
   assert.equal(result.status, 1);
-  if (result.stderr !== "") {
-    assert.match(result.stderr, /target not found/);
-  }
+  assert.match(result.stderr, /target not found/);
 });
 
 void test("--check: does not modify files and reports both fmt and lint violations", (t) => {
