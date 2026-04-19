@@ -42,8 +42,7 @@ Type-aware linting is always on.
 Strict rules including `no-floating-promises` and `no-unsafe-*` are enforced.  
 See [docs/weak-typings.md](docs/weak-typings.md) for escape hatches.
 
-Test files (`**/*.test.{js,ts}`) relax most `no-unsafe-*` rules,
-except `no-unsafe-return` which prevents `any` leaking out of test helpers.
+Test files (`**/*.test.{js,ts}`) relax the `no-unsafe-*` family to accommodate mocks, fixtures, and boundary I/O.
 
 ## Notes
 
