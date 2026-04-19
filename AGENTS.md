@@ -12,3 +12,7 @@ Node >= 22, pnpm.
 CLI lives in a single file at `src/cli.js`.
 Smoke tests in `test/`.
 `pnpm lint` dogfoods the CLI on this repo.
+
+## Temporary files
+
+Write agent scratch output (investigation notes, intermediate results, etc.) to `tmp/` under the project root instead of `$TMPDIR`, so the user can inspect it. `tmp/` is gitignored.
