@@ -30,7 +30,9 @@
     "@typescript-eslint/no-unsafe-call": "error",
     "@typescript-eslint/no-unsafe-member-access": "error",
     "@typescript-eslint/no-unsafe-return": "error",
-    "@typescript-eslint/consistent-return": "off"
+    "@typescript-eslint/consistent-return": "off",
+    "unicorn/no-array-reverse": "off",
+    "unicorn/no-array-sort": "off"
   },
   "overrides": [
     {
