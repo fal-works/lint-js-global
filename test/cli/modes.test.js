@@ -30,7 +30,7 @@ void test("basic: reformats sources and reports floating promise", (t) => {
     /weak-typings\.md/,
     "weak-typings hint must not fire when only non-unsafe rules trigger",
   );
-  // Scenario: default mode + not clean (unfixable lint remains).
+  // Scenario: default mode + not clean (unfixed lint remains).
   assertProgressLines(result.stdout, {
     fmtMode: "default",
     fmtStart: true,
@@ -38,7 +38,7 @@ void test("basic: reformats sources and reports floating promise", (t) => {
     lintMode: "with auto-fix",
     lintStart: true,
     lintCompletion: false,
-    summary: "lint-js: Failed. Issues fixed where possible; unfixable issues remain.",
+    summary: "lint-js: Failed. Issues fixed where possible; unfixed issues remain.",
   });
 });
 

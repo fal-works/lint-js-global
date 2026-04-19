@@ -33,7 +33,7 @@ function buildSummary({ check, fmtStatus, lintStatus }) {
   }
   return ok
     ? "Completed successfully. Issues fixed where possible."
-    : "Failed. Issues fixed where possible; unfixable issues remain.";
+    : "Failed. Issues fixed where possible; unfixed issues remain.";
 }
 
 const HELP_TEXT = `Usage: lint-js [--check] [path...]
