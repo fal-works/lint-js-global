@@ -52,7 +52,7 @@ Hint on the `no-unsafe-*` diagnostics:
 - ...
 - See: <package>/docs/weak-typings.md
 
-Found 2 unfixed issues in 1 files.
+Found 2 unfixed issues in 1 file.
 ```
 
 ## Type-aware linting

@@ -15,7 +15,7 @@ diagnostic legend: <location> `<code-slice>` [<rule-name>]
 src/index.ts
   5:1 `foo( );` [no-floating-promises]
 
-Found 1 unfixed issues in 1 files.
+Found 1 unfixed issue in 1 file.
 
 lint-js: Failed. Issues found; fixes required.
 

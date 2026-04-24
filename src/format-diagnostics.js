@@ -82,7 +82,9 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
   }
 
   const formattedStdout = `${sections.map((s) => s.join("\n")).join("\n\n")}\n`;
-  const linterSummary = `Found ${resolved.length} unfixed issues in ${fileGroups.size} files.`;
+  const issueWord = resolved.length === 1 ? "issue" : "issues";
+  const fileWord = fileGroups.size === 1 ? "file" : "files";
+  const linterSummary = `Found ${resolved.length} unfixed ${issueWord} in ${fileGroups.size} ${fileWord}.`;
   return { formattedStdout, linterSummary };
 }
 

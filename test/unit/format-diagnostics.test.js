@@ -89,7 +89,7 @@ void test("single file, single diagnostic (short single-line slice)", (t) => {
       [file, "  1:1 `debugger` [no-debugger]"],
     ]),
   );
-  assert.equal(result.linterSummary, "Found 1 unfixed issues in 1 files.");
+  assert.equal(result.linterSummary, "Found 1 unfixed issue in 1 file.");
 });
 
 void test("single file, multiple diagnostics sort by (line, col, rule-name)", (t) => {
@@ -142,7 +142,7 @@ void test("single file, multiple diagnostics sort by (line, col, rule-name)", (t
       ],
     ]),
   );
-  assert.equal(result.linterSummary, "Found 3 unfixed issues in 1 files.");
+  assert.equal(result.linterSummary, "Found 3 unfixed issues in 1 file.");
 });
 
 void test("multiple files sort lexicographically", (t) => {
@@ -355,7 +355,7 @@ void test("no-unsafe-* diagnostic triggers the weak-typings hint block", (t) => 
       ],
     ]),
   );
-  assert.equal(result.linterSummary, "Found 1 unfixed issues in 1 files.");
+  assert.equal(result.linterSummary, "Found 1 unfixed issue in 1 file.");
 });
 
 void test("diagnostic without `code` renders as [(message)]", (t) => {
@@ -424,7 +424,7 @@ void test("unreadable source file falls back to placeholder slice and reported L
       [file, "  3:5 `<unreadable>` [no-debugger]"],
     ]),
   );
-  assert.equal(result.linterSummary, "Found 1 unfixed issues in 1 files.");
+  assert.equal(result.linterSummary, "Found 1 unfixed issue in 1 file.");
 });
 
 void test("out-of-bounds span falls back to placeholder", (t) => {

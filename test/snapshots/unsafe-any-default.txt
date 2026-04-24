@@ -16,7 +16,7 @@ Hint on the `no-unsafe-*` diagnostics:
 - Inline disable (`// oxlint-disable-next-line`) is not a fix; use only when explicitly permitted by the project maintainer.
 - See: <PACKAGE_ROOT>/docs/weak-typings.md
 
-Found 2 unfixed issues in 1 files.
+Found 2 unfixed issues in 1 file.
 
 lint-js: Failed. Issues fixed where possible; unfixed issues remain.
 

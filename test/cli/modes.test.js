@@ -43,7 +43,7 @@ void test("basic: reformats sources and reports floating promise", (t) => {
   );
   assert.match(
     result.stdout,
-    /^Found 1 unfixed issues in 1 files\.$/m,
+    /^Found 1 unfixed issue in 1 file\.$/m,
     "expected issue-count summary line after the diagnostic block",
   );
   // Scenario: default mode + not clean (unfixed lint remains).
