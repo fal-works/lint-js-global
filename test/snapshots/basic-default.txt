@@ -1,0 +1,17 @@
+exit: 1
+
+==== stdout ====
+formatting...
+Finished in <DUR>ms on <N> files using <T> threads.
+
+linting (with auto-fix)...
+diagnostic legend: <location> `<code-slice>` [<rule-name>]
+
+src/index.ts
+  5:1 `foo();` [no-floating-promises]
+
+Found 1 unfixed issues in 1 files.
+
+lint-js: Failed. Issues fixed where possible; unfixed issues remain.
+
+==== stderr ====

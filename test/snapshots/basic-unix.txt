@@ -1,0 +1,14 @@
+exit: 1
+
+==== stdout ====
+formatting...
+Finished in <DUR>ms on <N> files using <T> threads.
+
+linting (with auto-fix)...
+src/index.ts:5:1: Promises must be awaited, add void operator to ignore. [Error/typescript-eslint(no-floating-promises)]
+
+1 problem
+
+lint-js: Failed. Issues fixed where possible; unfixed issues remain.
+
+==== stderr ====

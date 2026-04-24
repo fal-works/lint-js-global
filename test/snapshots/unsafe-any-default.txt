@@ -1,0 +1,23 @@
+exit: 1
+
+==== stdout ====
+formatting...
+Finished in <DUR>ms on <N> files using <T> threads.
+
+linting (with auto-fix)...
+diagnostic legend: <location> `<code-slice>` [<rule-name>]
+
+src/index.ts
+  1:7 `data = JSON.parse("{}")` [no-unsafe-assignment]
+  2:18 `foo` [no-unsafe-member-access]
+
+Hint on the `no-unsafe-*` diagnostics:
+- Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary module with typed wrappers.
+- Inline disable (`// oxlint-disable-next-line`) is not a fix; use only when explicitly permitted by the project maintainer.
+- See: <PACKAGE_ROOT>/docs/weak-typings.md
+
+Found 2 unfixed issues in 1 files.
+
+lint-js: Failed. Issues fixed where possible; unfixed issues remain.
+
+==== stderr ====
