@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Globally-installed CLI that runs Oxfmt and Oxlint with type-aware linting.",
   "license": "Apache-2.0",
+  "author": "FAL",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/fal-works/lint-js-global.git"
