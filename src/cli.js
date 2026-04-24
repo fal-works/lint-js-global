@@ -8,7 +8,7 @@ import { buildOxfmtArgs } from "./fmt.js";
 import { formatLintOutput } from "./format-diagnostics.js";
 import { getSystemIgnorePatterns } from "./ignore.js";
 import { buildOxlintArgs } from "./lint.js";
-import { errorTagged, print, printTagged } from "./log.js";
+import { errorTagged, LintJsError, print, printTagged } from "./log.js";
 import { getPackageVersion, packagePath, resolvePackageBin } from "./package-info.js";
 import { buildPathInjectedEnv, runTool, runToolCapturingOutput } from "./run-tool.js";
 
@@ -54,11 +54,43 @@ Without paths, the whole project is processed.
 node_modules is always skipped; .gitignore, .eslintignore, .prettierignore are respected.`;
 
 /**
+ * Detect errors thrown by `node:util#parseArgs`, identified by `code` starting with
+ * `ERR_PARSE_ARGS_` (e.g. unknown option, invalid value, unexpected positional).
+ *
+ * @param {unknown} err
+ * @returns {err is TypeError}
+ */
+function isParseArgsError(err) {
+  if (!(err instanceof TypeError)) return false;
+  if (!("code" in err)) return false;
+  const { code } = err;
+  return typeof code === "string" && code.startsWith("ERR_PARSE_ARGS_");
+}
+
+/**
  * CLI entry point. Returns the process exit code.
+ *
+ * Expected failure modes are caught and reported as plain diagnostics.
+ * Anything else is re-thrown so genuine bugs surface with their full stack trace.
  *
  * @returns {number}
  */
 function main() {
+  try {
+    return runMain();
+  } catch (err) {
+    if (err instanceof LintJsError || isParseArgsError(err)) {
+      errorTagged(err.message);
+      return 1;
+    }
+    throw err;
+  }
+}
+
+/**
+ * @returns {number}
+ */
+function runMain() {
   const { values, positionals } = parseArgs({
     args: process.argv.slice(2),
     options: {
