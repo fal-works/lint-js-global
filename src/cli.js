@@ -5,8 +5,9 @@ import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 
 import { buildOxfmtArgs } from "./fmt.js";
+import { formatLintOutput } from "./format-diagnostics.js";
 import { getSystemIgnorePatterns } from "./ignore.js";
-import { UNSAFE_ANY_DIAGNOSTIC_PATTERN, buildOxlintArgs, printWeakTypingsHint } from "./lint.js";
+import { buildOxlintArgs } from "./lint.js";
 import { errorTagged, print, printTagged } from "./log.js";
 import { getPackageVersion, packagePath, resolvePackageBin } from "./package-info.js";
 import { buildPathInjectedEnv, runTool, runToolCapturingOutput } from "./run-tool.js";
@@ -36,13 +37,16 @@ function buildSummary({ check, fmtStatus, lintStatus }) {
     : "Failed. Issues fixed where possible; unfixed issues remain.";
 }
 
-const HELP_TEXT = `Usage: lint-js [--check] [path...]
+const HELP_TEXT = `Usage: lint-js [--check] [--unix] [path...]
 
 Runs oxfmt and oxlint (+ auto-fix) on a JS/TS project.
 Must be run from a project root (package.json required).
 
 Options:
   --check         Verify only; do not rewrite files.
+  --unix          Emit oxlint's \`--format=unix\` output unchanged (for VS Code
+                  terminal link detection). Skips the LLM-friendly layout and
+                  the per-run issue-count summary.
   -h, --help      Show this help.
   -v, --version   Show version.
 
@@ -59,6 +63,7 @@ function main() {
     args: process.argv.slice(2),
     options: {
       check: { type: "boolean" },
+      unix: { type: "boolean" },
       help: { type: "boolean", short: "h" },
       version: { type: "boolean", short: "v" },
     },
@@ -88,8 +93,10 @@ function main() {
   const oxlintBin = resolvePackageBin("oxlint", "oxlint");
   const oxfmtConfig = packagePath("cfg", "oxfmtrc.json");
   const oxlintConfig = packagePath("cfg", "oxlintrc.json");
+  const weakTypingsDocPath = packagePath("docs", "weak-typings.md");
   const ignorePatterns = getSystemIgnorePatterns();
   const check = values.check === true;
+  const unix = values.unix === true;
   const targets = positionals.length > 0 ? positionals : ["."];
 
   for (const target of targets) {
@@ -125,17 +132,22 @@ function main() {
   } = runToolCapturingOutput({
     name: "oxlint",
     bin: oxlintBin,
-    args: buildOxlintArgs(oxlintConfig, ignorePatterns, targets, check),
+    args: buildOxlintArgs(oxlintConfig, ignorePatterns, targets, check, unix),
     env: buildPathInjectedEnv(packagePath("node_modules", ".bin")),
   });
   // Replay stderr first, then stdout. Both are batched (Codex-sandbox workaround)
   // so emission timing is lost; this fixed order keeps the relayed sequence deterministic.
   process.stderr.write(lintStderr);
-  process.stdout.write(lintStdout);
+  const { formattedStdout, linterSummary } = formatLintOutput({
+    capturedStdout: lintStdout,
+    unix,
+    weakTypingsDocPath,
+  });
+  process.stdout.write(formattedStdout);
   if (lintResult.status === 0) print(`${lintLabel}: clean.`);
-  if (UNSAFE_ANY_DIAGNOSTIC_PATTERN.test(lintStdout)) {
+  if (linterSummary !== null) {
     print("");
-    printWeakTypingsHint();
+    print(linterSummary);
   }
 
   print("");
