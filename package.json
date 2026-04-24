@@ -22,7 +22,7 @@
   "scripts": {
     "lint": "node src/cli.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/cli/*.test.js",
+    "test": "node --test test/cli/*.test.js test/unit/*.test.js",
     "prepublishOnly": "pnpm lint --check && pnpm typecheck && pnpm test"
   },
   "dependencies": {
