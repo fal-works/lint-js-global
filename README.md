@@ -18,8 +18,8 @@ Run from a project root:
 lint-js [--check] [--unix] [path...]
 ```
 
-The current directory must contain `package.json`  
-(only as a guard against accidental runs; contents are not read).
+The current directory must contain `package.json` (contents not read), as a guard against accidentally running without target paths in a wide location such as `~/`.
+Target paths themselves may point anywhere.
 
 ### Options
 
