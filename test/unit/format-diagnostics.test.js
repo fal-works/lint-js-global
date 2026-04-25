@@ -466,6 +466,62 @@ void test("zero diagnostics yields empty formattedStdout and null linterSummary"
 
   assert.equal(result.formattedStdout, "");
   assert.equal(result.linterSummary, null);
+  assert.equal(result.unrecognizedSchema, false);
+});
+
+void test("valid JSON without `diagnostics` array flags unrecognizedSchema and relays raw", () => {
+  // Simulate a hypothetical schema change (e.g. a fatal payload at the top level).
+  const raw = JSON.stringify({ fatal: "internal error", number_of_files: 0 });
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(
+    result.formattedStdout,
+    raw,
+    "raw payload must be relayed verbatim so the actual cause is visible",
+  );
+  assert.equal(result.linterSummary, null);
+  assert.equal(result.unrecognizedSchema, true);
+});
+
+void test("valid JSON with non-array `diagnostics` is treated as unrecognized schema", () => {
+  const raw = JSON.stringify({ diagnostics: "oops not an array" });
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(result.formattedStdout, raw);
+  assert.equal(result.unrecognizedSchema, true);
+});
+
+void test("non-object JSON (e.g. bare array) is treated as unrecognized schema", () => {
+  const raw = "[]";
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(result.formattedStdout, raw);
+  assert.equal(result.unrecognizedSchema, true);
+});
+
+void test("broken JSON does NOT flag unrecognizedSchema (parse failure is a separate path)", () => {
+  const result = formatLintOutput({
+    capturedStdout: "{not valid json",
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(result.unrecognizedSchema, false);
 });
 
 void test("unreadable source file falls back to placeholder slice and reported L:C", () => {

@@ -174,12 +174,21 @@ function runMain() {
   // Replay stderr first, then stdout. Both are batched (Codex-sandbox workaround)
   // so emission timing is lost; this fixed order keeps the relayed sequence deterministic.
   process.stderr.write(lintStderr);
-  const { formattedStdout, linterSummary } = formatLintOutput({
+  const { formattedStdout, linterSummary, unrecognizedSchema } = formatLintOutput({
     capturedStdout: lintStdout,
     unix,
     weakTypingsDocPath,
   });
   process.stdout.write(formattedStdout);
+  if (unrecognizedSchema && lintResult.status !== 0) {
+    // Valid JSON without a `diagnostics` array: oxlint may have changed its
+    // schema (caret-pinned dep) or emitted a structured fatal. The raw payload
+    // was just relayed via `formattedStdout`; flag it so the cause is visible
+    // rather than buried under the generic `lint-js: Failed.` summary.
+    errorTagged(
+      "oxlint emitted JSON without a recognized `diagnostics` array; raw payload relayed above.",
+    );
+  }
   if (lintResult.status === 0) print(`${lintLabel}: clean.`);
   if (linterSummary !== null) {
     print("");

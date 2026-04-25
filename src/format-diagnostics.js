@@ -33,20 +33,39 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
  */
 
 /**
+ * @typedef {{
+ *   formattedStdout: string;
+ *   linterSummary: string | null;
+ *   unrecognizedSchema: boolean;
+ * }} FormatLintResult
+ *
+ * `unrecognizedSchema` is set when the captured stdout parsed as JSON but did
+ * not expose a `diagnostics` array. In that case `formattedStdout` carries the
+ * raw stdout (verbatim relay), `linterSummary` is null, and the caller should
+ * decide whether to emit a stderr warning based on the child's exit status.
+ *
+ * Broken JSON (parse failure) is *not* treated as `unrecognizedSchema`: the
+ * raw output is still relayed via `formattedStdout`, but the failure is loud
+ * enough on its own (unparseable text in stdout). Reserving the flag for
+ * "valid JSON but missing schema" makes the intent of the warning specific.
+ */
+
+/**
  * Entry point: takes raw oxlint JSON-format stdout and returns the formatted payload.
  *
  * Not a strictly pure function (reads source files to resolve spans), but performs
- * no stdout/stderr output — the caller decides when and where to emit.
+ * no stdout/stderr output. The caller decides when and where to emit, including
+ * how to react to `unrecognizedSchema` (raw relay + warning vs silent).
  *
  * @param {object} options
  * @param {string} options.capturedStdout Raw oxlint stdout from `--format=json`.
  * @param {boolean} options.unix If true, pass through unchanged (no legend, no hint, no summary).
  * @param {string} options.weakTypingsDocPath Absolute path used in the weak-typings hint.
- * @returns {{ formattedStdout: string; linterSummary: string | null }}
+ * @returns {FormatLintResult}
  */
 export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
   if (unix) {
-    return { formattedStdout: capturedStdout, linterSummary: null };
+    return { formattedStdout: capturedStdout, linterSummary: null, unrecognizedSchema: false };
   }
 
   /** @type {unknown} */
@@ -56,12 +75,17 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
   } catch {
     // Broken JSON: relay oxlint's raw output verbatim and let the overall
     // `lint-js:` summary flag the failure via non-zero exit code.
-    return { formattedStdout: capturedStdout, linterSummary: null };
+    return { formattedStdout: capturedStdout, linterSummary: null, unrecognizedSchema: false };
   }
 
   const rawDiagnostics = extractDiagnostics(parsed);
+  if (rawDiagnostics === null) {
+    // Valid JSON but no `diagnostics` array. Could indicate an oxlint schema
+    // change or a structured fatal payload. Relay raw and let the caller warn.
+    return { formattedStdout: capturedStdout, linterSummary: null, unrecognizedSchema: true };
+  }
   if (rawDiagnostics.length === 0) {
-    return { formattedStdout: "", linterSummary: null };
+    return { formattedStdout: "", linterSummary: null, unrecognizedSchema: false };
   }
 
   const cache = createSourceCache();
@@ -85,17 +109,20 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
   const issueWord = resolved.length === 1 ? "issue" : "issues";
   const fileWord = fileGroups.size === 1 ? "file" : "files";
   const linterSummary = `Found ${resolved.length} unfixed ${issueWord} in ${fileGroups.size} ${fileWord}.`;
-  return { formattedStdout, linterSummary };
+  return { formattedStdout, linterSummary, unrecognizedSchema: false };
 }
 
 /**
+ * Returns the `diagnostics` array if the parsed payload exposes one, else null.
+ * Null signals an unrecognized schema (caller relays raw and may warn).
+ *
  * @param {unknown} parsed
- * @returns {unknown[]}
+ * @returns {unknown[] | null}
  */
 function extractDiagnostics(parsed) {
-  if (typeof parsed !== "object" || parsed === null) return [];
+  if (typeof parsed !== "object" || parsed === null) return null;
   const diags = /** @type {{ diagnostics?: unknown }} */ (parsed).diagnostics;
-  return Array.isArray(diags) ? diags : [];
+  return Array.isArray(diags) ? diags : null;
 }
 
 /**
