@@ -2,9 +2,28 @@
 
 const LOG_PREFIX = "lint-js:";
 
-/** Error raised by lint-js itself (not a wrapped child-process or tool error). */
+/**
+ * Single channel for expected failures raised by lint-js itself: usage errors, missing
+ * files, malformed dep metadata, child-process launch failures (not a wrapped child-process
+ * or tool error).
+ *
+ * The CLI boundary catches `LintJsError` and routes it through {@link errorTagged}
+ * (`message` as headline, `details` as continuation lines), then exits with status 1.
+ * Anything else propagates as an unhandled exception so genuine bugs surface with
+ * their full stack trace.
+ */
 export class LintJsError extends Error {
   name = "LintJsError";
+  /** @type {readonly string[]} */
+  details;
+  /**
+   * @param {string} message
+   * @param {{ details?: readonly string[]; cause?: unknown }} [options]
+   */
+  constructor(message, options = {}) {
+    super(message, options.cause !== undefined ? { cause: options.cause } : undefined);
+    this.details = options.details ?? [];
+  }
 }
 
 /**

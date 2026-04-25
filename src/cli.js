@@ -54,20 +54,6 @@ Without paths, the whole project is processed.
 node_modules is always skipped; .gitignore, .eslintignore, .prettierignore are respected.`;
 
 /**
- * Detect errors thrown by `node:util#parseArgs`, identified by `code` starting with
- * `ERR_PARSE_ARGS_` (e.g. unknown option, invalid value, unexpected positional).
- *
- * @param {unknown} err
- * @returns {err is TypeError}
- */
-function isParseArgsError(err) {
-  if (!(err instanceof TypeError)) return false;
-  if (!("code" in err)) return false;
-  const { code } = err;
-  return typeof code === "string" && code.startsWith("ERR_PARSE_ARGS_");
-}
-
-/**
  * CLI entry point. Returns the process exit code.
  *
  * Expected failure modes are caught and reported as plain diagnostics.
@@ -79,8 +65,8 @@ function main() {
   try {
     return runMain();
   } catch (err) {
-    if (err instanceof LintJsError || isParseArgsError(err)) {
-      errorTagged(err.message);
+    if (err instanceof LintJsError) {
+      errorTagged(err.message, ...err.details);
       return 1;
     }
     throw err;
@@ -88,20 +74,33 @@ function main() {
 }
 
 /**
+ * Wrap `parseArgs` so its error becomes a `LintJsError` for the boundary handler to report.
+ *
+ * @returns {ReturnType<typeof parseArgs>}
+ */
+function parseCliArgs() {
+  try {
+    return parseArgs({
+      args: process.argv.slice(2),
+      options: {
+        check: { type: "boolean" },
+        unix: { type: "boolean" },
+        help: { type: "boolean", short: "h" },
+        version: { type: "boolean", short: "v" },
+      },
+      allowPositionals: true,
+      strict: true,
+    });
+  } catch (err) {
+    throw new LintJsError(err instanceof Error ? err.message : String(err), { cause: err });
+  }
+}
+
+/**
  * @returns {number}
  */
 function runMain() {
-  const { values, positionals } = parseArgs({
-    args: process.argv.slice(2),
-    options: {
-      check: { type: "boolean" },
-      unix: { type: "boolean" },
-      help: { type: "boolean", short: "h" },
-      version: { type: "boolean", short: "v" },
-    },
-    allowPositionals: true,
-    strict: true,
-  });
+  const { values, positionals } = parseCliArgs();
 
   if (values.help === true) {
     print(HELP_TEXT);
@@ -113,12 +112,12 @@ function runMain() {
   }
 
   if (!existsSync("package.json")) {
-    errorTagged(
-      "no package.json in current directory.",
-      "Run lint-js from the root of a JS/TS project.",
-      "(Required as a guard against accidental runs)",
-    );
-    return 1;
+    throw new LintJsError("no package.json in current directory.", {
+      details: [
+        "Run lint-js from the root of a JS/TS project.",
+        "(Required as a guard against accidental runs)",
+      ],
+    });
   }
 
   const oxfmtBin = resolvePackageBin("oxfmt", "oxfmt");
@@ -133,8 +132,7 @@ function runMain() {
 
   for (const target of targets) {
     if (!existsSync(target)) {
-      errorTagged(`target not found: ${target}`);
-      return 1;
+      throw new LintJsError(`target not found: ${target}`);
     }
   }
 
