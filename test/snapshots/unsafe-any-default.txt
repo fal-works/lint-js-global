@@ -14,7 +14,7 @@ src/index.ts
 Hint on the `no-unsafe-*` diagnostics:
 - Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary module with typed wrappers.
 - Inline disable (`// oxlint-disable-next-line`) is not a fix; use only when explicitly permitted by the project maintainer.
-- See: <PACKAGE_ROOT>/docs/weak-typings.md
+- See: <PACKAGE_ROOT>/docs/guide/weak-typings.md
 
 Found 2 unfixed issues in 1 file.
 

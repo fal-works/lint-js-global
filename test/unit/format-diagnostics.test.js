@@ -8,7 +8,7 @@ import test from "node:test";
 
 import { formatLintOutput } from "../../src/format-diagnostics.js";
 
-const HINT_PATH = "/opt/lint-js/docs/weak-typings.md";
+const HINT_PATH = "/opt/lint-js/docs/guide/weak-typings.md";
 
 /**
  * @typedef {{

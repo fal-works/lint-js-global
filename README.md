@@ -50,7 +50,7 @@ src/index.ts
 
 Hint on the `no-unsafe-*` diagnostics:
 - ...
-- See: <package>/docs/weak-typings.md
+- See: <package>/docs/guide/weak-typings.md
 
 Found 2 unfixed issues in 1 file.
 ```
@@ -62,7 +62,7 @@ Type-aware linting is always on.
 `tsconfig.json` is auto-detected per file; sub-directory tsconfigs are respected.
 
 Strict rules including `no-floating-promises` and `no-unsafe-*` are enforced.  
-See [docs/weak-typings.md](docs/weak-typings.md) for escape hatches.
+See [docs/guide/weak-typings.md](docs/guide/weak-typings.md) for escape hatches.
 
 Test files (`**/*.test.{js,ts}`) relax the `no-unsafe-*` family to accommodate mocks, fixtures, and boundary I/O.
 

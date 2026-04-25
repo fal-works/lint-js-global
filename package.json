@@ -14,7 +14,7 @@
   "files": [
     "src",
     "cfg",
-    "docs"
+    "docs/guide"
   ],
   "type": "module",
   "publishConfig": {

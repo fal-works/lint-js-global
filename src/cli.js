@@ -130,7 +130,7 @@ function runMain() {
   const oxlintBin = resolvePackageBin("oxlint", "oxlint");
   const oxfmtConfig = packagePath("cfg", "oxfmtrc.json");
   const oxlintConfig = packagePath("cfg", "oxlintrc.json");
-  const weakTypingsDocPath = packagePath("docs", "weak-typings.md");
+  const weakTypingsDocPath = packagePath("docs", "guide", "weak-typings.md");
   const ignorePatterns = getSystemIgnorePatterns();
   const check = values.check === true;
   const unix = values.unix === true;
