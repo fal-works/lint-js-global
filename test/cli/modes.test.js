@@ -33,7 +33,7 @@ void test("basic: reformats sources and reports floating promise", (t) => {
   // Default formatter: legend + bracketed rule-name + issue-count summary all present.
   assert.match(
     result.stdout,
-    /^diagnostic legend: <location> `<code-slice>` \[<rule-name>\]$/m,
+    /^diagnostic legend: <location> <code-slice> \[<rule-name>\]$/m,
     "expected legend line at the top of the diagnostic block",
   );
   assert.match(

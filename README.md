@@ -42,11 +42,11 @@ Default lint output groups diagnostics per file with a self-describing legend li
 byte-accurate spans shown as `L:C` or `L:C-L:C`, and the exact code slice the rule points at:
 
 ```
-diagnostic legend: <location> `<code-slice>` [<rule-name>]
+diagnostic legend: <location> <code-slice> [<rule-name>]
 
 src/index.ts
-  1:7 `data = JSON.parse("{}")` [no-unsafe-assignment]
-  2:18 `foo` [no-unsafe-member-access]
+  1:7 data = JSON.parse("{}") [no-unsafe-assignment]
+  2:18 foo [no-unsafe-member-access]
 
 Hint on the `no-unsafe-*` diagnostics:
 - ...

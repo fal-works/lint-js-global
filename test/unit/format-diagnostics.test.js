@@ -85,8 +85,8 @@ void test("single file, single diagnostic (short single-line slice)", (t) => {
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> `<code-slice>` [<rule-name>]"],
-      [file, "  1:1 `debugger` [no-debugger]"],
+      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
+      [file, "  1:1 debugger [no-debugger]"],
     ]),
   );
   assert.equal(result.linterSummary, "Found 1 unfixed issue in 1 file.");
@@ -133,12 +133,12 @@ void test("single file, multiple diagnostics sort by (line, col, rule-name)", (t
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> `<code-slice>` [<rule-name>]"],
+      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
       [
         file,
-        "  1:7 `x` [no-unused-vars]",
-        "  2:7 `y` [no-unused-vars]",
-        "  3:1 `debugger` [no-debugger]",
+        "  1:7 x [no-unused-vars]",
+        "  2:7 y [no-unused-vars]",
+        "  3:1 debugger [no-debugger]",
       ],
     ]),
   );
@@ -178,9 +178,9 @@ void test("multiple files sort lexicographically", (t) => {
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> `<code-slice>` [<rule-name>]"],
-      [fileA, "  1:1 `debugger` [no-debugger]"],
-      [fileB, "  1:1 `debugger` [no-debugger]"],
+      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
+      [fileA, "  1:1 debugger [no-debugger]"],
+      [fileB, "  1:1 debugger [no-debugger]"],
     ]),
   );
   assert.equal(result.linterSummary, "Found 2 unfixed issues in 2 files.");
@@ -214,8 +214,8 @@ void test("long single-line slice truncates at 40 characters with no leading spa
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> `<code-slice>` [<rule-name>]"],
-      [file, `  1:1-1:45 \`${truncated}\` [no-unused-vars]`],
+      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
+      [file, `  1:1-1:45 ${truncated} [no-unused-vars]`],
     ]),
   );
 });
@@ -245,8 +245,8 @@ void test("multi-line span with first line ≤40 chars gets the ' ...' multi-lin
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> `<code-slice>` [<rule-name>]"],
-      [file, "  1:1-3:1 `function foo() { ...` [some-rule]"],
+      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
+      [file, "  1:1-3:1 function foo() { ... [some-rule]"],
     ]),
   );
 });
@@ -282,8 +282,8 @@ void test("multi-line span with first line >40 chars suppresses the multi-line m
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> `<code-slice>` [<rule-name>]"],
-      [file, `  1:1-2:4 \`${truncated}\` [some-rule]`],
+      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
+      [file, `  1:1-2:4 ${truncated} [some-rule]`],
     ]),
   );
 });
@@ -317,8 +317,8 @@ void test("CRLF source: multi-line span strips the CR before the multi-line mark
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> `<code-slice>` [<rule-name>]"],
-      [file, "  1:1-2:3 `foo bar ...` [some-rule]"],
+      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
+      [file, "  1:1-2:3 foo bar ... [some-rule]"],
     ]),
   );
 });
@@ -351,8 +351,8 @@ void test("CRLF source: span ending exactly at CR strips the trailing CR", (t) =
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> `<code-slice>` [<rule-name>]"],
-      [file, "  1:1 `foo` [some-rule]"],
+      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
+      [file, "  1:1 foo [some-rule]"],
     ]),
   );
 });
@@ -386,8 +386,8 @@ void test("UTF-8 multi-byte span resolves byte offsets correctly", (t) => {
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> `<code-slice>` [<rule-name>]"],
-      [file, "  1:11 `'あいう'` [some-rule]"],
+      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
+      [file, "  1:11 'あいう' [some-rule]"],
     ]),
   );
 });
@@ -414,8 +414,8 @@ void test("no-unsafe-* diagnostic triggers the weak-typings hint block", (t) => 
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> `<code-slice>` [<rule-name>]"],
-      [file, "  1:7 `x = foo` [no-unsafe-assignment]"],
+      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
+      [file, "  1:7 x = foo [no-unsafe-assignment]"],
       [
         "Hint on the `no-unsafe-*` diagnostics:",
         "- Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary module with typed wrappers.",
@@ -449,8 +449,8 @@ void test("diagnostic without `code` renders as [(message)]", (t) => {
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> `<code-slice>` [<rule-name>]"],
-      [file, "  1:11 `;` [(Unexpected token)]"],
+      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
+      [file, "  1:11 ; [(Unexpected token)]"],
     ]),
   );
 });
@@ -545,8 +545,8 @@ void test("unreadable source file falls back to placeholder slice and reported L
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> `<code-slice>` [<rule-name>]"],
-      [file, "  3:5 `<unreadable>` [no-debugger]"],
+      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
+      [file, "  3:5 <unreadable> [no-debugger]"],
     ]),
   );
   assert.equal(result.linterSummary, "Found 1 unfixed issue in 1 file.");
@@ -574,8 +574,8 @@ void test("out-of-bounds span falls back to placeholder", (t) => {
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> `<code-slice>` [<rule-name>]"],
-      [file, "  1:1 `<unreadable>` [no-debugger]"],
+      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
+      [file, "  1:1 <unreadable> [no-debugger]"],
     ]),
   );
 });

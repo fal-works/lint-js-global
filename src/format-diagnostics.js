@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
  * See `dev/records/011-llm-diagnostic-format-spec.md` for the specification.
  */
 
-const LEGEND = "diagnostic legend: <location> `<code-slice>` [<rule-name>]";
+const LEGEND = "diagnostic legend: <location> <code-slice> [<rule-name>]";
 const SLICE_MAX_LEN = 40;
 const UNREADABLE_SLICE = "<unreadable>";
 const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
@@ -377,7 +377,7 @@ function groupByFilename(resolved) {
  * @returns {string}
  */
 function formatDiagLine(d) {
-  return `  ${d.location} \`${d.slice}\` [${d.ruleName}]`;
+  return `  ${d.location} ${d.slice} [${d.ruleName}]`;
 }
 
 /**

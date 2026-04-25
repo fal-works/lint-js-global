@@ -10,10 +10,10 @@ Format issues found in above 1 files. Run without `--check` to fix.
 Finished in <DUR>ms on <N> files using <T> threads.
 
 linting (no auto-fix)...
-diagnostic legend: <location> `<code-slice>` [<rule-name>]
+diagnostic legend: <location> <code-slice> [<rule-name>]
 
 src/index.ts
-  5:1 `foo( );` [no-floating-promises]
+  5:1 foo( ); [no-floating-promises]
 
 Found 1 unfixed issue in 1 file.
 
