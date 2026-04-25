@@ -237,6 +237,10 @@ function resolveDiagnostic(diag, cache) {
 }
 
 /**
+ * Takes `labels[0]` only.
+ * Typical multi-label diagnostics are duplicate-style where every label points at an identical slice,
+ * so listing the rest just repeats content.
+ *
  * @param {Record<string, unknown>} diag
  * @returns {Record<string, unknown> | null}
  */
