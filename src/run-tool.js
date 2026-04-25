@@ -9,7 +9,9 @@ import { LintJsError } from "./log.js";
 
 /**
  * Launches a tool via `process.execPath` with stdio inherited.
- * Throws on launch failure so Node surfaces the stack trace.
+ * Throws `LintJsError` on launch failure or signal-driven termination so the
+ * CLI boundary routes it to exit 2 instead of conflating with normal lint
+ * findings (exit 1).
  *
  * @param {object} options
  * @param {string} options.name Tool name for launch-failure diagnostics.
@@ -23,11 +25,7 @@ export function runTool({ name, bin, args, env }) {
     stdio: "inherit",
     env,
   });
-  if (result.error) {
-    throw new LintJsError(`failed to launch ${name}: ${result.error.message}`, {
-      cause: result.error,
-    });
-  }
+  ensureNormalExit(name, result);
   return result;
 }
 
@@ -67,11 +65,7 @@ export function runToolCapturingOutput({ name, bin, args, env }) {
     stdoutFd = -1;
     closeSync(stderrFd);
     stderrFd = -1;
-    if (result.error) {
-      throw new LintJsError(`failed to launch ${name}: ${result.error.message}`, {
-        cause: result.error,
-      });
-    }
+    ensureNormalExit(name, result);
     return {
       result,
       capturedStdout: readFileSync(stdoutPath, "utf8"),
@@ -81,6 +75,30 @@ export function runToolCapturingOutput({ name, bin, args, env }) {
     if (stdoutFd !== -1) closeSync(stdoutFd);
     if (stderrFd !== -1) closeSync(stderrFd);
     rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Translate launch failures and signal-driven termination of a child into
+ * `LintJsError`. Normal exits (any numeric status, including non-zero) pass
+ * through; the caller uses the status as part of its own outcome reporting.
+ *
+ * Without this guard, a signal-killed child would surface as `status: null`
+ * with `error: null` and the CLI's exit-code rule (`status === 0 ? 0 : 1`)
+ * would mislabel the crash as "unfixed lint findings remain".
+ *
+ * @param {string} name Tool name for diagnostics.
+ * @param {ReturnType<typeof spawnSync>} result
+ * @returns {void}
+ */
+function ensureNormalExit(name, result) {
+  if (result.error) {
+    throw new LintJsError(`failed to launch ${name}: ${result.error.message}`, {
+      cause: result.error,
+    });
+  }
+  if (result.signal !== null) {
+    throw new LintJsError(`${name} was terminated by signal ${result.signal}.`);
   }
 }
 
