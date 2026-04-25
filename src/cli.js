@@ -180,13 +180,15 @@ function runMain() {
     weakTypingsDocPath,
   });
   process.stdout.write(formattedStdout);
-  if (unrecognizedSchema && lintResult.status !== 0) {
-    // Valid JSON without a `diagnostics` array: oxlint may have changed its
-    // schema (caret-pinned dep) or emitted a structured fatal. The raw payload
-    // was just relayed via `formattedStdout`; flag it so the cause is visible
-    // rather than buried under the generic `lint-js: Failed.` summary.
-    errorTagged(
-      "oxlint emitted JSON without a recognized `diagnostics` array; raw payload relayed above.",
+  if (unrecognizedSchema) {
+    // Valid JSON without a `diagnostics` array means oxlint's output contract
+    // diverged from what this wrapper understands (schema bump on a caret-pinned
+    // dep, or a structured fatal payload). Raw stdout was just relayed above;
+    // surface this as a hard failure on the LintJsError channel so it doesn't
+    // get conflated with a normal lint outcome.
+    throw new LintJsError(
+      "oxlint emitted JSON without a recognized `diagnostics` array (oxlint output contract mismatch).",
+      { details: ["Raw payload relayed to stdout above."] },
     );
   }
   if (lintResult.status === 0) print(`${lintLabel}: clean.`);
