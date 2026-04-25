@@ -288,6 +288,75 @@ void test("multi-line span with first line >40 chars suppresses the multi-line m
   );
 });
 
+void test("CRLF source: multi-line span strips the CR before the multi-line marker", (t) => {
+  // CRLF ("\r\n" = 2 bytes per break). Source: "foo bar\r\nbaz\r\n" (14 bytes).
+  // Span covers "foo bar\r\nbaz" (12 bytes): offset 0, length 12.
+  // Without the CRLF-aware fix, firstLine would be "foo bar\r" and the rendered slice
+  // would carry an embedded CR before the " ..." multi-line marker.
+  const src = "foo bar\r\nbaz\r\n";
+  const dir = setupFixture(t, { "x.ts": src });
+  const file = join(dir, "x.ts");
+  const stdout = makeStdout([
+    {
+      message: "multi-line crlf",
+      code: "eslint(some-rule)",
+      severity: "error",
+      filename: file,
+      labels: [{ span: { offset: 0, length: 12, line: 1, column: 1 } }],
+    },
+  ]);
+
+  const result = formatLintOutput({
+    capturedStdout: stdout,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  // End line is 2 (last byte of span = 'z' of "baz" at offset 11; line 2 starts at offset 9).
+  // endCol = 11 - 9 + 1 = 3.
+  assert.equal(
+    result.formattedStdout,
+    joinSections([
+      ["diagnostic legend: <location> `<code-slice>` [<rule-name>]"],
+      [file, "  1:1-2:3 `foo bar ...` [some-rule]"],
+    ]),
+  );
+});
+
+void test("CRLF source: span ending exactly at CR strips the trailing CR", (t) => {
+  // CRLF source. Span deliberately stops at the CR byte (no following LF inside span).
+  // Source: "foo\r\nbar\r\n" (10 bytes). Span covers "foo\r": offset 0, length 4.
+  const src = "foo\r\nbar\r\n";
+  const dir = setupFixture(t, { "x.ts": src });
+  const file = join(dir, "x.ts");
+  const stdout = makeStdout([
+    {
+      message: "trailing cr",
+      code: "eslint(some-rule)",
+      severity: "error",
+      filename: file,
+      labels: [{ span: { offset: 0, length: 4, line: 1, column: 1 } }],
+    },
+  ]);
+
+  const result = formatLintOutput({
+    capturedStdout: stdout,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  // Single-line slice (no LF inside span → no multi-line marker), CR stripped.
+  // Span text "foo\r" is 4 bytes; lastByte = offset 3 ('\r' on line 1). endCol = 4.
+  // truncated = false (length ≤ 40 and no further lines), so location uses `L:C` form.
+  assert.equal(
+    result.formattedStdout,
+    joinSections([
+      ["diagnostic legend: <location> `<code-slice>` [<rule-name>]"],
+      [file, "  1:1 `foo` [some-rule]"],
+    ]),
+  );
+});
+
 void test("UTF-8 multi-byte span resolves byte offsets correctly", (t) => {
   // "あ" is 3 bytes. Source: "const x = 'あいう';\n"
   // "あいう" = 9 bytes. Let's pick a span around it.

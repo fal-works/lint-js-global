@@ -286,13 +286,18 @@ function extractRuleName(rawCode, message) {
 /**
  * Per spec §3.2: extract first line, truncate if too long, append multi-line marker.
  *
+ * Handles both LF and CRLF source files: the regex split discards a CR that
+ * pairs with the next LF, and the trailing-CR strip covers the edge case where
+ * a span ends exactly at the CR of a CRLF pair (no following LF inside the span).
+ *
  * @param {string} text
  * @returns {{ text: string; truncated: boolean }}
  */
 function formatCodeSlice(text) {
-  const nlIdx = text.indexOf("\n");
-  const firstLine = nlIdx === -1 ? text : text.slice(0, nlIdx);
+  const nlIdx = text.search(/\r?\n/);
   const hasMoreLines = nlIdx !== -1;
+  const rawFirstLine = hasMoreLines ? text.slice(0, nlIdx) : text;
+  const firstLine = rawFirstLine.replace(/\r$/, "");
   // Iterate as Unicode code points (not UTF-16 units) so e.g. "𠮷" counts as 1.
   const codePoints = Array.from(firstLine);
   if (codePoints.length > SLICE_MAX_LEN) {
