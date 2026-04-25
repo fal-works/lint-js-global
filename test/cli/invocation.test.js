@@ -32,6 +32,27 @@ void test("--version: prints semver and exits 0 without requiring package.json",
   }
 });
 
+void test("unknown CLI option: exits 1 with parsing-error diagnostic", (t) => {
+  const dir = makeTempDir("bad-arg");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const result = runCli(dir, ["--no-such-flag"]);
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Argument parsing error\./, "expected parse-error headline on stderr");
+  assert.match(result.stderr, /--no-such-flag/, "expected original parseArgs detail on stderr");
+  assert.doesNotMatch(
+    result.stderr,
+    /no package\.json/,
+    "arg parsing should fail before the package.json check",
+  );
+  assert.doesNotMatch(
+    result.stdout,
+    /Argument parsing error/,
+    "diagnostic should not leak to stdout",
+  );
+});
+
 void test("missing package.json: exits 1 with diagnostic", (t) => {
   const dir = makeTempDir("no-pkg");
   t.after(() => rmSync(dir, { recursive: true, force: true }));

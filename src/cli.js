@@ -92,7 +92,9 @@ function parseCliArgs() {
       strict: true,
     });
   } catch (err) {
-    throw new LintJsError(err instanceof Error ? err.message : String(err), { cause: err });
+    const errMsg = err instanceof Error ? err.message : String(err);
+
+    throw new LintJsError(`Argument parsing error.`, { cause: err, details: [errMsg] });
   }
 }
 
