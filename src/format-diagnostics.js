@@ -33,21 +33,23 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
  */
 
 /**
+ * Result of {@link formatLintOutput}.
+ *
+ * `unrecognizedSchema` is set when the captured stdout parsed as JSON but did
+ * not expose a `diagnostics` array. In that case `formattedStdout` carries the
+ * raw stdout (verbatim relay), `linterSummary` is null, and the caller decides
+ * whether to emit a stderr warning based on the child's exit status.
+ *
+ * Broken JSON (parse failure) is not treated as `unrecognizedSchema`: the raw
+ * output is still relayed via `formattedStdout`, but the failure is loud
+ * enough on its own (unparseable text in stdout). Reserving the flag for the
+ * "valid JSON but missing schema" case keeps the warning's intent specific.
+ *
  * @typedef {{
  *   formattedStdout: string;
  *   linterSummary: string | null;
  *   unrecognizedSchema: boolean;
  * }} FormatLintResult
- *
- * `unrecognizedSchema` is set when the captured stdout parsed as JSON but did
- * not expose a `diagnostics` array. In that case `formattedStdout` carries the
- * raw stdout (verbatim relay), `linterSummary` is null, and the caller should
- * decide whether to emit a stderr warning based on the child's exit status.
- *
- * Broken JSON (parse failure) is *not* treated as `unrecognizedSchema`: the
- * raw output is still relayed via `formattedStdout`, but the failure is loud
- * enough on its own (unparseable text in stdout). Reserving the flag for
- * "valid JSON but missing schema" makes the intent of the warning specific.
  */
 
 /**
