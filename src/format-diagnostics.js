@@ -16,7 +16,6 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
  * @typedef {{
  *   filename: string;
  *   rawCode: string | null;
- *   message: string;
  *   sortLine: number;
  *   sortCol: number;
  *   ruleName: string;
@@ -213,7 +212,6 @@ function resolveDiagnostic(diag, cache) {
       return {
         filename,
         rawCode,
-        message,
         sortLine: resolved.startLine,
         sortCol: resolved.startCol,
         ruleName,
@@ -227,7 +225,6 @@ function resolveDiagnostic(diag, cache) {
   return {
     filename,
     rawCode,
-    message,
     sortLine: reportedLine,
     sortCol: reportedCol,
     ruleName,
@@ -237,9 +234,8 @@ function resolveDiagnostic(diag, cache) {
 }
 
 /**
- * Takes `labels[0]` only.
- * Typical multi-label diagnostics are duplicate-style where every label points at an identical slice,
- * so listing the rest just repeats content.
+ * Takes `labels[0]` only. Typical multi-label diagnostics are duplicate-style where every label
+ * points at an identical slice, so listing the rest just repeats content.
  *
  * @param {Record<string, unknown>} diag
  * @returns {Record<string, unknown> | null}
