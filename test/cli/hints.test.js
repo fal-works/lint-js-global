@@ -12,7 +12,7 @@ void test("unsafe-any: weak-typings hint follows no-unsafe-* diagnostics", (t) =
 
   const result = runCli(dir, ["--check"]);
 
-  assert.notEqual(result.status, 0, "expected non-zero exit from no-unsafe-* errors");
+  assert.equal(result.status, 1, "expected exit 1 from no-unsafe-* errors (fmt/lint findings)");
   assert.match(result.stdout, /no-unsafe-/, "expected oxlint to report a no-unsafe-* diagnostic");
   assert.match(result.stdout, /weak-typings\.md/, "expected weak-typings hint pointer on stdout");
 

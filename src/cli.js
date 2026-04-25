@@ -56,7 +56,11 @@ node_modules is always skipped; .gitignore, .eslintignore, .prettierignore are r
 /**
  * CLI entry point. Returns the process exit code.
  *
- * Expected failure modes are caught and reported as plain diagnostics.
+ * Exit codes:
+ * - 0: success (any auto-fixable issues were fixed and nothing remains)
+ * - 1: unfixed fmt/lint findings remain and are reported
+ * - 2: expected failure raised by lint-js itself
+ *
  * Anything else is re-thrown so genuine bugs surface with their full stack trace.
  *
  * @returns {number}
@@ -67,7 +71,7 @@ function main() {
   } catch (err) {
     if (err instanceof LintJsError) {
       errorTagged(err.message, ...err.details);
-      return 1;
+      return 2;
     }
     throw err;
   }
@@ -185,7 +189,10 @@ function runMain() {
   print("");
   printTagged(buildSummary({ check, fmtStatus: fmtResult.status, lintStatus: lintResult.status }));
 
-  return Math.max(fmtResult.status ?? 1, lintResult.status ?? 1);
+  // Normalize child statuses to {0, 1}:
+  // oxfmt returns 2 on parse errors, but lint-js reserves exit 2 for LintJsError.
+  // Any non-zero child status collapses to 1.
+  return fmtResult.status === 0 && lintResult.status === 0 ? 0 : 1;
 }
 
 process.exitCode = main();

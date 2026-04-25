@@ -100,7 +100,9 @@ void test("oxfmt failure propagates to exit code even when lint is clean", (t) =
 
   const result = runCli(dir);
 
-  assert.notEqual(result.status, 0, "oxfmt failure must not be swallowed");
+  // oxfmt itself returns 2 on parse errors, but lint-js reserves 2 for LintJsError;
+  // any non-zero child status must collapse to 1 (fmt/lint findings).
+  assert.equal(result.status, 1, "oxfmt parse-error exit must be normalized to 1");
 });
 
 void test("--check: does not modify files and reports both fmt and lint violations", (t) => {

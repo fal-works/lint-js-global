@@ -32,14 +32,22 @@ void test("--version: prints semver and exits 0 without requiring package.json",
   }
 });
 
-void test("unknown CLI option: exits 1 with parsing-error diagnostic", (t) => {
+void test("unknown CLI option: exits 2 with parsing-error diagnostic", (t) => {
   const dir = makeTempDir("bad-arg");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
   const result = runCli(dir, ["--no-such-flag"]);
 
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /Argument parsing error\./, "expected parse-error headline on stderr");
+  assert.equal(
+    result.status,
+    2,
+    "LintJsError path uses exit 2 (distinct from fmt/lint failure = 1)",
+  );
+  assert.match(
+    result.stderr,
+    /Argument parsing error\./,
+    "expected parse-error headline on stderr",
+  );
   assert.match(result.stderr, /--no-such-flag/, "expected original parseArgs detail on stderr");
   assert.doesNotMatch(
     result.stderr,
@@ -53,13 +61,17 @@ void test("unknown CLI option: exits 1 with parsing-error diagnostic", (t) => {
   );
 });
 
-void test("missing package.json: exits 1 with diagnostic", (t) => {
+void test("missing package.json: exits 2 with diagnostic", (t) => {
   const dir = makeTempDir("no-pkg");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
   const result = runCli(dir);
 
-  assert.equal(result.status, 1);
+  assert.equal(
+    result.status,
+    2,
+    "LintJsError path uses exit 2 (distinct from fmt/lint failure = 1)",
+  );
   assert.match(result.stderr, /no package\.json/, "expected diagnostic about missing package.json");
   assert.doesNotMatch(
     result.stdout,
@@ -74,6 +86,10 @@ void test("nonexistent target fails fast with diagnostic", (t) => {
 
   const result = runCli(dir, ["src/does-not-exist.ts"]);
 
-  assert.equal(result.status, 1);
+  assert.equal(
+    result.status,
+    2,
+    "LintJsError path uses exit 2 (distinct from fmt/lint failure = 1)",
+  );
   assert.match(result.stderr, /target not found/);
 });
