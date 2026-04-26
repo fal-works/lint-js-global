@@ -515,14 +515,33 @@ void test("non-object JSON (e.g. bare array) is treated as schemaMismatch", () =
   assert.notEqual(result.schemaMismatch, null);
 });
 
-void test("broken JSON does NOT flag schemaMismatch (parse failure is a separate path)", () => {
+void test("non-empty broken JSON flags schemaMismatch (output-contract failure)", () => {
   const result = formatLintOutput({
     capturedStdout: "{not valid json",
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
 
+  assert.notEqual(result.schemaMismatch, null);
+  assert.match(
+    result.schemaMismatch?.reason ?? "",
+    /JSON/,
+    "reason should identify the failure as a JSON parse problem",
+  );
+});
+
+void test("empty stdout in JSON mode is clean-compatible (no schemaMismatch)", () => {
+  // oxlint should always emit JSON in default mode, but empty stdout is a benign
+  // edge case (no payload at all) and should not be escalated to a contract failure.
+  const result = formatLintOutput({
+    capturedStdout: "",
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
   assert.equal(result.schemaMismatch, null);
+  assert.equal(result.formattedStdout, "");
+  assert.equal(result.linterSummary, null);
 });
 
 void test("entry missing `filename` is treated as schemaMismatch with index in reason", () => {
@@ -813,7 +832,7 @@ void test("out-of-bounds span falls back to placeholder", (t) => {
   );
 });
 
-void test("broken JSON is relayed verbatim as formattedStdout", () => {
+void test("broken JSON is relayed verbatim and surfaced via schemaMismatch", () => {
   const broken = "{not valid json";
 
   const result = formatLintOutput({
@@ -824,6 +843,7 @@ void test("broken JSON is relayed verbatim as formattedStdout", () => {
 
   assert.equal(result.formattedStdout, broken);
   assert.equal(result.linterSummary, null);
+  assert.notEqual(result.schemaMismatch, null);
 });
 
 void test("--unix mode passes stdout through unchanged", () => {

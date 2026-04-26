@@ -47,10 +47,11 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 /**
  * Result of {@link formatLintOutput}.
  *
- * `schemaMismatch` is non-null when the captured stdout parsed as JSON but
- * its shape diverges from the wrapper's contract.
+ * `schemaMismatch` is non-null when the captured stdout fails the wrapper's output contract:
+ * either non-empty stdout that does not parse as JSON, or
+ * JSON whose shape diverges from the expected diagnostic schema.
  *
- * `reason` names the offending field.
+ * `reason` names the offending field or parser failure.
  * In that case `formattedStdout` carries the raw stdout for relay and `linterSummary` is null.
  *
  * @typedef {{
@@ -77,14 +78,26 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
     return { formattedStdout: capturedStdout, linterSummary: null, schemaMismatch: null };
   }
 
+  // Empty stdout is treated as clean-compatible: oxlint emitted no payload at all,
+  // which is benign and should not be escalated to a contract failure.
+  if (capturedStdout === "") {
+    return { formattedStdout: "", linterSummary: null, schemaMismatch: null };
+  }
+
   /** @type {unknown} */
   let parsed;
   try {
     parsed = JSON.parse(capturedStdout);
-  } catch {
-    // Broken JSON: relay oxlint's raw output verbatim and let the overall
-    // `lint-js:` summary flag the failure via non-zero exit code.
-    return { formattedStdout: capturedStdout, linterSummary: null, schemaMismatch: null };
+  } catch (err) {
+    // Non-empty unparseable stdout is an output-contract failure (e.g. caret-range
+    // oxlint update silently changed the format). Surface it via the same path as
+    // schema drift so the wrapper exits 2 instead of misreporting the run as clean.
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      formattedStdout: capturedStdout,
+      linterSummary: null,
+      schemaMismatch: { reason: `stdout is not valid JSON: ${message}` },
+    };
   }
 
   const validation = validatePayload(parsed);
