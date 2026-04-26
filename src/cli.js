@@ -142,12 +142,6 @@ function runMain() {
     }
   }
 
-  // Phase banners deliberately omit the `lint-js:` prefix used elsewhere for CLI diagnostics.
-  // They sit inline with oxfmt/oxlint's own output; prefixing would break visual cohesion.
-
-  // Fmt start banner is unconditional although oxfmt itself prints "Checking formatting..." in check mode.
-  // oxfmt's own opener is absent for zero-match runs,
-  // so without this line stdout would show no trace of the fmt phase at all.
   const fmtLabel = check ? "formatting (check-only)" : "formatting";
   print(`${fmtLabel}...`);
   const fmtResult = runTool({
@@ -181,9 +175,7 @@ function runMain() {
   });
   process.stdout.write(formattedStdout);
   if (schemaMismatch !== null) {
-    // Valid JSON whose shape diverges from what this wrapper understands.
-    // Raw stdout was just relayed above; surface this as a hard failure on the
-    // LintJsError channel so it doesn't get conflated with a normal lint outcome.
+    // Raw stdout was relayed above; route the contract failure through LintJsError.
     throw new LintJsError("oxlint output contract mismatch.", {
       details: [schemaMismatch.reason, "Raw payload relayed to stdout above."],
     });
@@ -197,9 +189,7 @@ function runMain() {
   print("");
   printTagged(buildSummary({ check, fmtStatus: fmtResult.status, lintStatus: lintResult.status }));
 
-  // Normalize child statuses to {0, 1}:
-  // oxfmt returns 2 on parse errors, but lint-js reserves exit 2 for LintJsError.
-  // Any non-zero child status collapses to 1.
+  // Collapse any non-zero child status to 1; exit 2 is reserved for LintJsError.
   return fmtResult.status === 0 && lintResult.status === 0 ? 0 : 1;
 }
 

@@ -25,7 +25,10 @@ export class LintJsError extends Error {
 }
 
 /**
- * Plain stdout line. Used for help, version, phase banners, blank separators.
+ * Plain stdout line. Used for help, version, blank separators.
+ *
+ * Use also for phase banners; they sit inline with oxfmt/oxlint output
+ * and prefixing would break visual cohesion.
  *
  * @param {string} msg
  */

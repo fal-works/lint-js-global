@@ -15,11 +15,15 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 /**
  * Per-diagnostic shape after schema validation.
  *
- * Only fields the wrapper actually consumes are kept; unused oxlint fields
- * (`severity`, `causes`, `url`, `help`, `related`, label text) are not retained.
+ * Only fields the wrapper consumes are kept; unused oxlint fields (`severity`,
+ * `causes`, `url`, `help`, `related`, label text) are not retained.
  *
- * `code` and `message` are both nullable, but the validator guarantees at least
- * one is non-null. `extractRuleName` falls back to `(message)` when `code` is absent.
+ * Multi-label diagnostics are reduced to `labels[0]`: typical multi-label
+ * entries are duplicate-style with every label pointing at an identical slice,
+ * so listing the rest just repeats content.
+ *
+ * `code` and `message` are both nullable, but the validator guarantees at
+ * least one is non-null.
  *
  * @typedef {{
  *   filename: string;
@@ -51,16 +55,13 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 /**
  * Result of {@link formatLintOutput}.
  *
- * `schemaMismatch` is non-null when the captured stdout parsed as JSON but
- * either lacked the top-level `diagnostics` array or contained an entry whose
- * shape diverges from what the wrapper relies on. This signals an oxlint
- * output contract mismatch (likely a schema bump on the caret-pinned dep, or
- * a structured fatal payload). The `reason` carries a short description of
- * which field in which position failed validation, so the caller can surface
- * actionable details. `formattedStdout` then holds the raw stdout for relay
- * and `linterSummary` is null. The CLI boundary routes this through
- * `LintJsError` (exit 2) rather than conflating it with a normal lint
- * outcome.
+ * `schemaMismatch` is non-null when the captured stdout parsed as JSON but its
+ * shape diverges from what the wrapper consumes (missing top-level
+ * `diagnostics` array, or an entry whose shape fails validation). This signals
+ * an oxlint output contract mismatch — typically a schema bump on the
+ * caret-pinned dep, or a structured fatal payload. `reason` is a short
+ * description of which field failed; `formattedStdout` then carries the raw
+ * stdout for relay and `linterSummary` is null.
  *
  * Broken JSON (parse failure) is not treated as `schemaMismatch`: the raw
  * output is still relayed via `formattedStdout`, but unparseable text on
@@ -75,11 +76,10 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
  */
 
 /**
- * Entry point: takes raw oxlint JSON-format stdout and returns the formatted payload.
+ * Format raw oxlint JSON stdout into the LLM-friendly payload.
  *
- * Not a strictly pure function (reads source files to resolve spans), but performs
- * no stdout/stderr output. The caller decides when and where to emit, including
- * how to react to `schemaMismatch` (raw relay + warning vs silent).
+ * No stdout/stderr emission; the caller decides when and where to write. May
+ * read source files to resolve span positions.
  *
  * @param {object} options
  * @param {string} options.capturedStdout Raw oxlint stdout from `--format=json`.
@@ -143,14 +143,7 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
 }
 
 /**
- * Validate the parsed oxlint payload against the wrapper's expected shape.
- *
- * Top-level: `{ diagnostics: array, ... }`. Per entry: `filename` is a string,
- * `labels[0].span` carries the four numeric fields the resolver consumes
- * (`offset`, `length`, `line`, `column`), and at least one of `code`/`message`
- * is a string (`extractRuleName` falls back to `(message)` when `code` is
- * absent). Optional fields oxlint emits but the wrapper ignores (`severity`,
- * `causes`, `url`, `help`, `related`, label text) are not checked.
+ * Validate the parsed oxlint payload against the {@link ValidatedDiagnostic} contract.
  *
  * Returns `{ ok: false, reason }` on first mismatch — fail fast so a single
  * shape drift surfaces as a contract error rather than getting averaged over
@@ -289,14 +282,11 @@ function findLine(lineStartOffsets, offset) {
 }
 
 /**
- * Resolve a validated diagnostic against the source cache. Schema validation
- * happened upstream, so the only branches here are runtime degradations:
- * source file unreadable or span out-of-bounds. Both fall back to the
- * `<unreadable>` slice and oxlint's reported start position.
+ * Resolve a validated diagnostic against the source cache.
  *
- * Multi-label diagnostics are reduced to `labels[0]` upstream — typical
- * multi-label entries are duplicate-style where every label points at an
- * identical slice, so listing the rest just repeats content.
+ * Schema validation happened upstream, so the only branches here are runtime
+ * degradations: source file unreadable or span out-of-bounds. Both fall back
+ * to the `<unreadable>` slice and oxlint's reported start position.
  *
  * @param {ValidatedDiagnostic} diag
  * @param {ReturnType<typeof createSourceCache>} cache
@@ -351,8 +341,7 @@ function isUnknownArray(v) {
 }
 
 /**
- * `Number.isInteger` rejects NaN, Infinity, and fractional values; the `>= 0`
- * guard then keeps the domain to byte counts and offsets.
+ * Used for byte counts and byte offsets.
  *
  * @param {unknown} v
  * @returns {v is number}
@@ -405,11 +394,11 @@ function resolveSpan(cache, filename, offset, length) {
 }
 
 /**
- * Per spec §3.3: strip the plugin prefix and use the inner rule ID.
- * Per agreed design: if `code` is absent, use `(message)` with the full message, newlines stripped.
+ * Per spec §3.3: strip the plugin prefix from `rawCode` and use the inner rule ID.
+ * Per agreed design: when `rawCode` is null, fall back to `(message)` with newlines collapsed.
  *
- * The validator guarantees at least one of `rawCode`/`message` is non-null; the
- * `?? ""` is purely a type-system fallback that is never reached at runtime.
+ * (`message ?? ""` is a type-system fallback never reached at runtime — the
+ * validator guarantees at least one of the two is non-null.)
  *
  * @param {string | null} rawCode
  * @param {string | null} message
@@ -439,12 +428,11 @@ function formatCodeSlice(text) {
   // Iterate as Unicode code points (not UTF-16 units) so e.g. "𠮷" counts as 1.
   const codePoints = Array.from(firstLine);
   if (codePoints.length > SLICE_MAX_LEN) {
-    // Rule 2: hard truncate, no leading space before "...".
-    // Applies regardless of whether more lines follow.
+    // Rule 2: hard truncate, regardless of whether more lines follow.
     return { text: `${codePoints.slice(0, SLICE_MAX_LEN).join("")}...`, truncated: true };
   }
   if (hasMoreLines) {
-    // Rule 3: first line fits but there are more lines — append " ..." with a leading space.
+    // Rule 3: first line fits but more lines follow.
     return { text: `${firstLine} ...`, truncated: true };
   }
   return { text: firstLine, truncated: false };

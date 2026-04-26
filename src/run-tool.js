@@ -8,10 +8,9 @@ import { join } from "node:path";
 import { LintJsError } from "./log.js";
 
 /**
- * Launches a tool via `process.execPath` with stdio inherited.
- * Throws `LintJsError` on launch failure or signal-driven termination so the
- * CLI boundary routes it to exit 2 instead of conflating with normal lint
- * findings (exit 1).
+ * Run a Node-based tool with stdio inherited (executed via `process.execPath`).
+ *
+ * Throws {@link LintJsError} on launch failure or signal-driven termination.
  *
  * @param {object} options
  * @param {string} options.name Tool name for launch-failure diagnostics.
@@ -79,13 +78,12 @@ export function runToolCapturingOutput({ name, bin, args, env }) {
 }
 
 /**
- * Translate launch failures and signal-driven termination of a child into
- * `LintJsError`. Normal exits (any numeric status, including non-zero) pass
- * through; the caller uses the status as part of its own outcome reporting.
+ * Translate launch failures and signal-driven termination into {@link LintJsError}.
+ * Normal exits (any numeric status, including non-zero) pass through;
+ * the caller uses the status as part of its own outcome reporting.
  *
- * Without this guard, a signal-killed child would surface as `status: null`
- * with `error: null` and the CLI's exit-code rule (`status === 0 ? 0 : 1`)
- * would mislabel the crash as "unfixed lint findings remain".
+ * Without this guard, a signal-killed child surfaces as `status: null` with `error: null`,
+ * which is indistinguishable from a clean exit when the caller only inspects status.
  *
  * @param {string} name Tool name for diagnostics.
  * @param {ReturnType<typeof spawnSync>} result
