@@ -13,14 +13,8 @@ const UNREADABLE_SLICE = "<unreadable>";
 const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 
 /**
- * Per-diagnostic shape after schema validation.
- *
- * Only fields the wrapper consumes are kept; unused oxlint fields (`severity`,
- * `causes`, `url`, `help`, `related`, label text) are not retained.
- *
- * Multi-label diagnostics are reduced to `labels[0]`: typical multi-label
- * entries are duplicate-style with every label pointing at an identical slice,
- * so listing the rest just repeats content.
+ * Per-diagnostic shape after schema validation. Only fields the wrapper
+ * consumes are kept.
  *
  * `code` and `message` are both nullable, but the validator guarantees at
  * least one is non-null.
@@ -55,18 +49,10 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 /**
  * Result of {@link formatLintOutput}.
  *
- * `schemaMismatch` is non-null when the captured stdout parsed as JSON but its
- * shape diverges from what the wrapper consumes (missing top-level
- * `diagnostics` array, or an entry whose shape fails validation). This signals
- * an oxlint output contract mismatch — typically a schema bump on the
- * caret-pinned dep, or a structured fatal payload. `reason` is a short
- * description of which field failed; `formattedStdout` then carries the raw
- * stdout for relay and `linterSummary` is null.
- *
- * Broken JSON (parse failure) is not treated as `schemaMismatch`: the raw
- * output is still relayed via `formattedStdout`, but unparseable text on
- * stdout is loud enough on its own. Reserving the flag for the "valid JSON
- * but unexpected shape" case keeps its meaning specific.
+ * `schemaMismatch` is non-null when the captured stdout parsed as JSON but
+ * its shape diverges from the wrapper's contract. `reason` names the
+ * offending field. In that case `formattedStdout` carries the raw stdout for
+ * relay and `linterSummary` is null.
  *
  * @typedef {{
  *   formattedStdout: string;
@@ -104,9 +90,6 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
 
   const validation = validatePayload(parsed);
   if (!validation.ok) {
-    // Valid JSON but the shape diverges from what the wrapper relies on.
-    // Relay raw stdout so the actual payload stays visible to the caller,
-    // and surface the specific reason via `schemaMismatch`.
     return {
       formattedStdout: capturedStdout,
       linterSummary: null,
@@ -145,9 +128,8 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
 /**
  * Validate the parsed oxlint payload against the {@link ValidatedDiagnostic} contract.
  *
- * Returns `{ ok: false, reason }` on first mismatch — fail fast so a single
- * shape drift surfaces as a contract error rather than getting averaged over
- * silently-degraded entries.
+ * Stops at the first mismatch so shape drift surfaces as a contract error
+ * rather than averaging out across silently-degraded entries.
  *
  * @param {unknown} parsed
  * @returns {{ ok: true; diagnostics: ValidatedDiagnostic[] } | { ok: false; reason: string }}
@@ -187,16 +169,16 @@ function validateDiagnostic(diag) {
   if (!isUnknownArray(diag.labels) || diag.labels.length === 0) {
     return { ok: false, reason: "`labels` is missing or empty" };
   }
+  // Reduce multi-label entries to `labels[0]`. Typical extras are duplicate
+  // pointers to the same slice.
   const first = diag.labels[0];
   if (!isObject(first)) return { ok: false, reason: "`labels[0]` is not an object" };
   const span = first.span;
   if (!isObject(span)) {
     return { ok: false, reason: "`labels[0].span` is missing or not an object" };
   }
-  // Domain checks: offset/length are UTF-8 byte counts (non-negative integers);
-  // line/column are 1-origin positions (positive integers). Without these,
-  // negative or fractional values would slip past the validator and surface as
-  // `<unreadable>` from the runtime path, masking contract drift.
+  // Without integer-domain checks, malformed spans slip past validation and
+  // surface as `<unreadable>` at the runtime path, masking contract drift.
   if (!isNonNegativeInteger(span.offset)) {
     return { ok: false, reason: "`labels[0].span.offset` is not a non-negative integer" };
   }
@@ -282,11 +264,8 @@ function findLine(lineStartOffsets, offset) {
 }
 
 /**
- * Resolve a validated diagnostic against the source cache.
- *
- * Schema validation happened upstream, so the only branches here are runtime
- * degradations: source file unreadable or span out-of-bounds. Both fall back
- * to the `<unreadable>` slice and oxlint's reported start position.
+ * Resolve a validated diagnostic against the source cache. Falls back when
+ * the source is unreadable or the span is out-of-bounds.
  *
  * @param {ValidatedDiagnostic} diag
  * @param {ReturnType<typeof createSourceCache>} cache
@@ -341,8 +320,6 @@ function isUnknownArray(v) {
 }
 
 /**
- * Used for byte counts and byte offsets.
- *
  * @param {unknown} v
  * @returns {v is number}
  */
@@ -351,8 +328,6 @@ function isNonNegativeInteger(v) {
 }
 
 /**
- * Used for 1-origin line / column positions.
- *
  * @param {unknown} v
  * @returns {v is number}
  */
@@ -394,11 +369,8 @@ function resolveSpan(cache, filename, offset, length) {
 }
 
 /**
- * Per spec §3.3: strip the plugin prefix from `rawCode` and use the inner rule ID.
- * Per agreed design: when `rawCode` is null, fall back to `(message)` with newlines collapsed.
- *
- * (`message ?? ""` is a type-system fallback never reached at runtime — the
- * validator guarantees at least one of the two is non-null.)
+ * Strip the plugin prefix from `rawCode` and return the inner rule ID. When
+ * `rawCode` is null, fall back to `(message)` with newlines collapsed.
  *
  * @param {string | null} rawCode
  * @param {string | null} message
@@ -411,11 +383,8 @@ function extractRuleName(rawCode, message) {
 }
 
 /**
- * Per spec §3.2: extract first line, truncate if too long, append multi-line marker.
- *
- * Handles both LF and CRLF source files: the regex split discards a CR that
- * pairs with the next LF, and the trailing-CR strip covers the edge case where
- * a span ends exactly at the CR of a CRLF pair (no following LF inside the span).
+ * Extract the first line of a span, truncate if too long, and append a
+ * multi-line marker if more lines follow.
  *
  * @param {string} text
  * @returns {{ text: string; truncated: boolean }}
@@ -424,15 +393,15 @@ function formatCodeSlice(text) {
   const nlIdx = text.search(/\r?\n/);
   const hasMoreLines = nlIdx !== -1;
   const rawFirstLine = hasMoreLines ? text.slice(0, nlIdx) : text;
+  // Strip a trailing CR left when the span ends exactly at the CR of a CRLF
+  // pair (the LF that the regex would otherwise consume is outside the span).
   const firstLine = rawFirstLine.replace(/\r$/, "");
   // Iterate as Unicode code points (not UTF-16 units) so e.g. "𠮷" counts as 1.
   const codePoints = Array.from(firstLine);
   if (codePoints.length > SLICE_MAX_LEN) {
-    // Rule 2: hard truncate, regardless of whether more lines follow.
     return { text: `${codePoints.slice(0, SLICE_MAX_LEN).join("")}...`, truncated: true };
   }
   if (hasMoreLines) {
-    // Rule 3: first line fits but more lines follow.
     return { text: `${firstLine} ...`, truncated: true };
   }
   return { text: firstLine, truncated: false };
