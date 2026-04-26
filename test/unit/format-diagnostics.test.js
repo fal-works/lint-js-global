@@ -745,11 +745,15 @@ void test("entry with span.column below 1 is treated as schemaMismatch", () => {
   assert.match(result.schemaMismatch?.reason ?? "", /column.*positive/);
 });
 
-void test("entry missing both `code` and `message` is treated as schemaMismatch", () => {
+void test("entry missing `message` is treated as schemaMismatch (even when `code` is present)", () => {
+  // `message` is contractually required: oxlint is observed to always emit it. Tightening this
+  // ensures any upstream drift that drops the field surfaces as a contract failure rather than
+  // silently degrading to a rule-line-only render.
   const raw = JSON.stringify({
     diagnostics: [
       {
         filename: "/x.ts",
+        code: "eslint(no-debugger)",
         labels: [{ span: { offset: 0, length: 1, line: 1, column: 1 } }],
       },
     ],
@@ -761,36 +765,9 @@ void test("entry missing both `code` and `message` is treated as schemaMismatch"
     weakTypingsDocPath: HINT_PATH,
   });
 
+  assert.equal(result.formattedStdout, raw, "raw payload must be relayed");
   assert.notEqual(result.schemaMismatch, null);
-  assert.match(result.schemaMismatch?.reason ?? "", /code.*message|message.*code/);
-});
-
-void test("entry missing only `message` (with valid `code`) passes validation and emits no continuation", (t) => {
-  // `message` absent is fine when `code` carries the rule identity.
-  // The message continuation line is suppressed because there is no message text to render.
-  const dir = setupFixture(t, { "x.ts": "debugger;\n" });
-  const file = join(dir, "x.ts");
-  const raw = JSON.stringify({
-    diagnostics: [
-      {
-        filename: file,
-        code: "eslint(no-debugger)",
-        labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
-      },
-    ],
-  });
-
-  const result = formatLintOutput({
-    capturedStdout: raw,
-    unix: false,
-    weakTypingsDocPath: HINT_PATH,
-  });
-
-  assert.equal(result.schemaMismatch, null);
-  assert.equal(
-    result.formattedStdout,
-    joinSections([LEGEND, [file, "  1:1 debugger [no-debugger]"]]),
-  );
+  assert.match(result.schemaMismatch?.reason ?? "", /message.*missing|missing.*message/);
 });
 
 void test("entry with non-string `code` (object) is treated as schemaMismatch", () => {

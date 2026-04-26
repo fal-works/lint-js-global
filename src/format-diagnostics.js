@@ -23,12 +23,12 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
  * Per-diagnostic shape after schema validation.
  * Only fields the wrapper consumes are kept.
  *
- * `code` and `message` are both nullable, but the validator guarantees at least one is non-null.
+ * `code` is nullable: oxc parser-error diagnostics omit it.
  *
  * @typedef {{
  *   filename: string;
  *   code: string | null;
- *   message: string | null;
+ *   message: string;
  *   span: { offset: number; length: number; line: number; column: number };
  * }} ValidatedDiagnostic
  */
@@ -37,7 +37,7 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
  * @typedef {{
  *   filename: string;
  *   rawCode: string | null;
- *   message: string | null;
+ *   message: string;
  *   sortLine: number;
  *   sortCol: number;
  *   ruleName: string;
@@ -184,18 +184,16 @@ function validateDiagnostic(diag) {
   }
   const codeResult = validateOptionalString(diag.code, "code");
   if (!codeResult.ok) return codeResult;
-  const messageResult = validateOptionalString(diag.message, "message");
-  if (!messageResult.ok) return messageResult;
   const code = codeResult.value;
-  const message = messageResult.value;
-  if (code === null && message === null) {
-    return { ok: false, reason: "neither `code` nor `message` is a string" };
+  if (typeof diag.message !== "string") {
+    return { ok: false, reason: "`message` is missing or not a string" };
   }
+  const message = diag.message;
   if (!isUnknownArray(diag.labels) || diag.labels.length === 0) {
     return { ok: false, reason: "`labels` is missing or empty" };
   }
   // Reduce multi-label entries to `labels[0]`.
-  // Typical extras are duplicate pointers to the same slice.
+  // Typical extras are duplicate pointers to the identical slice at different locations.
   const first = diag.labels[0];
   if (!isObject(first)) return { ok: false, reason: "`labels[0]` is not an object" };
   const span = first.span;
@@ -415,11 +413,11 @@ function resolveSpan(cache, filename, offset, length) {
  * `rawCode` is null, fall back to `(message)` with newlines collapsed.
  *
  * @param {string | null} rawCode
- * @param {string | null} message
+ * @param {string} message
  * @returns {string}
  */
 function extractRuleName(rawCode, message) {
-  if (rawCode === null) return `(${(message ?? "").replace(/\r?\n/g, " ")})`;
+  if (rawCode === null) return `(${message.replace(/\r?\n/g, " ")})`;
   const match = /\(([^)]+)\)\s*$/.exec(rawCode);
   return match ? match[1] : rawCode;
 }
@@ -479,17 +477,17 @@ function groupByFilename(resolved) {
 
 /**
  * Render a single diagnostic as the rule line, optionally followed by a message
- * continuation line. The continuation is suppressed when `code` is null (the message,
- * if any, is already inlined into the rule slot via `extractRuleName`) or when
- * `message` is null (nothing to render). Newlines inside `message` collapse to a
- * single space so the continuation stays on one line.
+ * continuation line. The continuation is suppressed when `rawCode` is null because
+ * the message is already inlined into the rule slot via `extractRuleName`.
+ * Newlines inside `message` collapse to a single space so the continuation stays
+ * on one line.
  *
  * @param {ResolvedDiagnostic} d
  * @returns {string}
  */
 function formatDiagLine(d) {
   const ruleLine = `  ${d.location} ${d.slice} [${d.ruleName}]`;
-  if (d.rawCode === null || d.message === null) return ruleLine;
+  if (d.rawCode === null) return ruleLine;
   const messageLine = d.message.replace(/\r?\n/g, " ");
   return `${ruleLine}\n    ${messageLine}`;
 }
