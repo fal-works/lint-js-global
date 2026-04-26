@@ -5,11 +5,15 @@ formatting...
 Finished in <DUR>ms on <N> files using <T> threads.
 
 linting (with auto-fix)...
-diagnostic legend: <location> <code-slice> [<rule-name>]
+diagnostic legend:
+  <location> <code-slice> [<rule-name>]
+    <message>
 
 src/index.ts
   1:7 data = JSON.parse("{}") [no-unsafe-assignment]
+    Unsafe assignment of an any value.
   2:18 foo [no-unsafe-member-access]
+    Unsafe member access .foo on an `any` value.
 
 Hint on the `no-unsafe-*` diagnostics:
 - Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary module with typed wrappers.

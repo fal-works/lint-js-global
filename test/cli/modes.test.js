@@ -30,11 +30,22 @@ void test("basic: reformats sources and reports floating promise", (t) => {
     /weak-typings\.md/,
     "weak-typings hint must not fire when only non-unsafe rules trigger",
   );
-  // Default formatter: legend + bracketed rule-name + issue-count summary all present.
+  // Default formatter: legend block + bracketed rule-name + issue-count summary all present.
+  // The legend is a 3-line block (`diagnostic legend:` + the two structural placeholder lines).
   assert.match(
     result.stdout,
-    /^diagnostic legend: <location> <code-slice> \[<rule-name>\]$/m,
-    "expected legend line at the top of the diagnostic block",
+    /^diagnostic legend:$/m,
+    "expected legend block header at the top of the diagnostic block",
+  );
+  assert.match(
+    result.stdout,
+    /^ {2}<location> <code-slice> \[<rule-name>\]$/m,
+    "expected rule-line placeholder inside the legend block",
+  );
+  assert.match(
+    result.stdout,
+    /^ {4}<message>$/m,
+    "expected message-continuation placeholder inside the legend block",
   );
   assert.match(
     result.stdout,

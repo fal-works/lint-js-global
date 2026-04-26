@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
  * LLM-friendly formatter for oxlint's `--format=json` output.
  */
 
-const LEGEND = "diagnostic legend: <location> <code-slice> [<rule-name>]";
+const LEGEND = "diagnostic legend:\n  <location> <code-slice> [<rule-name>]\n    <message>";
 const SLICE_MAX_LEN = 40;
 const UNREADABLE_SLICE = "<unreadable>";
 const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
@@ -37,6 +37,7 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
  * @typedef {{
  *   filename: string;
  *   rawCode: string | null;
+ *   message: string | null;
  *   sortLine: number;
  *   sortCol: number;
  *   ruleName: string;
@@ -306,6 +307,7 @@ function resolveDiagnostic(diag, cache) {
     return {
       filename: diag.filename,
       rawCode: diag.code,
+      message: diag.message,
       sortLine: resolved.startLine,
       sortCol: resolved.startCol,
       ruleName,
@@ -317,6 +319,7 @@ function resolveDiagnostic(diag, cache) {
   return {
     filename: diag.filename,
     rawCode: diag.code,
+    message: diag.message,
     sortLine: diag.span.line,
     sortCol: diag.span.column,
     ruleName,
@@ -475,11 +478,20 @@ function groupByFilename(resolved) {
 }
 
 /**
+ * Render a single diagnostic as the rule line, optionally followed by a message
+ * continuation line. The continuation is suppressed when `code` is null (the message,
+ * if any, is already inlined into the rule slot via `extractRuleName`) or when
+ * `message` is null (nothing to render). Newlines inside `message` collapse to a
+ * single space so the continuation stays on one line.
+ *
  * @param {ResolvedDiagnostic} d
  * @returns {string}
  */
 function formatDiagLine(d) {
-  return `  ${d.location} ${d.slice} [${d.ruleName}]`;
+  const ruleLine = `  ${d.location} ${d.slice} [${d.ruleName}]`;
+  if (d.rawCode === null || d.message === null) return ruleLine;
+  const messageLine = d.message.replace(/\r?\n/g, " ");
+  return `${ruleLine}\n    ${messageLine}`;
 }
 
 /**

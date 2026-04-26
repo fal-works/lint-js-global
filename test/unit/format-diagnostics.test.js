@@ -10,6 +10,8 @@ import { formatLintOutput } from "../../src/format-diagnostics.js";
 
 const HINT_PATH = "/opt/lint-js/docs/guide/weak-typings.md";
 
+const LEGEND = ["diagnostic legend:", "  <location> <code-slice> [<rule-name>]", "    <message>"];
+
 /**
  * @typedef {{
  *   message: string;
@@ -85,8 +87,8 @@ void test("single file, single diagnostic (short single-line slice)", (t) => {
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
-      [file, "  1:1 debugger [no-debugger]"],
+      LEGEND,
+      [file, "  1:1 debugger [no-debugger]", "    `debugger` statement is not allowed."],
     ]),
   );
   assert.equal(result.linterSummary, "Found 1 unfixed issue in 1 file.");
@@ -133,12 +135,15 @@ void test("single file, multiple diagnostics sort by (line, col, rule-name)", (t
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
+      LEGEND,
       [
         file,
         "  1:7 x [no-unused-vars]",
+        "    a",
         "  2:7 y [no-unused-vars]",
+        "    b",
         "  3:1 debugger [no-debugger]",
+        "    d",
       ],
     ]),
   );
@@ -178,9 +183,9 @@ void test("multiple files sort lexicographically", (t) => {
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
-      [fileA, "  1:1 debugger [no-debugger]"],
-      [fileB, "  1:1 debugger [no-debugger]"],
+      LEGEND,
+      [fileA, "  1:1 debugger [no-debugger]", "    d"],
+      [fileB, "  1:1 debugger [no-debugger]", "    d"],
     ]),
   );
   assert.equal(result.linterSummary, "Found 2 unfixed issues in 2 files.");
@@ -213,10 +218,7 @@ void test("long single-line slice truncates at 40 characters with no leading spa
   const truncated = "a".repeat(40) + "...";
   assert.equal(
     result.formattedStdout,
-    joinSections([
-      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
-      [file, `  1:1-1:45 ${truncated} [no-unused-vars]`],
-    ]),
+    joinSections([LEGEND, [file, `  1:1-1:45 ${truncated} [no-unused-vars]`, "    unused"]]),
   );
 });
 
@@ -245,8 +247,8 @@ void test("multi-line span with first line ≤40 chars gets the ' ...' multi-lin
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
-      [file, "  1:1-3:1 function foo() { ... [some-rule]"],
+      LEGEND,
+      [file, "  1:1-3:1 function foo() { ... [some-rule]", "    bad function"],
     ]),
   );
 });
@@ -281,10 +283,7 @@ void test("multi-line span with first line >40 chars suppresses the multi-line m
   // lastByte = offset 54 (last non-newline byte of 'more' = 'e'); endLine = 2; endCol = 54 - 51 + 1 = 4.
   assert.equal(
     result.formattedStdout,
-    joinSections([
-      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
-      [file, `  1:1-2:4 ${truncated} [some-rule]`],
-    ]),
+    joinSections([LEGEND, [file, `  1:1-2:4 ${truncated} [some-rule]`, "    bad"]]),
   );
 });
 
@@ -316,10 +315,7 @@ void test("CRLF source: multi-line span strips the CR before the multi-line mark
   // endCol = 11 - 9 + 1 = 3.
   assert.equal(
     result.formattedStdout,
-    joinSections([
-      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
-      [file, "  1:1-2:3 foo bar ... [some-rule]"],
-    ]),
+    joinSections([LEGEND, [file, "  1:1-2:3 foo bar ... [some-rule]", "    multi-line crlf"]]),
   );
 });
 
@@ -350,10 +346,7 @@ void test("CRLF source: span ending exactly at CR strips the trailing CR", (t) =
   // truncated = false (length ≤ 40 and no further lines), so location uses `L:C` form.
   assert.equal(
     result.formattedStdout,
-    joinSections([
-      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
-      [file, "  1:1 foo [some-rule]"],
-    ]),
+    joinSections([LEGEND, [file, "  1:1 foo [some-rule]", "    trailing cr"]]),
   );
 });
 
@@ -385,10 +378,7 @@ void test("UTF-8 multi-byte span resolves byte offsets correctly", (t) => {
   // startLine=1, startCol = 10 - 0 + 1 = 11 (byte-based).
   assert.equal(
     result.formattedStdout,
-    joinSections([
-      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
-      [file, "  1:11 'あいう' [some-rule]"],
-    ]),
+    joinSections([LEGEND, [file, "  1:11 'あいう' [some-rule]", "    literal"]]),
   );
 });
 
@@ -414,8 +404,8 @@ void test("no-unsafe-* diagnostic triggers the weak-typings hint block", (t) => 
   assert.equal(
     result.formattedStdout,
     joinSections([
-      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
-      [file, "  1:7 x = foo [no-unsafe-assignment]"],
+      LEGEND,
+      [file, "  1:7 x = foo [no-unsafe-assignment]", "    Unsafe assignment"],
       [
         "Hint on the `no-unsafe-*` diagnostics:",
         "- Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary module with typed wrappers.",
@@ -425,6 +415,64 @@ void test("no-unsafe-* diagnostic triggers the weak-typings hint block", (t) => 
     ]),
   );
   assert.equal(result.linterSummary, "Found 1 unfixed issue in 1 file.");
+});
+
+void test("tsgolint-style typescript(TS\\d+) code renders message on continuation line", (t) => {
+  // The motivating case for spec 011 §3.4 (2026-04-27 revision):
+  // tsgolint emits TypeScript compile errors with `code: typescript(TS<NNNN>)`. After plugin-prefix
+  // stripping, the rule-name is just `TS2591`, which is opaque on its own. The continuation line
+  // is what carries the actual diagnostic content.
+  const dir = setupFixture(t, { "x.ts": "import 'node:fs';\n" });
+  const file = join(dir, "x.ts");
+  const stdout = makeStdout([
+    {
+      message: "Cannot find name 'node:fs'.",
+      code: "typescript(TS2591)",
+      severity: "error",
+      filename: file,
+      // 'node:fs' starts at byte 8, length 7
+      labels: [{ span: { offset: 8, length: 7, line: 1, column: 9 } }],
+    },
+  ]);
+
+  const result = formatLintOutput({
+    capturedStdout: stdout,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(
+    result.formattedStdout,
+    joinSections([LEGEND, [file, "  1:9 node:fs [TS2591]", "    Cannot find name 'node:fs'."]]),
+  );
+});
+
+void test("newlines in message are collapsed to single spaces on the continuation line", (t) => {
+  const dir = setupFixture(t, { "x.ts": "debugger;\n" });
+  const file = join(dir, "x.ts");
+  const stdout = makeStdout([
+    {
+      message: "first line\nsecond line\r\nthird line",
+      code: "eslint(no-debugger)",
+      severity: "error",
+      filename: file,
+      labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
+    },
+  ]);
+
+  const result = formatLintOutput({
+    capturedStdout: stdout,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(
+    result.formattedStdout,
+    joinSections([
+      LEGEND,
+      [file, "  1:1 debugger [no-debugger]", "    first line second line third line"],
+    ]),
+  );
 });
 
 void test("diagnostic without `code` renders as [(message)]", (t) => {
@@ -448,10 +496,7 @@ void test("diagnostic without `code` renders as [(message)]", (t) => {
 
   assert.equal(
     result.formattedStdout,
-    joinSections([
-      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
-      [file, "  1:11 ; [(Unexpected token)]"],
-    ]),
+    joinSections([LEGEND, [file, "  1:11 ; [(Unexpected token)]"]]),
   );
 });
 
@@ -720,8 +765,9 @@ void test("entry missing both `code` and `message` is treated as schemaMismatch"
   assert.match(result.schemaMismatch?.reason ?? "", /code.*message|message.*code/);
 });
 
-void test("entry missing only `message` (with valid `code`) passes validation", (t) => {
+void test("entry missing only `message` (with valid `code`) passes validation and emits no continuation", (t) => {
   // `message` absent is fine when `code` carries the rule identity.
+  // The message continuation line is suppressed because there is no message text to render.
   const dir = setupFixture(t, { "x.ts": "debugger;\n" });
   const file = join(dir, "x.ts");
   const raw = JSON.stringify({
@@ -741,7 +787,10 @@ void test("entry missing only `message` (with valid `code`) passes validation", 
   });
 
   assert.equal(result.schemaMismatch, null);
-  assert.match(result.formattedStdout, /1:1 debugger \[no-debugger\]/);
+  assert.equal(
+    result.formattedStdout,
+    joinSections([LEGEND, [file, "  1:1 debugger [no-debugger]"]]),
+  );
 });
 
 void test("entry with non-string `code` (object) is treated as schemaMismatch", () => {
@@ -793,9 +842,10 @@ void test("entry with non-string `message` (number) is treated as schemaMismatch
   assert.match(result.schemaMismatch?.reason ?? "", /message/);
 });
 
-void test("entry with explicit null `code` (and valid `message`) passes validation", (t) => {
+void test("entry with explicit null `code` (and valid `message`) renders message in the rule slot only", (t) => {
   // `null` is treated as equivalent to absent: the contract permits it and falls back
   // to the `(message)` rendering path. Only present-but-wrong-typed values are rejected.
+  // No continuation line is emitted because the message is already inlined into the rule slot.
   const dir = setupFixture(t, { "x.ts": "const x = ;\n" });
   const file = join(dir, "x.ts");
   const raw = JSON.stringify({
@@ -816,7 +866,10 @@ void test("entry with explicit null `code` (and valid `message`) passes validati
   });
 
   assert.equal(result.schemaMismatch, null);
-  assert.match(result.formattedStdout, /\[\(Unexpected token\)\]/);
+  assert.equal(
+    result.formattedStdout,
+    joinSections([LEGEND, [file, "  1:11 ; [(Unexpected token)]"]]),
+  );
 });
 
 void test("schemaMismatch reports the first failing entry index when later entries are valid", (t) => {
@@ -871,10 +924,7 @@ void test("unreadable source file falls back to placeholder slice and reported L
 
   assert.equal(
     result.formattedStdout,
-    joinSections([
-      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
-      [file, "  3:5 <unreadable> [no-debugger]"],
-    ]),
+    joinSections([LEGEND, [file, "  3:5 <unreadable> [no-debugger]", "    something"]]),
   );
   assert.equal(result.linterSummary, "Found 1 unfixed issue in 1 file.");
 });
@@ -900,10 +950,7 @@ void test("out-of-bounds span falls back to placeholder", (t) => {
 
   assert.equal(
     result.formattedStdout,
-    joinSections([
-      ["diagnostic legend: <location> <code-slice> [<rule-name>]"],
-      [file, "  1:1 <unreadable> [no-debugger]"],
-    ]),
+    joinSections([LEGEND, [file, "  1:1 <unreadable> [no-debugger]", "    oob"]]),
   );
 });
 
