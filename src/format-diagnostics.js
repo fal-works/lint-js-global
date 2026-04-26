@@ -12,6 +12,14 @@ const UNREADABLE_SLICE = "<unreadable>";
 const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 
 /**
+ * Discriminated-union result type for fallible validators.
+ *
+ * @template T
+ * @template E
+ * @typedef {{ ok: true; value: T } | { ok: false; reason: E }} Result
+ */
+
+/**
  * Per-diagnostic shape after schema validation.
  * Only fields the wrapper consumes are kept.
  *
@@ -108,7 +116,7 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
       schemaMismatch: { reason: validation.reason },
     };
   }
-  const validated = validation.diagnostics;
+  const validated = validation.value;
   if (validated.length === 0) {
     return { formattedStdout: "", linterSummary: null, schemaMismatch: null };
   }
@@ -144,7 +152,7 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
  * rather than averaging out across silently-degraded entries.
  *
  * @param {unknown} parsed
- * @returns {{ ok: true; diagnostics: ValidatedDiagnostic[] } | { ok: false; reason: string }}
+ * @returns {Result<ValidatedDiagnostic[], string>}
  */
 function validatePayload(parsed) {
   if (!isObject(parsed)) return { ok: false, reason: "top-level value is not an object" };
@@ -159,14 +167,14 @@ function validatePayload(parsed) {
     if (!result.ok) return { ok: false, reason: `diagnostics[${i}]: ${result.reason}` };
     validated.push(result.value);
   }
-  return { ok: true, diagnostics: validated };
+  return { ok: true, value: validated };
 }
 
 /**
  * Validate a single oxlint diagnostic entry.
  *
  * @param {unknown} diag
- * @returns {{ ok: true; value: ValidatedDiagnostic } | { ok: false; reason: string }}
+ * @returns {Result<ValidatedDiagnostic, string>}
  */
 function validateDiagnostic(diag) {
   if (!isObject(diag)) return { ok: false, reason: "not an object" };
@@ -342,7 +350,7 @@ function isUnknownArray(v) {
  *
  * @param {unknown} v
  * @param {string} name Field name, used in the failure reason.
- * @returns {{ ok: true; value: string | null } | { ok: false; reason: string }}
+ * @returns {Result<string | null, string>}
  */
 function validateOptionalString(v, name) {
   if (v === undefined || v === null) return { ok: true, value: null };
