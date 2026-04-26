@@ -744,6 +744,81 @@ void test("entry missing only `message` (with valid `code`) passes validation", 
   assert.match(result.formattedStdout, /1:1 debugger \[no-debugger\]/);
 });
 
+void test("entry with non-string `code` (object) is treated as schemaMismatch", () => {
+  // Even with a valid `message`, a wrong-typed `code` must not be silently dropped:
+  // upstream schema drift (e.g. `code` becoming a structured object) should surface.
+  const raw = JSON.stringify({
+    diagnostics: [
+      {
+        filename: "/x.ts",
+        code: { plugin: "eslint", rule: "no-debugger" },
+        message: "ok",
+        labels: [{ span: { offset: 0, length: 1, line: 1, column: 1 } }],
+      },
+    ],
+  });
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(result.formattedStdout, raw, "raw payload must be relayed");
+  assert.notEqual(result.schemaMismatch, null);
+  assert.match(result.schemaMismatch?.reason ?? "", /code/);
+});
+
+void test("entry with non-string `message` (number) is treated as schemaMismatch", () => {
+  // Same idea on the message side.
+  const raw = JSON.stringify({
+    diagnostics: [
+      {
+        filename: "/x.ts",
+        code: "eslint(no-debugger)",
+        message: 42,
+        labels: [{ span: { offset: 0, length: 1, line: 1, column: 1 } }],
+      },
+    ],
+  });
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(result.formattedStdout, raw, "raw payload must be relayed");
+  assert.notEqual(result.schemaMismatch, null);
+  assert.match(result.schemaMismatch?.reason ?? "", /message/);
+});
+
+void test("entry with explicit null `code` (and valid `message`) passes validation", (t) => {
+  // `null` is treated as equivalent to absent: the contract permits it and falls back
+  // to the `(message)` rendering path. Only present-but-wrong-typed values are rejected.
+  const dir = setupFixture(t, { "x.ts": "const x = ;\n" });
+  const file = join(dir, "x.ts");
+  const raw = JSON.stringify({
+    diagnostics: [
+      {
+        filename: file,
+        code: null,
+        message: "Unexpected token",
+        labels: [{ span: { offset: 10, length: 1, line: 1, column: 11 } }],
+      },
+    ],
+  });
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(result.schemaMismatch, null);
+  assert.match(result.formattedStdout, /\[\(Unexpected token\)\]/);
+});
+
 void test("schemaMismatch reports the first failing entry index when later entries are valid", (t) => {
   const dir = setupFixture(t, { "x.ts": "debugger;\n" });
   const file = join(dir, "x.ts");

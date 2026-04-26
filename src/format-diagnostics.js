@@ -173,8 +173,12 @@ function validateDiagnostic(diag) {
   if (typeof diag.filename !== "string") {
     return { ok: false, reason: "`filename` is missing or not a string" };
   }
-  const code = typeof diag.code === "string" ? diag.code : null;
-  const message = typeof diag.message === "string" ? diag.message : null;
+  const codeResult = validateOptionalString(diag.code, "code");
+  if (!codeResult.ok) return codeResult;
+  const messageResult = validateOptionalString(diag.message, "message");
+  if (!messageResult.ok) return messageResult;
+  const code = codeResult.value;
+  const message = messageResult.value;
   if (code === null && message === null) {
     return { ok: false, reason: "neither `code` nor `message` is a string" };
   }
@@ -329,6 +333,21 @@ function isObject(v) {
  */
 function isUnknownArray(v) {
   return Array.isArray(v);
+}
+
+/**
+ * Accept string, null, or undefined as a valid optional-string field. A present-but-wrong-typed
+ * value (e.g. a structured object from a future schema change) is rejected so caret-range
+ * upstream drift surfaces as a contract failure instead of being silently coerced to null.
+ *
+ * @param {unknown} v
+ * @param {string} name Field name, used in the failure reason.
+ * @returns {{ ok: true; value: string | null } | { ok: false; reason: string }}
+ */
+function validateOptionalString(v, name) {
+  if (v === undefined || v === null) return { ok: true, value: null };
+  if (typeof v === "string") return { ok: true, value: v };
+  return { ok: false, reason: `\`${name}\` is present but not a string or null` };
 }
 
 /**
