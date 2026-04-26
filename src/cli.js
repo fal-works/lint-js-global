@@ -58,7 +58,7 @@ Options:
   -v, --version   Show version.
 
 Without paths, the whole project is processed.
-node_modules is always skipped; .gitignore, .eslintignore, .prettierignore are respected.`;
+node_modules is always skipped; each tool's standard ignore files (like .gitignore) are respected.`;
 
 /**
  * CLI entry point. Returns the process exit code.

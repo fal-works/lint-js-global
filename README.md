@@ -34,7 +34,7 @@ Paths are optional; without them the whole project is processed.
 Each path must be an existing file or directory.
 
 `node_modules` is always skipped.  
-Standard ignore files (`.gitignore`, `.eslintignore`, `.prettierignore`) are respected if present.
+Each tool's standard ignore files (like `.gitignore`) are respected.
 
 ### Output
 
