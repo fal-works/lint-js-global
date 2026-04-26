@@ -15,9 +15,10 @@ import { buildPathInjectedEnv, runTool, runToolCapturingOutput } from "./run-too
 /**
  * Pick the one-line summary emitted after both phases finish.
  *
- * Binary verdict (success/failure) — which phase failed is readable from the
- * tool output above, so the summary only needs to convey overall outcome and
- * whether fixes may have been applied.
+ * Binary verdict only (success/failure).
+ * Which phase failed is readable from the tool output above,
+ * so the summary only needs to convey overall outcome
+ * and whether fixes may have been applied.
  *
  * @param {object} options
  * @param {boolean} options.check

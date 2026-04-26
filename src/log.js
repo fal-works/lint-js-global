@@ -5,10 +5,6 @@ const LOG_PREFIX = "lint-js:";
 /**
  * Single channel for expected failures raised by lint-js itself,
  * e.g. usage errors or child-process launch failures (not a wrapped tool error).
- *
- * The CLI boundary catches `LintJsError` and routes it through {@link errorTagged}, then exits with
- * status 2 (distinct from status 1, which is reserved for fmt/lint findings). Anything else
- * propagates as an unhandled exception so genuine bugs surface with their full stack trace.
  */
 export class LintJsError extends Error {
   name = "LintJsError";

@@ -33,8 +33,9 @@ export function runTool({ name, bin, args, env }) {
  *
  * File-backed stdio (not pipes): workaround for https://github.com/openai/codex/issues/18473,
  * where captured pipe-backed output from a nested Node child can be dropped in the Codex sandbox.
- * Side effect: the child's output is batched until exit instead of streaming;
- * both streams are captured symmetrically so the caller can flush them in a deterministic order.
+ *
+ * Side effect: the child's output is batched until exit instead of streaming.
+ * Both streams are captured symmetrically so the caller can flush them in a deterministic order.
  *
  * @param {object} options
  * @param {string} options.name
