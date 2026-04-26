@@ -5,16 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { LintJsError } from "./log.js";
-
-/**
- * Resolve a path relative to this package's root (not the cwd).
- *
- * @param {...string} segments
- * @returns {string}
- */
-export function packagePath(...segments) {
-  return join(import.meta.dirname, "..", ...segments);
-}
+import { PACKAGE_JSON } from "./package-paths.js";
 
 /**
  * Type predicate narrowing an arbitrary value to a string-keyed record.
@@ -57,7 +48,7 @@ export function resolvePackageBin(packageName, binName) {
  */
 export function getPackageVersion() {
   /** @type {unknown} */
-  const pkg = JSON.parse(readFileSync(packagePath("package.json"), "utf8"));
+  const pkg = JSON.parse(readFileSync(PACKAGE_JSON, "utf8"));
   if (!isRecord(pkg) || typeof pkg.version !== "string") {
     throw new LintJsError('Missing or malformed "version" in package.json.');
   }

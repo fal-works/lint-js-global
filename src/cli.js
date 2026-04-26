@@ -9,7 +9,13 @@ import { formatLintOutput } from "./format-diagnostics.js";
 import { getSystemIgnorePatterns } from "./ignore.js";
 import { buildOxlintArgs } from "./lint.js";
 import { errorTagged, LintJsError, print, printTagged } from "./log.js";
-import { getPackageVersion, packagePath, resolvePackageBin } from "./package-info.js";
+import { getPackageVersion, resolvePackageBin } from "./package-info.js";
+import {
+  NODE_MODULES_BIN,
+  OXFMT_CONFIG,
+  OXLINT_CONFIG,
+  WEAK_TYPINGS_DOC,
+} from "./package-paths.js";
 import { buildPathInjectedEnv, runTool, runToolCapturingOutput } from "./run-tool.js";
 
 /**
@@ -129,9 +135,6 @@ function runMain() {
 
   const oxfmtBin = resolvePackageBin("oxfmt", "oxfmt");
   const oxlintBin = resolvePackageBin("oxlint", "oxlint");
-  const oxfmtConfig = packagePath("cfg", "oxfmtrc.json");
-  const oxlintConfig = packagePath("cfg", "oxlintrc.json");
-  const weakTypingsDocPath = packagePath("docs", "guide", "weak-typings.md");
   const ignorePatterns = getSystemIgnorePatterns();
   const check = values.check === true;
   const unix = values.unix === true;
@@ -148,7 +151,7 @@ function runMain() {
   const fmtResult = runTool({
     name: "oxfmt",
     bin: oxfmtBin,
-    args: buildOxfmtArgs(oxfmtConfig, ignorePatterns, targets, check),
+    args: buildOxfmtArgs(OXFMT_CONFIG, ignorePatterns, targets, check),
   });
   // No fmt completion banner: oxfmt prints its own summary and ours would duplicate.
 
@@ -163,8 +166,8 @@ function runMain() {
   } = runToolCapturingOutput({
     name: "oxlint",
     bin: oxlintBin,
-    args: buildOxlintArgs(oxlintConfig, ignorePatterns, targets, check, unix),
-    env: buildPathInjectedEnv(packagePath("node_modules", ".bin")),
+    args: buildOxlintArgs(OXLINT_CONFIG, ignorePatterns, targets, check, unix),
+    env: buildPathInjectedEnv(NODE_MODULES_BIN),
   });
   // Replay stderr first, then stdout. Both are batched (Codex-sandbox workaround)
   // so emission timing is lost; this fixed order keeps the relayed sequence deterministic.
@@ -172,7 +175,7 @@ function runMain() {
   const { formattedStdout, linterSummary, schemaMismatch } = formatLintOutput({
     capturedStdout: lintStdout,
     unix,
-    weakTypingsDocPath,
+    weakTypingsDocPath: WEAK_TYPINGS_DOC,
   });
   process.stdout.write(formattedStdout);
   if (schemaMismatch !== null) {
