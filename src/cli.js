@@ -174,22 +174,19 @@ function runMain() {
   // Replay stderr first, then stdout. Both are batched (Codex-sandbox workaround)
   // so emission timing is lost; this fixed order keeps the relayed sequence deterministic.
   process.stderr.write(lintStderr);
-  const { formattedStdout, linterSummary, unrecognizedSchema } = formatLintOutput({
+  const { formattedStdout, linterSummary, schemaMismatch } = formatLintOutput({
     capturedStdout: lintStdout,
     unix,
     weakTypingsDocPath,
   });
   process.stdout.write(formattedStdout);
-  if (unrecognizedSchema) {
-    // Valid JSON without a `diagnostics` array means oxlint's output contract
-    // diverged from what this wrapper understands (schema bump on a caret-pinned
-    // dep, or a structured fatal payload). Raw stdout was just relayed above;
-    // surface this as a hard failure on the LintJsError channel so it doesn't
-    // get conflated with a normal lint outcome.
-    throw new LintJsError(
-      "oxlint emitted JSON without a recognized `diagnostics` array (oxlint output contract mismatch).",
-      { details: ["Raw payload relayed to stdout above."] },
-    );
+  if (schemaMismatch !== null) {
+    // Valid JSON whose shape diverges from what this wrapper understands.
+    // Raw stdout was just relayed above; surface this as a hard failure on the
+    // LintJsError channel so it doesn't get conflated with a normal lint outcome.
+    throw new LintJsError("oxlint output contract mismatch.", {
+      details: [schemaMismatch.reason, "Raw payload relayed to stdout above."],
+    });
   }
   if (lintResult.status === 0) print(`${lintLabel}: clean.`);
   if (linterSummary !== null) {

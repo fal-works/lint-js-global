@@ -13,6 +13,23 @@ const UNREADABLE_SLICE = "<unreadable>";
 const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 
 /**
+ * Per-diagnostic shape after schema validation.
+ *
+ * Only fields the wrapper actually consumes are kept; unused oxlint fields
+ * (`severity`, `causes`, `url`, `help`, `related`, label text) are not retained.
+ *
+ * `code` and `message` are both nullable, but the validator guarantees at least
+ * one is non-null. `extractRuleName` falls back to `(message)` when `code` is absent.
+ *
+ * @typedef {{
+ *   filename: string;
+ *   code: string | null;
+ *   message: string | null;
+ *   span: { offset: number; length: number; line: number; column: number };
+ * }} ValidatedDiagnostic
+ */
+
+/**
  * @typedef {{
  *   filename: string;
  *   rawCode: string | null;
@@ -34,23 +51,26 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 /**
  * Result of {@link formatLintOutput}.
  *
- * `unrecognizedSchema` is set when the captured stdout parsed as JSON but did
- * not expose a `diagnostics` array. This indicates an oxlint output contract
- * mismatch (likely a schema bump on the caret-pinned dep, or a structured
- * fatal payload). `formattedStdout` carries the raw stdout for relay so the
- * caller can show what oxlint produced; `linterSummary` is null. The CLI
- * boundary then routes this through `LintJsError` (exit 2) rather than
- * conflating it with a normal lint outcome.
+ * `schemaMismatch` is non-null when the captured stdout parsed as JSON but
+ * either lacked the top-level `diagnostics` array or contained an entry whose
+ * shape diverges from what the wrapper relies on. This signals an oxlint
+ * output contract mismatch (likely a schema bump on the caret-pinned dep, or
+ * a structured fatal payload). The `reason` carries a short description of
+ * which field in which position failed validation, so the caller can surface
+ * actionable details. `formattedStdout` then holds the raw stdout for relay
+ * and `linterSummary` is null. The CLI boundary routes this through
+ * `LintJsError` (exit 2) rather than conflating it with a normal lint
+ * outcome.
  *
- * Broken JSON (parse failure) is not treated as `unrecognizedSchema`: the raw
+ * Broken JSON (parse failure) is not treated as `schemaMismatch`: the raw
  * output is still relayed via `formattedStdout`, but unparseable text on
  * stdout is loud enough on its own. Reserving the flag for the "valid JSON
- * but missing schema" case keeps its meaning specific.
+ * but unexpected shape" case keeps its meaning specific.
  *
  * @typedef {{
  *   formattedStdout: string;
  *   linterSummary: string | null;
- *   unrecognizedSchema: boolean;
+ *   schemaMismatch: { reason: string } | null;
  * }} FormatLintResult
  */
 
@@ -59,7 +79,7 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
  *
  * Not a strictly pure function (reads source files to resolve spans), but performs
  * no stdout/stderr output. The caller decides when and where to emit, including
- * how to react to `unrecognizedSchema` (raw relay + warning vs silent).
+ * how to react to `schemaMismatch` (raw relay + warning vs silent).
  *
  * @param {object} options
  * @param {string} options.capturedStdout Raw oxlint stdout from `--format=json`.
@@ -69,7 +89,7 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
  */
 export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
   if (unix) {
-    return { formattedStdout: capturedStdout, linterSummary: null, unrecognizedSchema: false };
+    return { formattedStdout: capturedStdout, linterSummary: null, schemaMismatch: null };
   }
 
   /** @type {unknown} */
@@ -79,21 +99,27 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
   } catch {
     // Broken JSON: relay oxlint's raw output verbatim and let the overall
     // `lint-js:` summary flag the failure via non-zero exit code.
-    return { formattedStdout: capturedStdout, linterSummary: null, unrecognizedSchema: false };
+    return { formattedStdout: capturedStdout, linterSummary: null, schemaMismatch: null };
   }
 
-  const rawDiagnostics = extractDiagnostics(parsed);
-  if (rawDiagnostics === null) {
-    // Valid JSON but no `diagnostics` array. Could indicate an oxlint schema
-    // change or a structured fatal payload. Relay raw and let the caller warn.
-    return { formattedStdout: capturedStdout, linterSummary: null, unrecognizedSchema: true };
+  const validation = validatePayload(parsed);
+  if (!validation.ok) {
+    // Valid JSON but the shape diverges from what the wrapper relies on.
+    // Relay raw stdout so the actual payload stays visible to the caller,
+    // and surface the specific reason via `schemaMismatch`.
+    return {
+      formattedStdout: capturedStdout,
+      linterSummary: null,
+      schemaMismatch: { reason: validation.reason },
+    };
   }
-  if (rawDiagnostics.length === 0) {
-    return { formattedStdout: "", linterSummary: null, unrecognizedSchema: false };
+  const validated = validation.diagnostics;
+  if (validated.length === 0) {
+    return { formattedStdout: "", linterSummary: null, schemaMismatch: null };
   }
 
   const cache = createSourceCache();
-  const resolved = rawDiagnostics.map((d) => resolveDiagnostic(d, cache));
+  const resolved = validated.map((d) => resolveDiagnostic(d, cache));
   resolved.sort(compareDiagnostics);
 
   const fileGroups = groupByFilename(resolved);
@@ -113,20 +139,97 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
   const issueWord = resolved.length === 1 ? "issue" : "issues";
   const fileWord = fileGroups.size === 1 ? "file" : "files";
   const linterSummary = `Found ${resolved.length} unfixed ${issueWord} in ${fileGroups.size} ${fileWord}.`;
-  return { formattedStdout, linterSummary, unrecognizedSchema: false };
+  return { formattedStdout, linterSummary, schemaMismatch: null };
 }
 
 /**
- * Returns the `diagnostics` array if the parsed payload exposes one, else null.
- * Null signals an unrecognized schema (caller relays raw and may warn).
+ * Validate the parsed oxlint payload against the wrapper's expected shape.
+ *
+ * Top-level: `{ diagnostics: array, ... }`. Per entry: `filename` is a string,
+ * `labels[0].span` carries the four numeric fields the resolver consumes
+ * (`offset`, `length`, `line`, `column`), and at least one of `code`/`message`
+ * is a string (`extractRuleName` falls back to `(message)` when `code` is
+ * absent). Optional fields oxlint emits but the wrapper ignores (`severity`,
+ * `causes`, `url`, `help`, `related`, label text) are not checked.
+ *
+ * Returns `{ ok: false, reason }` on first mismatch — fail fast so a single
+ * shape drift surfaces as a contract error rather than getting averaged over
+ * silently-degraded entries.
  *
  * @param {unknown} parsed
- * @returns {unknown[] | null}
+ * @returns {{ ok: true; diagnostics: ValidatedDiagnostic[] } | { ok: false; reason: string }}
  */
-function extractDiagnostics(parsed) {
-  if (typeof parsed !== "object" || parsed === null) return null;
-  const diags = /** @type {{ diagnostics?: unknown }} */ (parsed).diagnostics;
-  return Array.isArray(diags) ? diags : null;
+function validatePayload(parsed) {
+  if (!isObject(parsed)) return { ok: false, reason: "top-level value is not an object" };
+  const diagnostics = parsed.diagnostics;
+  if (!isUnknownArray(diagnostics)) {
+    return { ok: false, reason: "`diagnostics` is missing or not an array" };
+  }
+  /** @type {ValidatedDiagnostic[]} */
+  const validated = [];
+  for (let i = 0; i < diagnostics.length; i++) {
+    const result = validateDiagnostic(diagnostics[i]);
+    if (!result.ok) return { ok: false, reason: `diagnostics[${i}]: ${result.reason}` };
+    validated.push(result.value);
+  }
+  return { ok: true, diagnostics: validated };
+}
+
+/**
+ * Validate a single oxlint diagnostic entry.
+ *
+ * @param {unknown} diag
+ * @returns {{ ok: true; value: ValidatedDiagnostic } | { ok: false; reason: string }}
+ */
+function validateDiagnostic(diag) {
+  if (!isObject(diag)) return { ok: false, reason: "not an object" };
+  if (typeof diag.filename !== "string") {
+    return { ok: false, reason: "`filename` is missing or not a string" };
+  }
+  const code = typeof diag.code === "string" ? diag.code : null;
+  const message = typeof diag.message === "string" ? diag.message : null;
+  if (code === null && message === null) {
+    return { ok: false, reason: "neither `code` nor `message` is a string" };
+  }
+  if (!isUnknownArray(diag.labels) || diag.labels.length === 0) {
+    return { ok: false, reason: "`labels` is missing or empty" };
+  }
+  const first = diag.labels[0];
+  if (!isObject(first)) return { ok: false, reason: "`labels[0]` is not an object" };
+  const span = first.span;
+  if (!isObject(span)) {
+    return { ok: false, reason: "`labels[0].span` is missing or not an object" };
+  }
+  // Domain checks: offset/length are UTF-8 byte counts (non-negative integers);
+  // line/column are 1-origin positions (positive integers). Without these,
+  // negative or fractional values would slip past the validator and surface as
+  // `<unreadable>` from the runtime path, masking contract drift.
+  if (!isNonNegativeInteger(span.offset)) {
+    return { ok: false, reason: "`labels[0].span.offset` is not a non-negative integer" };
+  }
+  if (!isNonNegativeInteger(span.length)) {
+    return { ok: false, reason: "`labels[0].span.length` is not a non-negative integer" };
+  }
+  if (!isPositiveInteger(span.line)) {
+    return { ok: false, reason: "`labels[0].span.line` is not a positive integer" };
+  }
+  if (!isPositiveInteger(span.column)) {
+    return { ok: false, reason: "`labels[0].span.column` is not a positive integer" };
+  }
+  return {
+    ok: true,
+    value: {
+      filename: diag.filename,
+      code,
+      message,
+      span: {
+        offset: span.offset,
+        length: span.length,
+        line: span.line,
+        column: span.column,
+      },
+    },
+  };
 }
 
 /**
@@ -186,68 +289,47 @@ function findLine(lineStartOffsets, offset) {
 }
 
 /**
- * @param {unknown} diag
+ * Resolve a validated diagnostic against the source cache. Schema validation
+ * happened upstream, so the only branches here are runtime degradations:
+ * source file unreadable or span out-of-bounds. Both fall back to the
+ * `<unreadable>` slice and oxlint's reported start position.
+ *
+ * Multi-label diagnostics are reduced to `labels[0]` upstream — typical
+ * multi-label entries are duplicate-style where every label points at an
+ * identical slice, so listing the rest just repeats content.
+ *
+ * @param {ValidatedDiagnostic} diag
  * @param {ReturnType<typeof createSourceCache>} cache
  * @returns {ResolvedDiagnostic}
  */
 function resolveDiagnostic(diag, cache) {
-  const d = isObject(diag) ? diag : {};
-  const filename = typeof d.filename === "string" ? d.filename : "<unknown>";
-  const rawCode = typeof d.code === "string" ? d.code : null;
-  const message = typeof d.message === "string" ? d.message : "";
-  const span = extractFirstSpan(d);
-  const ruleName = extractRuleName(rawCode, message);
-
-  // Reported position from oxlint (start only). Used as sort key and fallback location.
-  const reportedLine = span !== null && typeof span.line === "number" ? span.line : 1;
-  const reportedCol = span !== null && typeof span.column === "number" ? span.column : 1;
-
-  if (span !== null && typeof span.offset === "number" && typeof span.length === "number") {
-    const resolved = resolveSpan(cache, filename, span.offset, span.length);
-    if (resolved !== null) {
-      const slice = formatCodeSlice(resolved.text);
-      const location = slice.truncated
-        ? `${resolved.startLine}:${resolved.startCol}-${resolved.endLine}:${resolved.endCol}`
-        : `${resolved.startLine}:${resolved.startCol}`;
-      return {
-        filename,
-        rawCode,
-        sortLine: resolved.startLine,
-        sortCol: resolved.startCol,
-        ruleName,
-        location,
-        slice: slice.text,
-      };
-    }
+  const ruleName = extractRuleName(diag.code, diag.message);
+  const resolved = resolveSpan(cache, diag.filename, diag.span.offset, diag.span.length);
+  if (resolved !== null) {
+    const slice = formatCodeSlice(resolved.text);
+    const location = slice.truncated
+      ? `${resolved.startLine}:${resolved.startCol}-${resolved.endLine}:${resolved.endCol}`
+      : `${resolved.startLine}:${resolved.startCol}`;
+    return {
+      filename: diag.filename,
+      rawCode: diag.code,
+      sortLine: resolved.startLine,
+      sortCol: resolved.startCol,
+      ruleName,
+      location,
+      slice: slice.text,
+    };
   }
 
-  // Fallback: source unreadable or span out-of-bounds. Preserve start position from oxlint.
   return {
-    filename,
-    rawCode,
-    sortLine: reportedLine,
-    sortCol: reportedCol,
+    filename: diag.filename,
+    rawCode: diag.code,
+    sortLine: diag.span.line,
+    sortCol: diag.span.column,
     ruleName,
-    location: `${reportedLine}:${reportedCol}`,
+    location: `${diag.span.line}:${diag.span.column}`,
     slice: UNREADABLE_SLICE,
   };
-}
-
-/**
- * Takes `labels[0]` only. Typical multi-label diagnostics are duplicate-style where every label
- * points at an identical slice, so listing the rest just repeats content.
- *
- * @param {Record<string, unknown>} diag
- * @returns {Record<string, unknown> | null}
- */
-function extractFirstSpan(diag) {
-  const labels = diag.labels;
-  if (!isUnknownArray(labels) || labels.length === 0) return null;
-  const first = labels[0];
-  if (!isObject(first)) return null;
-  const span = first.span;
-  if (!isObject(span)) return null;
-  return span;
 }
 
 /**
@@ -266,6 +348,27 @@ function isObject(v) {
  */
 function isUnknownArray(v) {
   return Array.isArray(v);
+}
+
+/**
+ * `Number.isInteger` rejects NaN, Infinity, and fractional values; the `>= 0`
+ * guard then keeps the domain to byte counts and offsets.
+ *
+ * @param {unknown} v
+ * @returns {v is number}
+ */
+function isNonNegativeInteger(v) {
+  return typeof v === "number" && Number.isInteger(v) && v >= 0;
+}
+
+/**
+ * Used for 1-origin line / column positions.
+ *
+ * @param {unknown} v
+ * @returns {v is number}
+ */
+function isPositiveInteger(v) {
+  return typeof v === "number" && Number.isInteger(v) && v >= 1;
 }
 
 /**
@@ -305,12 +408,15 @@ function resolveSpan(cache, filename, offset, length) {
  * Per spec §3.3: strip the plugin prefix and use the inner rule ID.
  * Per agreed design: if `code` is absent, use `(message)` with the full message, newlines stripped.
  *
+ * The validator guarantees at least one of `rawCode`/`message` is non-null; the
+ * `?? ""` is purely a type-system fallback that is never reached at runtime.
+ *
  * @param {string | null} rawCode
- * @param {string} message
+ * @param {string | null} message
  * @returns {string}
  */
 function extractRuleName(rawCode, message) {
-  if (rawCode === null) return `(${message.replace(/\r?\n/g, " ")})`;
+  if (rawCode === null) return `(${(message ?? "").replace(/\r?\n/g, " ")})`;
   const match = /\(([^)]+)\)\s*$/.exec(rawCode);
   return match ? match[1] : rawCode;
 }

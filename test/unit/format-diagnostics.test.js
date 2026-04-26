@@ -466,10 +466,10 @@ void test("zero diagnostics yields empty formattedStdout and null linterSummary"
 
   assert.equal(result.formattedStdout, "");
   assert.equal(result.linterSummary, null);
-  assert.equal(result.unrecognizedSchema, false);
+  assert.equal(result.schemaMismatch, null);
 });
 
-void test("valid JSON without `diagnostics` array flags unrecognizedSchema and relays raw", () => {
+void test("valid JSON without `diagnostics` array flags schemaMismatch and relays raw", () => {
   // Simulate a hypothetical schema change (e.g. a fatal payload at the top level).
   const raw = JSON.stringify({ fatal: "internal error", number_of_files: 0 });
 
@@ -485,10 +485,11 @@ void test("valid JSON without `diagnostics` array flags unrecognizedSchema and r
     "raw payload must be relayed verbatim so the actual cause is visible",
   );
   assert.equal(result.linterSummary, null);
-  assert.equal(result.unrecognizedSchema, true);
+  assert.notEqual(result.schemaMismatch, null);
+  assert.match(result.schemaMismatch?.reason ?? "", /diagnostics/);
 });
 
-void test("valid JSON with non-array `diagnostics` is treated as unrecognized schema", () => {
+void test("valid JSON with non-array `diagnostics` is treated as schemaMismatch", () => {
   const raw = JSON.stringify({ diagnostics: "oops not an array" });
 
   const result = formatLintOutput({
@@ -498,10 +499,10 @@ void test("valid JSON with non-array `diagnostics` is treated as unrecognized sc
   });
 
   assert.equal(result.formattedStdout, raw);
-  assert.equal(result.unrecognizedSchema, true);
+  assert.notEqual(result.schemaMismatch, null);
 });
 
-void test("non-object JSON (e.g. bare array) is treated as unrecognized schema", () => {
+void test("non-object JSON (e.g. bare array) is treated as schemaMismatch", () => {
   const raw = "[]";
 
   const result = formatLintOutput({
@@ -511,17 +512,249 @@ void test("non-object JSON (e.g. bare array) is treated as unrecognized schema",
   });
 
   assert.equal(result.formattedStdout, raw);
-  assert.equal(result.unrecognizedSchema, true);
+  assert.notEqual(result.schemaMismatch, null);
 });
 
-void test("broken JSON does NOT flag unrecognizedSchema (parse failure is a separate path)", () => {
+void test("broken JSON does NOT flag schemaMismatch (parse failure is a separate path)", () => {
   const result = formatLintOutput({
     capturedStdout: "{not valid json",
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.unrecognizedSchema, false);
+  assert.equal(result.schemaMismatch, null);
+});
+
+void test("entry missing `filename` is treated as schemaMismatch with index in reason", () => {
+  const raw = JSON.stringify({
+    diagnostics: [
+      {
+        code: "eslint(no-debugger)",
+        message: "x",
+        labels: [{ span: { offset: 0, length: 1, line: 1, column: 1 } }],
+        // filename absent
+      },
+    ],
+  });
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(result.formattedStdout, raw, "raw payload must be relayed");
+  assert.notEqual(result.schemaMismatch, null);
+  assert.match(result.schemaMismatch?.reason ?? "", /diagnostics\[0\]/);
+  assert.match(result.schemaMismatch?.reason ?? "", /filename/);
+});
+
+void test("entry missing `labels[0].span` is treated as schemaMismatch", () => {
+  const raw = JSON.stringify({
+    diagnostics: [
+      {
+        filename: "/x.ts",
+        code: "eslint(no-debugger)",
+        message: "x",
+        labels: [{}],
+      },
+    ],
+  });
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.notEqual(result.schemaMismatch, null);
+  assert.match(result.schemaMismatch?.reason ?? "", /span/);
+});
+
+void test("entry with non-numeric span field is treated as schemaMismatch", () => {
+  const raw = JSON.stringify({
+    diagnostics: [
+      {
+        filename: "/x.ts",
+        code: "eslint(no-debugger)",
+        message: "x",
+        labels: [{ span: { offset: "0", length: 1, line: 1, column: 1 } }],
+      },
+    ],
+  });
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.notEqual(result.schemaMismatch, null);
+  assert.match(result.schemaMismatch?.reason ?? "", /offset/);
+});
+
+void test("entry with negative span.offset is treated as schemaMismatch", () => {
+  const raw = JSON.stringify({
+    diagnostics: [
+      {
+        filename: "/x.ts",
+        code: "eslint(no-debugger)",
+        message: "x",
+        labels: [{ span: { offset: -1, length: 1, line: 1, column: 1 } }],
+      },
+    ],
+  });
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.notEqual(result.schemaMismatch, null);
+  assert.match(result.schemaMismatch?.reason ?? "", /offset.*non-negative/);
+});
+
+void test("entry with fractional span.length is treated as schemaMismatch", () => {
+  const raw = JSON.stringify({
+    diagnostics: [
+      {
+        filename: "/x.ts",
+        code: "eslint(no-debugger)",
+        message: "x",
+        labels: [{ span: { offset: 0, length: 1.5, line: 1, column: 1 } }],
+      },
+    ],
+  });
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.notEqual(result.schemaMismatch, null);
+  assert.match(result.schemaMismatch?.reason ?? "", /length.*non-negative/);
+});
+
+void test("entry with span.line below 1 is treated as schemaMismatch", () => {
+  const raw = JSON.stringify({
+    diagnostics: [
+      {
+        filename: "/x.ts",
+        code: "eslint(no-debugger)",
+        message: "x",
+        labels: [{ span: { offset: 0, length: 1, line: 0, column: 1 } }],
+      },
+    ],
+  });
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.notEqual(result.schemaMismatch, null);
+  assert.match(result.schemaMismatch?.reason ?? "", /line.*positive/);
+});
+
+void test("entry with span.column below 1 is treated as schemaMismatch", () => {
+  const raw = JSON.stringify({
+    diagnostics: [
+      {
+        filename: "/x.ts",
+        code: "eslint(no-debugger)",
+        message: "x",
+        labels: [{ span: { offset: 0, length: 1, line: 1, column: 0 } }],
+      },
+    ],
+  });
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.notEqual(result.schemaMismatch, null);
+  assert.match(result.schemaMismatch?.reason ?? "", /column.*positive/);
+});
+
+void test("entry missing both `code` and `message` is treated as schemaMismatch", () => {
+  const raw = JSON.stringify({
+    diagnostics: [
+      {
+        filename: "/x.ts",
+        labels: [{ span: { offset: 0, length: 1, line: 1, column: 1 } }],
+      },
+    ],
+  });
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.notEqual(result.schemaMismatch, null);
+  assert.match(result.schemaMismatch?.reason ?? "", /code.*message|message.*code/);
+});
+
+void test("entry missing only `message` (with valid `code`) passes validation", (t) => {
+  // `message` absent is fine when `code` carries the rule identity.
+  const dir = setupFixture(t, { "x.ts": "debugger;\n" });
+  const file = join(dir, "x.ts");
+  const raw = JSON.stringify({
+    diagnostics: [
+      {
+        filename: file,
+        code: "eslint(no-debugger)",
+        labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
+      },
+    ],
+  });
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(result.schemaMismatch, null);
+  assert.match(result.formattedStdout, /1:1 debugger \[no-debugger\]/);
+});
+
+void test("schemaMismatch reports the first failing entry index when later entries are valid", (t) => {
+  const dir = setupFixture(t, { "x.ts": "debugger;\n" });
+  const file = join(dir, "x.ts");
+  const raw = JSON.stringify({
+    diagnostics: [
+      {
+        filename: file,
+        code: "eslint(no-debugger)",
+        message: "ok",
+        labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
+      },
+      {
+        // second entry malformed: missing labels
+        filename: file,
+        code: "eslint(no-debugger)",
+        message: "broken",
+      },
+    ],
+  });
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.notEqual(result.schemaMismatch, null);
+  assert.match(result.schemaMismatch?.reason ?? "", /diagnostics\[1\]/);
+  assert.match(result.schemaMismatch?.reason ?? "", /labels/);
+  assert.equal(result.formattedStdout, raw, "fail-fast: raw relay, no partial render");
 });
 
 void test("unreadable source file falls back to placeholder slice and reported L:C", () => {
