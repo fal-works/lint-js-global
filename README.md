@@ -38,15 +38,20 @@ Standard ignore files (`.gitignore`, `.eslintignore`, `.prettierignore`) are res
 
 ### Output
 
-Default lint output groups diagnostics per file with a self-describing legend line,
-byte-accurate spans shown as `L:C` or `L:C-L:C`, and the exact code slice the rule points at:
+Default lint output groups diagnostics per file with a self-describing legend block,
+byte-accurate spans shown as `L:C` or `L:C-L:C`, the exact source-code slice the rule points at,
+and the diagnostic message on a continuation line:
 
 ```
-diagnostic legend: <location> <code-slice> [<rule-name>]
+diagnostic legend:
+  <location> <source-code-slice> [<error-code>]
+    <message>
 
 src/index.ts
-  1:7 data = JSON.parse("{}") [no-unsafe-assignment]
-  2:18 foo [no-unsafe-member-access]
+  1:7 data = JSON.parse("{}") [typescript-eslint(no-unsafe-assignment)]
+    Unsafe assignment of an `any` value.
+  2:18 foo [typescript-eslint(no-unsafe-member-access)]
+    Unsafe member access .foo on an `any` value.
 
 Hint on the `no-unsafe-*` diagnostics:
 - ...

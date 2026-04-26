@@ -17,9 +17,10 @@ void test("unsafe-any: weak-typings hint follows no-unsafe-* diagnostics", (t) =
   assert.match(result.stdout, /weak-typings\.md/, "expected weak-typings hint pointer on stdout");
 
   const lines = result.stdout.split("\n");
-  // Match the default formatter's bracketed rule-name specifically; the hint line contains
+  // Match the default formatter's bracketed error-code specifically; the hint line contains
   // the literal "no-unsafe-" too but wraps it in backticks, so the `[` anchor disambiguates.
-  const firstUnsafeIdx = lines.findIndex((l) => /\[no-unsafe-/.test(l));
+  // The error-code is the raw `plugin(rule)` form, e.g. `[typescript-eslint(no-unsafe-...)]`.
+  const firstUnsafeIdx = lines.findIndex((l) => /\[[^\]]*\(no-unsafe-/.test(l));
   // Path separator agnostic (POSIX `/` or native Windows `\`).
   const seeMatch = lines
     .map((l) => l.match(/^- See: ((?:.*[/\\])?weak-typings\.md)$/))

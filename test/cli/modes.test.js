@@ -30,7 +30,7 @@ void test("basic: reformats sources and reports floating promise", (t) => {
     /weak-typings\.md/,
     "weak-typings hint must not fire when only non-unsafe rules trigger",
   );
-  // Default formatter: legend block + bracketed rule-name + issue-count summary all present.
+  // Default formatter: legend block + bracketed error-code + issue-count summary all present.
   // The legend is a 3-line block (`diagnostic legend:` + the two structural placeholder lines).
   assert.match(
     result.stdout,
@@ -39,8 +39,8 @@ void test("basic: reformats sources and reports floating promise", (t) => {
   );
   assert.match(
     result.stdout,
-    /^ {2}<location> <code-slice> \[<rule-name>\]$/m,
-    "expected rule-line placeholder inside the legend block",
+    /^ {2}<location> <source-code-slice> \[<error-code>\]$/m,
+    "expected head-line placeholder inside the legend block",
   );
   assert.match(
     result.stdout,
@@ -49,8 +49,8 @@ void test("basic: reformats sources and reports floating promise", (t) => {
   );
   assert.match(
     result.stdout,
-    /\[no-floating-promises\]/,
-    "expected bracketed rule-name in the diagnostic line",
+    /\[typescript-eslint\(no-floating-promises\)\]/,
+    "expected bracketed error-code (raw plugin(rule) form) in the head line",
   );
   assert.match(
     result.stdout,

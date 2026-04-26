@@ -6,13 +6,13 @@ Finished in <DUR>ms on <N> files using <T> threads.
 
 linting (with auto-fix)...
 diagnostic legend:
-  <location> <code-slice> [<rule-name>]
+  <location> <source-code-slice> [<error-code>]
     <message>
 
 src/index.ts
-  1:7 data = JSON.parse("{}") [no-unsafe-assignment]
+  1:7 data = JSON.parse("{}") [typescript-eslint(no-unsafe-assignment)]
     Unsafe assignment of an any value.
-  2:18 foo [no-unsafe-member-access]
+  2:18 foo [typescript-eslint(no-unsafe-member-access)]
     Unsafe member access .foo on an `any` value.
 
 Hint on the `no-unsafe-*` diagnostics:

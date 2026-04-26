@@ -6,7 +6,8 @@ import { readFileSync } from "node:fs";
  * LLM-friendly formatter for oxlint's `--format=json` output.
  */
 
-const LEGEND = "diagnostic legend:\n  <location> <code-slice> [<rule-name>]\n    <message>";
+const LEGEND = "diagnostic legend:\n  <location> <source-code-slice> [<error-code>]\n    <message>";
+const PARSE_ERROR_CODE = "parse-error";
 const SLICE_MAX_LEN = 40;
 const UNREADABLE_SLICE = "<unreadable>";
 const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
@@ -34,13 +35,18 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
  */
 
 /**
+ * `errorCode` is the value to emit inside `[...]`. For real diagnostics it is the
+ * raw `code` from oxlint, passed through unchanged (e.g. `eslint(no-debugger)`,
+ * `typescript(TS2591)`). For oxc parser errors (no `code`), it is the synthetic
+ * literal `parse-error`. The shape is structurally distinguishable from real codes
+ * (real codes carry the `plugin(rule)` form with parens; the placeholder does not).
+ *
  * @typedef {{
  *   filename: string;
- *   rawCode: string | null;
+ *   errorCode: string;
  *   message: string;
  *   sortLine: number;
  *   sortCol: number;
- *   ruleName: string;
  *   location: string;
  *   slice: string;
  * }} ResolvedDiagnostic
@@ -134,7 +140,7 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
     sections.push([filename, ...diags.map(formatDiagLine)]);
   }
 
-  const hasUnsafe = resolved.some((d) => d.rawCode !== null && UNSAFE_CODE_PATTERN.test(d.rawCode));
+  const hasUnsafe = resolved.some((d) => UNSAFE_CODE_PATTERN.test(d.errorCode));
   if (hasUnsafe) {
     sections.push(renderWeakTypingsHint(weakTypingsDocPath));
   }
@@ -295,7 +301,7 @@ function findLine(lineStartOffsets, offset) {
  * @returns {ResolvedDiagnostic}
  */
 function resolveDiagnostic(diag, cache) {
-  const ruleName = extractRuleName(diag.code, diag.message);
+  const errorCode = diag.code ?? PARSE_ERROR_CODE;
   const resolved = resolveSpan(cache, diag.filename, diag.span.offset, diag.span.length);
   if (resolved !== null) {
     const slice = formatCodeSlice(resolved.text);
@@ -304,11 +310,10 @@ function resolveDiagnostic(diag, cache) {
       : `${resolved.startLine}:${resolved.startCol}`;
     return {
       filename: diag.filename,
-      rawCode: diag.code,
+      errorCode,
       message: diag.message,
       sortLine: resolved.startLine,
       sortCol: resolved.startCol,
-      ruleName,
       location,
       slice: slice.text,
     };
@@ -316,11 +321,10 @@ function resolveDiagnostic(diag, cache) {
 
   return {
     filename: diag.filename,
-    rawCode: diag.code,
+    errorCode,
     message: diag.message,
     sortLine: diag.span.line,
     sortCol: diag.span.column,
-    ruleName,
     location: `${diag.span.line}:${diag.span.column}`,
     slice: UNREADABLE_SLICE,
   };
@@ -409,20 +413,6 @@ function resolveSpan(cache, filename, offset, length) {
 }
 
 /**
- * Strip the plugin prefix from `rawCode` and return the inner rule ID. When
- * `rawCode` is null, fall back to `(message)` with newlines collapsed.
- *
- * @param {string | null} rawCode
- * @param {string} message
- * @returns {string}
- */
-function extractRuleName(rawCode, message) {
-  if (rawCode === null) return `(${message.replace(/\r?\n/g, " ")})`;
-  const match = /\(([^)]+)\)\s*$/.exec(rawCode);
-  return match ? match[1] : rawCode;
-}
-
-/**
  * Extract the first line, truncate if too long,
  * and append a multi-line marker if more lines follow.
  *
@@ -456,7 +446,7 @@ function compareDiagnostics(a, b) {
   if (a.filename !== b.filename) return a.filename < b.filename ? -1 : 1;
   if (a.sortLine !== b.sortLine) return a.sortLine - b.sortLine;
   if (a.sortCol !== b.sortCol) return a.sortCol - b.sortCol;
-  if (a.ruleName !== b.ruleName) return a.ruleName < b.ruleName ? -1 : 1;
+  if (a.errorCode !== b.errorCode) return a.errorCode < b.errorCode ? -1 : 1;
   return 0;
 }
 
@@ -476,20 +466,17 @@ function groupByFilename(resolved) {
 }
 
 /**
- * Render a single diagnostic as the rule line, optionally followed by a message
- * continuation line. The continuation is suppressed when `rawCode` is null because
- * the message is already inlined into the rule slot via `extractRuleName`.
- * Newlines inside `message` collapse to a single space so the continuation stays
- * on one line.
+ * Render a single diagnostic as the head line (`<location> <slice> [<error-code>]`)
+ * followed by a message continuation line. Newlines inside `message` collapse to
+ * a single space so the continuation stays on one line.
  *
  * @param {ResolvedDiagnostic} d
  * @returns {string}
  */
 function formatDiagLine(d) {
-  const ruleLine = `  ${d.location} ${d.slice} [${d.ruleName}]`;
-  if (d.rawCode === null) return ruleLine;
+  const headLine = `  ${d.location} ${d.slice} [${d.errorCode}]`;
   const messageLine = d.message.replace(/\r?\n/g, " ");
-  return `${ruleLine}\n    ${messageLine}`;
+  return `${headLine}\n    ${messageLine}`;
 }
 
 /**
