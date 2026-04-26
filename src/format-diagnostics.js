@@ -4,7 +4,6 @@ import { readFileSync } from "node:fs";
 
 /**
  * LLM-friendly formatter for oxlint's `--format=json` output.
- * See `dev/records/011-llm-diagnostic-format-spec.md` for the specification.
  */
 
 const LEGEND = "diagnostic legend: <location> <code-slice> [<rule-name>]";
@@ -13,11 +12,10 @@ const UNREADABLE_SLICE = "<unreadable>";
 const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 
 /**
- * Per-diagnostic shape after schema validation. Only fields the wrapper
- * consumes are kept.
+ * Per-diagnostic shape after schema validation.
+ * Only fields the wrapper consumes are kept.
  *
- * `code` and `message` are both nullable, but the validator guarantees at
- * least one is non-null.
+ * `code` and `message` are both nullable, but the validator guarantees at least one is non-null.
  *
  * @typedef {{
  *   filename: string;
@@ -50,9 +48,10 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
  * Result of {@link formatLintOutput}.
  *
  * `schemaMismatch` is non-null when the captured stdout parsed as JSON but
- * its shape diverges from the wrapper's contract. `reason` names the
- * offending field. In that case `formattedStdout` carries the raw stdout for
- * relay and `linterSummary` is null.
+ * its shape diverges from the wrapper's contract.
+ *
+ * `reason` names the offending field.
+ * In that case `formattedStdout` carries the raw stdout for relay and `linterSummary` is null.
  *
  * @typedef {{
  *   formattedStdout: string;
@@ -64,8 +63,8 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 /**
  * Format raw oxlint JSON stdout into the LLM-friendly payload.
  *
- * No stdout/stderr emission; the caller decides when and where to write. May
- * read source files to resolve span positions.
+ * No stdout/stderr emission.
+ * May read source files to resolve span positions.
  *
  * @param {object} options
  * @param {string} options.capturedStdout Raw oxlint stdout from `--format=json`.
@@ -169,8 +168,8 @@ function validateDiagnostic(diag) {
   if (!isUnknownArray(diag.labels) || diag.labels.length === 0) {
     return { ok: false, reason: "`labels` is missing or empty" };
   }
-  // Reduce multi-label entries to `labels[0]`. Typical extras are duplicate
-  // pointers to the same slice.
+  // Reduce multi-label entries to `labels[0]`.
+  // Typical extras are duplicate pointers to the same slice.
   const first = diag.labels[0];
   if (!isObject(first)) return { ok: false, reason: "`labels[0]` is not an object" };
   const span = first.span;
@@ -383,8 +382,8 @@ function extractRuleName(rawCode, message) {
 }
 
 /**
- * Extract the first line of a span, truncate if too long, and append a
- * multi-line marker if more lines follow.
+ * Extract the first line, truncate if too long,
+ * and append a multi-line marker if more lines follow.
  *
  * @param {string} text
  * @returns {{ text: string; truncated: boolean }}
