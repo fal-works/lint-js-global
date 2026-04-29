@@ -32,6 +32,21 @@ void test("--version: prints semver and exits 0 without requiring package.json",
   }
 });
 
+void test("--help / --version short-circuit before run-mode validation", (t) => {
+  const dir = makeTempDir("help-shortcircuit");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  // Combined with otherwise-invalid run-mode flags. Help/version must win and
+  // exit 0; mutual-exclusion (and any other run-only validation) must not fire.
+  const helpResult = runCli(dir, ["--help", "--format-only", "--lint-only"]);
+  assert.equal(helpResult.status, 0, "--help must short-circuit run-mode validation");
+  assert.match(helpResult.stdout, /Usage: lint-js/);
+
+  const versionResult = runCli(dir, ["--version", "--format-only", "--lint-only"]);
+  assert.equal(versionResult.status, 0, "--version must short-circuit run-mode validation");
+  assert.match(versionResult.stdout, /^lint-js \d+\.\d+\.\d+/);
+});
+
 void test("unknown CLI option: exits 2 with parsing-error diagnostic", (t) => {
   const dir = makeTempDir("bad-arg");
   t.after(() => rmSync(dir, { recursive: true, force: true }));

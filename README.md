@@ -15,7 +15,7 @@ pnpm install -g @fal-works/lint-js-global
 Run from a project root:
 
 ```sh
-lint-js [--check] [--unix] [path...]
+lint-js [--check] [--format-only | --lint-only] [--unix] [path...]
 ```
 
 The current directory must contain `package.json` (contents not read), as a guard against accidentally running without target paths in a wide location such as `~/`.
@@ -23,10 +23,12 @@ Target paths themselves may point anywhere.
 
 ### Options
 
-`--check` verifies formatting and lint without rewriting files.
+- `--check` verifies formatting and lint without rewriting files.
+- `--format-only` runs only the format phase; the lint phase (and its banners) is skipped entirely.
+- `--lint-only` is the symmetric counterpart (runs only the lint phase).
+- `--unix` passes oxlint's `--format=unix` output through unchanged.
 
-`--unix` passes oxlint's `--format=unix` output through unchanged, for VS Code terminal link detection.
-Skips the LLM-friendly layout, the hint block, and the per-run issue-count summary.
+`--format-only` and `--lint-only` are mutually exclusive.
 
 ### Target Paths
 

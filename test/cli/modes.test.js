@@ -5,7 +5,7 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import { assertProgressLines, copyFixture, runCli } from "../helpers.js";
+import { assertProgressLines, copyFixture, makeTempDir, runCli } from "../helpers.js";
 
 void test("basic: reformats sources and reports floating promise", (t) => {
   const dir = copyFixture("basic");
@@ -168,4 +168,94 @@ void test("--check: clean project exits 0", (t) => {
     lintCompletion: true,
     summary: "lint-js: Completed successfully. No issues found.",
   });
+});
+
+void test("--format-only: runs fmt phase, skips lint phase entirely", (t) => {
+  const dir = copyFixture("basic");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const target = join(dir, "src", "index.ts");
+  const before = readFileSync(target, "utf8");
+
+  const result = runCli(dir, ["--format-only"]);
+
+  assert.equal(
+    result.status,
+    0,
+    "fmt-only on the basic fixture succeeds: oxfmt rewrites the source and the lint phase is skipped",
+  );
+  assert.notEqual(readFileSync(target, "utf8"), before, "expected source to be reformatted");
+  assert.doesNotMatch(
+    result.stdout,
+    /no-floating-promises/,
+    "lint diagnostics must not appear under --format-only",
+  );
+  // Scenario: --format-only on a fixture whose only lint issue is unfixable.
+  // Skipping lint is what makes the run pass.
+  assertProgressLines(result.stdout, {
+    fmtMode: "default",
+    fmtStart: true,
+    fmtCompletion: false,
+    lintMode: null,
+    lintStart: false,
+    lintCompletion: false,
+    summary: "lint-js: Completed successfully. Issues fixed where possible.",
+  });
+});
+
+void test("--lint-only: runs lint phase, skips fmt phase entirely", (t) => {
+  const dir = copyFixture("basic");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const target = join(dir, "src", "index.ts");
+  const before = readFileSync(target, "utf8");
+
+  const result = runCli(dir, ["--lint-only"]);
+
+  assert.equal(result.status, 1, "expected exit 1 from unfixed lint error");
+  assert.match(result.stdout, /no-floating-promises/, "expected lint diagnostic on stdout");
+  assert.doesNotMatch(
+    result.stdout,
+    /Finished in .* on .* files using .* threads\./,
+    "oxfmt summary must not appear under --lint-only",
+  );
+  // Asserting bytes-equal is meaningful only because the basic fixture has
+  // formatting violations oxfmt would otherwise rewrite.
+  assert.equal(
+    readFileSync(target, "utf8"),
+    before,
+    "source must not be reformatted when fmt phase is skipped",
+  );
+  // Scenario: --lint-only + unfixed lint findings.
+  assertProgressLines(result.stdout, {
+    fmtMode: null,
+    fmtStart: false,
+    fmtCompletion: false,
+    lintMode: "with auto-fix",
+    lintStart: true,
+    lintCompletion: false,
+    summary: "lint-js: Failed. Issues fixed where possible; unfixed issues remain.",
+  });
+});
+
+void test("--format-only and --lint-only are mutually exclusive", (t) => {
+  // No package.json in this dir: argument-validity errors must fail before the
+  // package.json guard. Same contract as the `unknown CLI option` test.
+  const dir = makeTempDir("mutually-exclusive");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const result = runCli(dir, ["--format-only", "--lint-only"]);
+
+  assert.equal(result.status, 2, "LintJsError path uses exit 2");
+  assert.match(result.stderr, /mutually exclusive/);
+  assert.doesNotMatch(
+    result.stderr,
+    /no package\.json/,
+    "argument validation should fail before the package.json check",
+  );
+  assert.doesNotMatch(
+    result.stdout,
+    /^formatting/m,
+    "no phase banner should be emitted before the validation error",
+  );
 });

@@ -103,12 +103,16 @@ export function runCli(cwd, args = []) {
  * Internal tool output (oxfmt / oxlint stdout between our banners) is not
  * checked — only lint-js's own lines are.
  *
+ * Pass `fmtMode: null` (or `lintMode: null`) when the phase is skipped entirely
+ * via `--lint-only` / `--format-only`; the corresponding banners are then
+ * asserted absent regardless of the start/completion flags.
+ *
  * @param {string} stdout
  * @param {{
- *   fmtMode: "default" | "check-only";
+ *   fmtMode: "default" | "check-only" | null;
  *   fmtStart: boolean;
  *   fmtCompletion: boolean;
- *   lintMode: "with auto-fix" | "no auto-fix";
+ *   lintMode: "with auto-fix" | "no auto-fix" | null;
  *   lintStart: boolean;
  *   lintCompletion: boolean;
  *   summary: string;
@@ -117,12 +121,15 @@ export function runCli(cwd, args = []) {
 export function assertProgressLines(stdout, expected) {
   const lines = stdout.split("\n");
   const fmtLabel = expected.fmtMode === "check-only" ? "formatting (check-only)" : "formatting";
+  const lintLabel = expected.lintMode ?? "with auto-fix";
+  const fmtPhaseRuns = expected.fmtMode !== null;
+  const lintPhaseRuns = expected.lintMode !== null;
   /** @type {[string, string, boolean][]} name, line text, expected-present */
   const specs = [
-    ["fmt start", `${fmtLabel}...`, expected.fmtStart],
-    ["fmt completion", `${fmtLabel}: clean.`, expected.fmtCompletion],
-    ["lint start", `linting (${expected.lintMode})...`, expected.lintStart],
-    ["lint completion", `linting (${expected.lintMode}): clean.`, expected.lintCompletion],
+    ["fmt start", `${fmtLabel}...`, fmtPhaseRuns && expected.fmtStart],
+    ["fmt completion", `${fmtLabel}: clean.`, fmtPhaseRuns && expected.fmtCompletion],
+    ["lint start", `linting (${lintLabel})...`, lintPhaseRuns && expected.lintStart],
+    ["lint completion", `linting (${lintLabel}): clean.`, lintPhaseRuns && expected.lintCompletion],
     ["summary", expected.summary, true],
   ];
 
