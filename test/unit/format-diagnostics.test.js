@@ -601,6 +601,39 @@ void test("empty stdout in JSON mode is clean-compatible (no schemaMismatch)", (
   assert.equal(result.schemaMismatch, null);
   assert.equal(result.formattedStdout, "");
   assert.equal(result.linterSummary, null);
+  assert.equal(result.noFilesMatched, false);
+});
+
+void test('"No files found to lint." prefix is treated as a clean no-files run', () => {
+  // oxlint ≥1.61 prepends "No files found to lint." to stdout when no files match the targets,
+  // breaking JSON parsing. Surfaced as `noFilesMatched`.
+  const result = formatLintOutput({
+    capturedStdout:
+      'No files found to lint. Please check your paths and ignore patterns.\n{ "diagnostics": [], "number_of_files": 0 }\n',
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(result.noFilesMatched, true);
+  assert.equal(result.schemaMismatch, null);
+  assert.equal(result.formattedStdout, "");
+  assert.equal(result.linterSummary, null);
+});
+
+void test('"No files found to lint." prefix sets noFilesMatched in --unix mode too', () => {
+  // The same prefix appears in --format=unix output, so the detection must run
+  // before the unix passthrough branch.
+  const raw = "No files found to lint. Please check your paths and ignore patterns.\n";
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    unix: true,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(result.noFilesMatched, true);
+  assert.equal(result.schemaMismatch, null);
+  assert.equal(result.formattedStdout, raw, "unix mode keeps the raw payload as passthrough");
+  assert.equal(result.linterSummary, null);
 });
 
 void test("entry missing `filename` is treated as schemaMismatch with index in reason", () => {

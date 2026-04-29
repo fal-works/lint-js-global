@@ -69,12 +69,20 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
  * `reason` names the offending field or parser failure.
  * In that case `formattedStdout` carries the raw stdout for relay and `linterSummary` is null.
  *
+ * `noFilesMatched` is true when oxlint signaled that no files matched any target
+ * (the targets contained no lintable files, or every match was filtered out by ignore patterns).
+ * oxlint ≥1.61 prepends a human-readable line to stdout and exits non-zero in that case.
+ *
  * @typedef {{
  *   formattedStdout: string;
  *   linterSummary: string | null;
  *   schemaMismatch: { reason: string } | null;
+ *   noFilesMatched: boolean;
  * }} FormatLintResult
  */
+
+/** Prefix oxlint ≥1.61 prepends to stdout when no files match the targets. */
+const NO_FILES_PREFIX = "No files found to lint.";
 
 /**
  * Format raw oxlint JSON stdout into the LLM-friendly payload.
@@ -89,14 +97,38 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
  * @returns {FormatLintResult}
  */
 export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
+  // Detected before mode branching: the prefix appears in --format=unix output too,
+  // so unix mode also needs the exit-normalization signal.
+  const noFilesMatched = capturedStdout.startsWith(NO_FILES_PREFIX);
+
   if (unix) {
-    return { formattedStdout: capturedStdout, linterSummary: null, schemaMismatch: null };
+    return {
+      formattedStdout: capturedStdout,
+      linterSummary: null,
+      schemaMismatch: null,
+      noFilesMatched,
+    };
   }
 
   // Empty stdout is treated as clean-compatible: oxlint emitted no payload at all,
   // which is benign and should not be escalated to a contract failure.
   if (capturedStdout === "") {
-    return { formattedStdout: "", linterSummary: null, schemaMismatch: null };
+    return {
+      formattedStdout: "",
+      linterSummary: null,
+      schemaMismatch: null,
+      noFilesMatched: false,
+    };
+  }
+
+  // The prefix breaks JSON parsing; short-circuit to a clean result.
+  if (noFilesMatched) {
+    return {
+      formattedStdout: "",
+      linterSummary: null,
+      schemaMismatch: null,
+      noFilesMatched: true,
+    };
   }
 
   /** @type {unknown} */
@@ -112,6 +144,7 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
       formattedStdout: capturedStdout,
       linterSummary: null,
       schemaMismatch: { reason: `stdout is not valid JSON: ${message}` },
+      noFilesMatched: false,
     };
   }
 
@@ -121,11 +154,17 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
       formattedStdout: capturedStdout,
       linterSummary: null,
       schemaMismatch: { reason: validation.reason },
+      noFilesMatched: false,
     };
   }
   const validated = validation.value;
   if (validated.length === 0) {
-    return { formattedStdout: "", linterSummary: null, schemaMismatch: null };
+    return {
+      formattedStdout: "",
+      linterSummary: null,
+      schemaMismatch: null,
+      noFilesMatched: false,
+    };
   }
 
   const cache = createSourceCache();
@@ -149,7 +188,7 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
   const issueWord = resolved.length === 1 ? "issue" : "issues";
   const fileWord = fileGroups.size === 1 ? "file" : "files";
   const linterSummary = `Found ${resolved.length} unfixed ${issueWord} in ${fileGroups.size} ${fileWord}.`;
-  return { formattedStdout, linterSummary, schemaMismatch: null };
+  return { formattedStdout, linterSummary, schemaMismatch: null, noFilesMatched: false };
 }
 
 /**

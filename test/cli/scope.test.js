@@ -86,6 +86,53 @@ void test("--check + fully-ignored target: fmt phase label still fires", (t) => 
   });
 });
 
+void test("target dir with no lintable files exits cleanly", (t) => {
+  // oxlint ≥1.61's no-files signal also fires when a target simply contains no lintable files,
+  // not only when ignore patterns filter every match out.
+  const dir = copyFixture("basic");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  mkdirSync(join(dir, "empty-dir"));
+
+  const result = runCli(dir, ["empty-dir"]);
+
+  assert.equal(result.status, 0, "expected exit 0 when the target has no lintable files");
+  assertProgressLines(result.stdout, {
+    fmtMode: "default",
+    fmtStart: true,
+    fmtCompletion: false,
+    lintMode: "with auto-fix",
+    lintStart: true,
+    lintCompletion: true,
+    summary: "lint-js: Completed successfully. Issues fixed where possible.",
+  });
+});
+
+void test("--unix + fully-ignored target exits cleanly", (t) => {
+  // oxlint ≥1.61 emits the "No files found to lint." signal in --format=unix too,
+  // so the wrapper's exit normalization must run before the unix passthrough.
+  const dir = copyFixture("basic");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const ignored = join(dir, "src", "ignored.ts");
+  writeFileSync(ignored, DIRTY_SOURCE);
+  writeIgnoreFiles(dir, "ignored.ts");
+
+  const result = runCli(dir, ["--unix", "src/ignored.ts"]);
+
+  assert.equal(result.status, 0, "expected exit 0 when the only target is ignored");
+  assert.equal(readFileSync(ignored, "utf8"), DIRTY_SOURCE, "ignored file must not be touched");
+  assertProgressLines(result.stdout, {
+    fmtMode: "default",
+    fmtStart: true,
+    fmtCompletion: false,
+    lintMode: "with auto-fix",
+    lintStart: true,
+    lintCompletion: true,
+    summary: "lint-js: Completed successfully. Issues fixed where possible.",
+  });
+});
+
 void test("node_modules is ignored", (t) => {
   const dir = copyFixture("with-node-modules");
   t.after(() => rmSync(dir, { recursive: true, force: true }));

@@ -235,7 +235,7 @@ function runMain() {
     // Replay stderr first, then stdout. Both are batched (Codex-sandbox workaround)
     // so emission timing is lost; this fixed order keeps the relayed sequence deterministic.
     process.stderr.write(lintStderr);
-    const { formattedStdout, linterSummary, schemaMismatch } = formatLintOutput({
+    const { formattedStdout, linterSummary, schemaMismatch, noFilesMatched } = formatLintOutput({
       capturedStdout: lintStdout,
       unix,
       weakTypingsDocPath: WEAK_TYPINGS_DOC,
@@ -247,12 +247,14 @@ function runMain() {
         details: [schemaMismatch.reason, "Raw payload relayed to stdout above."],
       });
     }
-    if (lintResult.status === 0) print(`${lintLabel}: clean.`);
+    // oxlint ≥1.61 exits non-zero when no files match the targets; treat that as clean.
+    const lintCleanish = lintResult.status === 0 || noFilesMatched;
+    if (lintCleanish) print(`${lintLabel}: clean.`);
     if (linterSummary !== null) {
       print("");
       print(linterSummary);
     }
-    lintStatus = lintResult.status;
+    lintStatus = lintCleanish ? 0 : lintResult.status;
   }
 
   print("");
