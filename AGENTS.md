@@ -9,9 +9,8 @@ Also aims to support LLM coding agents that iterate lint+fix autonomously while 
 
 ## Development
 
-Node >= 22, pnpm.
-CLI lives in a single file at `src/cli.js`.
-Smoke tests in `test/`.
+Node >= 22.18.0, pnpm.
+Source files in `src/`, tests in `test/`.
 `pnpm lint` dogfoods the CLI on this repo.
 
 ## Temporary files
