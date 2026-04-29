@@ -79,12 +79,24 @@ export function runCli(cwd: string, args: readonly string[] = []): CliRunResult 
 }
 
 interface ProgressLineExpectations {
+  /**
+   * `null` if the format phase is skipped entirely (via `--lint-only`);
+   * banners are then asserted absent regardless of `fmtStart`/`fmtCompletion`.
+   */
   fmtMode: "default" | "check-only" | null;
+
   fmtStart: boolean;
   fmtCompletion: boolean;
+
+  /**
+   * `null` if the lint phase is skipped entirely (via `--format-only`);
+   * banners are then asserted absent regardless of `lintStart`/`lintCompletion`.
+   */
   lintMode: "with auto-fix" | "no auto-fix" | null;
+
   lintStart: boolean;
   lintCompletion: boolean;
+
   summary: string;
 }
 
@@ -101,12 +113,8 @@ interface ProgressLineExpectations {
  *   separate from — see dev/records/003)
  * - **summary anchor**: the summary line appears exactly once, with a blank line immediately above
  *
- * Internal tool output (oxfmt / oxlint stdout between our banners) is not
- * checked — only lint-js's own lines are.
- *
- * Pass `fmtMode: null` (or `lintMode: null`) when the phase is skipped entirely
- * via `--lint-only` / `--format-only`; the corresponding banners are then
- * asserted absent regardless of the start/completion flags.
+ * Internal tool output (oxfmt / oxlint stdout between our banners) is not checked
+ * — only lint-js's own lines are.
  */
 export function assertProgressLines(stdout: string, expected: ProgressLineExpectations): void {
   const lines = stdout.split("\n");

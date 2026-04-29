@@ -17,6 +17,22 @@ import {
 } from "./package-paths.ts";
 import { buildPathInjectedEnv, runTool, runToolCapturingOutput } from "./run-tool.ts";
 
+interface BuildSummaryOptions {
+  check: boolean;
+
+  /**
+   * `null` if the format phase was skipped (`--lint-only`);
+   * skipped phases do not contribute to the verdict.
+   */
+  fmtStatus: number | null;
+
+  /**
+   * `null` if the lint phase was skipped (`--format-only`);
+   * skipped phases do not contribute to the verdict.
+   */
+  lintStatus: number | null;
+}
+
 /**
  * Pick the one-line summary emitted after the run finishes.
  *
@@ -24,19 +40,8 @@ import { buildPathInjectedEnv, runTool, runToolCapturingOutput } from "./run-too
  * Which phase failed is readable from the tool output above,
  * so the summary only needs to convey overall outcome
  * and whether fixes may have been applied.
- *
- * `null` for either status means the phase was skipped (`--format-only` /
- * `--lint-only`); skipped phases do not contribute to the verdict.
  */
-function buildSummary({
-  check,
-  fmtStatus,
-  lintStatus,
-}: {
-  check: boolean;
-  fmtStatus: number | null;
-  lintStatus: number | null;
-}): string {
+function buildSummary({ check, fmtStatus, lintStatus }: BuildSummaryOptions): string {
   const fmtOk = fmtStatus === null || fmtStatus === 0;
   const lintOk = lintStatus === null || lintStatus === 0;
   const ok = fmtOk && lintOk;

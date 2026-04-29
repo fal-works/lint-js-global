@@ -15,26 +15,31 @@ type Result<T, E> = { ok: true; value: T } | { ok: false; reason: E };
 
 /**
  * Per-diagnostic shape after schema validation. Only fields the wrapper consumes are kept.
- *
- * `code` is nullable: oxc parser-error diagnostics omit it.
  */
 interface ValidatedDiagnostic {
   filename: string;
+
+  /** Nullable: oxc parser-error diagnostics omit `code`. */
   code: string | null;
+
   message: string;
   span: { offset: number; length: number; line: number; column: number };
 }
 
-/**
- * `errorCode` is the value to emit inside `[...]`. For real diagnostics it is the
- * raw `code` from oxlint, passed through unchanged (e.g. `eslint(no-debugger)`,
- * `typescript(TS2591)`). For oxc parser errors (no `code`), it is the synthetic
- * literal `parse-error`. The shape is structurally distinguishable from real codes
- * (real codes carry the `plugin(rule)` form with parens; the placeholder does not).
- */
 interface ResolvedDiagnostic {
   filename: string;
+
+  /**
+   * Value to emit inside `[...]` in the formatted output.
+   *
+   * - For real diagnostics it is the raw `code` from oxlint, passed through unchanged (e.g.
+   *   `eslint(no-debugger)`, `typescript(TS2591)`).
+   * - For oxc parser errors (no `code`), it is the synthetic literal `parse-error`. The shape is
+   *   structurally distinguishable from real codes (real codes carry the `plugin(rule)` form with
+   *   parens; the placeholder does not).
+   */
   errorCode: string;
+
   message: string;
   sortLine: number;
   sortCol: number;
@@ -49,47 +54,59 @@ interface SourceEntry {
 
 /**
  * Result of {@link formatLintOutput}.
- *
- * `schemaMismatch` is non-null when the captured stdout fails the wrapper's output contract:
- * either non-empty stdout that does not parse as JSON, or
- * JSON whose shape diverges from the expected diagnostic schema.
- *
- * `reason` names the offending field or parser failure.
- * In that case `formattedStdout` carries the raw stdout for relay and `linterSummary` is null.
- *
- * `noFilesMatched` is true when oxlint signaled that no files matched any target
- * (the targets contained no lintable files, or every match was filtered out by ignore patterns).
- * oxlint ≥1.61 prepends a human-readable line to stdout and exits non-zero in that case.
  */
 export interface FormatLintResult {
   formattedStdout: string;
+
+  /**
+   * A human-readable summary of the unfixed issues.
+   *
+   * Null when `schemaMismatch` is non-null.
+   */
   linterSummary: string | null;
+
+  /**
+   * Non-null when the captured stdout fails the wrapper's output contract:
+   * either non-empty stdout that does not parse as JSON, or
+   * JSON whose shape diverges from the expected diagnostic schema.
+   *
+   * `reason` names the offending field or parser failure.
+   */
   schemaMismatch: { reason: string } | null;
+
+  /**
+   * True when oxlint signaled that no files matched any target
+   * (the targets contained no lintable files, or every match was filtered out by ignore patterns).
+   * oxlint ≥1.61 prepends a human-readable line to stdout and exits non-zero in that case.
+   */
   noFilesMatched: boolean;
 }
 
 /** Prefix oxlint ≥1.61 prepends to stdout when no files match the targets. */
 const NO_FILES_PREFIX = "No files found to lint.";
 
+export interface FormatLintOptions {
+  /** Raw oxlint stdout from `--format=json`. */
+  capturedStdout: string;
+
+  /** If true, pass through unchanged (no legend, no hint, no summary). */
+  unix: boolean;
+
+  /** Absolute path used in the weak-typings hint. */
+  weakTypingsDocPath: string;
+}
+
 /**
  * Format raw oxlint JSON stdout into the LLM-friendly payload.
  *
  * No stdout/stderr emission.
  * May read source files to resolve span positions.
- *
- * @param capturedStdout - Raw oxlint stdout from `--format=json`.
- * @param unix - If true, pass through unchanged (no legend, no hint, no summary).
- * @param weakTypingsDocPath - Absolute path used in the weak-typings hint.
  */
 export function formatLintOutput({
   capturedStdout,
   unix,
   weakTypingsDocPath,
-}: {
-  capturedStdout: string;
-  unix: boolean;
-  weakTypingsDocPath: string;
-}): FormatLintResult {
+}: FormatLintOptions): FormatLintResult {
   // Detected before mode branching: the prefix appears in --format=unix output too,
   // so unix mode also needs the exit-normalization signal.
   const noFilesMatched = capturedStdout.startsWith(NO_FILES_PREFIX);
@@ -294,9 +311,10 @@ function buildLineStartOffsets(buffer: Buffer): number[] {
 }
 
 /**
- * Binary-search for the 1-origin line whose start offset is the greatest one ≤ `offset`,
- * returning both the line number and the matching start offset (saves a re-lookup at the
- * call site, which `noUncheckedIndexedAccess` would otherwise force a guard around).
+ * Binary-search for the 1-origin line whose start offset is the greatest one ≤ `offset`.
+ *
+ * Returns both the line number and the matching start offset so the caller can compute
+ * column without indexing back into the array.
  */
 function findLine(
   lineStartOffsets: readonly number[],
@@ -311,7 +329,7 @@ function findLine(
     else hi = mid - 1;
   }
   // `buildLineStartOffsets` always seeds the array with `[0]`, so index `lo` is in bounds;
-  // the `?? 0` is a no-op in practice but keeps TS narrowed without a non-null assertion.
+  // the `?? 0` is a no-op in practice but satisfies TS narrowing.
   const lineStart = lineStartOffsets[lo] ?? 0;
   return { line: lo + 1, lineStart };
 }

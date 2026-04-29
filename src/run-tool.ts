@@ -10,10 +10,13 @@ type SpawnResult = SpawnSyncReturns<Buffer | string>;
 interface RunToolOptions {
   /** Tool name for launch-failure diagnostics. */
   name: string;
+
   /** Absolute path to the tool's JS entry point. */
   bin: string;
+
   /** Arguments passed to the tool, excluding `bin`. */
   args: readonly string[];
+
   /** Env for the child. Defaults to inherited. */
   env?: NodeJS.ProcessEnv;
 }
