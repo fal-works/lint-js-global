@@ -1,12 +1,10 @@
-// @ts-check
-
 import assert from "node:assert/strict";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { copyFixture, runCli } from "../helpers.js";
+import { copyFixture, runCli, type CliRunResult } from "../helpers.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const snapshotDir = join(here, "..", "snapshots");
@@ -19,11 +17,8 @@ const UPDATE = process.env.UPDATE_SNAPSHOTS === "1";
  * - oxfmt's `Finished in Xms on N files using T threads.` (duration + thread count vary)
  * - oxfmt's per-file ` (Xms)` in --check mode
  * - absolute package-root path in the weak-typings hint (depends on test host)
- *
- * @param {string} text
- * @returns {string}
  */
-function normalize(text) {
+function normalize(text: string): string {
   return text
     .replaceAll(
       /Finished in \d+ms on \d+ files using \d+ threads\./g,
@@ -33,11 +28,7 @@ function normalize(text) {
     .replaceAll(packageRoot, "<PACKAGE_ROOT>");
 }
 
-/**
- * @param {{ status: number | null; stdout: string; stderr: string }} result
- * @returns {string}
- */
-function renderSnapshot(result) {
+function renderSnapshot(result: CliRunResult): string {
   return [
     `exit: ${result.status}`,
     "",
@@ -48,11 +39,7 @@ function renderSnapshot(result) {
   ].join("\n");
 }
 
-/**
- * @param {string} name
- * @param {{ status: number | null; stdout: string; stderr: string }} result
- */
-function matchSnapshot(name, result) {
+function matchSnapshot(name: string, result: CliRunResult): void {
   const path = join(snapshotDir, `${name}.txt`);
   const actual = renderSnapshot(result);
   if (UPDATE) {

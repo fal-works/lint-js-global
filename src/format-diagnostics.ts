@@ -1,5 +1,3 @@
-// @ts-check
-
 import { readFileSync } from "node:fs";
 
 /**
@@ -12,27 +10,20 @@ const SLICE_MAX_LEN = 40;
 const UNREADABLE_SLICE = "<unreadable>";
 const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 
-/**
- * Discriminated-union result type for fallible validators.
- *
- * @template T
- * @template E
- * @typedef {{ ok: true; value: T } | { ok: false; reason: E }} Result
- */
+/** Discriminated-union result type for fallible validators. */
+type Result<T, E> = { ok: true; value: T } | { ok: false; reason: E };
 
 /**
- * Per-diagnostic shape after schema validation.
- * Only fields the wrapper consumes are kept.
+ * Per-diagnostic shape after schema validation. Only fields the wrapper consumes are kept.
  *
  * `code` is nullable: oxc parser-error diagnostics omit it.
- *
- * @typedef {{
- *   filename: string;
- *   code: string | null;
- *   message: string;
- *   span: { offset: number; length: number; line: number; column: number };
- * }} ValidatedDiagnostic
  */
+interface ValidatedDiagnostic {
+  filename: string;
+  code: string | null;
+  message: string;
+  span: { offset: number; length: number; line: number; column: number };
+}
 
 /**
  * `errorCode` is the value to emit inside `[...]`. For real diagnostics it is the
@@ -40,24 +31,21 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
  * `typescript(TS2591)`). For oxc parser errors (no `code`), it is the synthetic
  * literal `parse-error`. The shape is structurally distinguishable from real codes
  * (real codes carry the `plugin(rule)` form with parens; the placeholder does not).
- *
- * @typedef {{
- *   filename: string;
- *   errorCode: string;
- *   message: string;
- *   sortLine: number;
- *   sortCol: number;
- *   location: string;
- *   slice: string;
- * }} ResolvedDiagnostic
  */
+interface ResolvedDiagnostic {
+  filename: string;
+  errorCode: string;
+  message: string;
+  sortLine: number;
+  sortCol: number;
+  location: string;
+  slice: string;
+}
 
-/**
- * @typedef {{
- *   buffer: Buffer;
- *   lineStartOffsets: number[];
- * }} SourceEntry
- */
+interface SourceEntry {
+  buffer: Buffer;
+  lineStartOffsets: number[];
+}
 
 /**
  * Result of {@link formatLintOutput}.
@@ -72,14 +60,13 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
  * `noFilesMatched` is true when oxlint signaled that no files matched any target
  * (the targets contained no lintable files, or every match was filtered out by ignore patterns).
  * oxlint ≥1.61 prepends a human-readable line to stdout and exits non-zero in that case.
- *
- * @typedef {{
- *   formattedStdout: string;
- *   linterSummary: string | null;
- *   schemaMismatch: { reason: string } | null;
- *   noFilesMatched: boolean;
- * }} FormatLintResult
  */
+export interface FormatLintResult {
+  formattedStdout: string;
+  linterSummary: string | null;
+  schemaMismatch: { reason: string } | null;
+  noFilesMatched: boolean;
+}
 
 /** Prefix oxlint ≥1.61 prepends to stdout when no files match the targets. */
 const NO_FILES_PREFIX = "No files found to lint.";
@@ -90,13 +77,19 @@ const NO_FILES_PREFIX = "No files found to lint.";
  * No stdout/stderr emission.
  * May read source files to resolve span positions.
  *
- * @param {object} options
- * @param {string} options.capturedStdout Raw oxlint stdout from `--format=json`.
- * @param {boolean} options.unix If true, pass through unchanged (no legend, no hint, no summary).
- * @param {string} options.weakTypingsDocPath Absolute path used in the weak-typings hint.
- * @returns {FormatLintResult}
+ * @param capturedStdout - Raw oxlint stdout from `--format=json`.
+ * @param unix - If true, pass through unchanged (no legend, no hint, no summary).
+ * @param weakTypingsDocPath - Absolute path used in the weak-typings hint.
  */
-export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
+export function formatLintOutput({
+  capturedStdout,
+  unix,
+  weakTypingsDocPath,
+}: {
+  capturedStdout: string;
+  unix: boolean;
+  weakTypingsDocPath: string;
+}): FormatLintResult {
   // Detected before mode branching: the prefix appears in --format=unix output too,
   // so unix mode also needs the exit-normalization signal.
   const noFilesMatched = capturedStdout.startsWith(NO_FILES_PREFIX);
@@ -131,8 +124,7 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
     };
   }
 
-  /** @type {unknown} */
-  let parsed;
+  let parsed: unknown;
   try {
     parsed = JSON.parse(capturedStdout);
   } catch (err) {
@@ -173,8 +165,7 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
 
   const fileGroups = groupByFilename(resolved);
 
-  /** @type {string[][]} */
-  const sections = [[LEGEND]];
+  const sections: string[][] = [[LEGEND]];
   for (const [filename, diags] of fileGroups) {
     sections.push([filename, ...diags.map(formatDiagLine)]);
   }
@@ -196,18 +187,14 @@ export function formatLintOutput({ capturedStdout, unix, weakTypingsDocPath }) {
  *
  * Stops at the first mismatch so shape drift surfaces as a contract error
  * rather than averaging out across silently-degraded entries.
- *
- * @param {unknown} parsed
- * @returns {Result<ValidatedDiagnostic[], string>}
  */
-function validatePayload(parsed) {
+function validatePayload(parsed: unknown): Result<ValidatedDiagnostic[], string> {
   if (!isObject(parsed)) return { ok: false, reason: "top-level value is not an object" };
   const diagnostics = parsed.diagnostics;
   if (!isUnknownArray(diagnostics)) {
     return { ok: false, reason: "`diagnostics` is missing or not an array" };
   }
-  /** @type {ValidatedDiagnostic[]} */
-  const validated = [];
+  const validated: ValidatedDiagnostic[] = [];
   for (let i = 0; i < diagnostics.length; i++) {
     const result = validateDiagnostic(diagnostics[i]);
     if (!result.ok) return { ok: false, reason: `diagnostics[${i}]: ${result.reason}` };
@@ -218,11 +205,8 @@ function validatePayload(parsed) {
 
 /**
  * Validate a single oxlint diagnostic entry.
- *
- * @param {unknown} diag
- * @returns {Result<ValidatedDiagnostic, string>}
  */
-function validateDiagnostic(diag) {
+function validateDiagnostic(diag: unknown): Result<ValidatedDiagnostic, string> {
   if (!isObject(diag)) return { ok: false, reason: "not an object" };
   if (typeof diag.filename !== "string") {
     return { ok: false, reason: "`filename` is missing or not a string" };
@@ -275,20 +259,19 @@ function validateDiagnostic(diag) {
   };
 }
 
-/**
- * @returns {{ get(filename: string): SourceEntry | null }}
- */
-function createSourceCache() {
-  /** @type {Map<string, SourceEntry | null>} */
-  const cache = new Map();
+interface SourceCache {
+  get(filename: string): SourceEntry | null;
+}
+
+function createSourceCache(): SourceCache {
+  const cache = new Map<string, SourceEntry | null>();
   return {
     get(filename) {
       const cached = cache.get(filename);
       if (cached !== undefined) return cached;
       try {
         const buffer = readFileSync(filename);
-        /** @type {SourceEntry} */
-        const entry = { buffer, lineStartOffsets: buildLineStartOffsets(buffer) };
+        const entry: SourceEntry = { buffer, lineStartOffsets: buildLineStartOffsets(buffer) };
         cache.set(filename, entry);
         return entry;
       } catch {
@@ -301,11 +284,8 @@ function createSourceCache() {
 
 /**
  * Build an index of byte offsets where each line starts (0-origin array, 1-origin line).
- *
- * @param {Buffer} buffer
- * @returns {number[]}
  */
-function buildLineStartOffsets(buffer) {
+function buildLineStartOffsets(buffer: Buffer): number[] {
   const offsets = [0];
   for (let i = 0; i < buffer.length; i++) {
     if (buffer[i] === 0x0a) offsets.push(i + 1);
@@ -314,32 +294,33 @@ function buildLineStartOffsets(buffer) {
 }
 
 /**
- * Binary-search for the 1-origin line whose start offset is the greatest one ≤ `offset`.
- *
- * @param {number[]} lineStartOffsets
- * @param {number} offset
- * @returns {number}
+ * Binary-search for the 1-origin line whose start offset is the greatest one ≤ `offset`,
+ * returning both the line number and the matching start offset (saves a re-lookup at the
+ * call site, which `noUncheckedIndexedAccess` would otherwise force a guard around).
  */
-function findLine(lineStartOffsets, offset) {
+function findLine(
+  lineStartOffsets: readonly number[],
+  offset: number,
+): { line: number; lineStart: number } {
   let lo = 0;
   let hi = lineStartOffsets.length - 1;
   while (lo < hi) {
     const mid = (lo + hi + 1) >> 1;
-    if (lineStartOffsets[mid] <= offset) lo = mid;
+    const midOffset = lineStartOffsets[mid];
+    if (midOffset !== undefined && midOffset <= offset) lo = mid;
     else hi = mid - 1;
   }
-  return lo + 1;
+  // `buildLineStartOffsets` always seeds the array with `[0]`, so index `lo` is in bounds;
+  // the `?? 0` is a no-op in practice but keeps TS narrowed without a non-null assertion.
+  const lineStart = lineStartOffsets[lo] ?? 0;
+  return { line: lo + 1, lineStart };
 }
 
 /**
  * Resolve a validated diagnostic against the source cache. Falls back when
  * the source is unreadable or the span is out-of-bounds.
- *
- * @param {ValidatedDiagnostic} diag
- * @param {ReturnType<typeof createSourceCache>} cache
- * @returns {ResolvedDiagnostic}
  */
-function resolveDiagnostic(diag, cache) {
+function resolveDiagnostic(diag: ValidatedDiagnostic, cache: SourceCache): ResolvedDiagnostic {
   const errorCode = diag.code ?? PARSE_ERROR_CODE;
   const resolved = resolveSpan(cache, diag.filename, diag.span.offset, diag.span.length);
   if (resolved !== null) {
@@ -369,21 +350,14 @@ function resolveDiagnostic(diag, cache) {
   };
 }
 
-/**
- * @param {unknown} v
- * @returns {v is Record<string, unknown>}
- */
-function isObject(v) {
+function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
 
 /**
  * Type-guard wrapper for `Array.isArray` that narrows to `unknown[]` instead of `any[]`.
- *
- * @param {unknown} v
- * @returns {v is unknown[]}
  */
-function isUnknownArray(v) {
+function isUnknownArray(v: unknown): v is unknown[] {
   return Array.isArray(v);
 }
 
@@ -392,29 +366,19 @@ function isUnknownArray(v) {
  * value (e.g. a structured object from a future schema change) is rejected so caret-range
  * upstream drift surfaces as a contract failure instead of being silently coerced to null.
  *
- * @param {unknown} v
- * @param {string} name Field name, used in the failure reason.
- * @returns {Result<string | null, string>}
+ * @param name - Field name, used in the failure reason.
  */
-function validateOptionalString(v, name) {
+function validateOptionalString(v: unknown, name: string): Result<string | null, string> {
   if (v === undefined || v === null) return { ok: true, value: null };
   if (typeof v === "string") return { ok: true, value: v };
   return { ok: false, reason: `\`${name}\` is present but not a string or null` };
 }
 
-/**
- * @param {unknown} v
- * @returns {v is number}
- */
-function isNonNegativeInteger(v) {
+function isNonNegativeInteger(v: unknown): v is number {
   return typeof v === "number" && Number.isInteger(v) && v >= 0;
 }
 
-/**
- * @param {unknown} v
- * @returns {v is number}
- */
-function isPositiveInteger(v) {
+function isPositiveInteger(v: unknown): v is number {
   return typeof v === "number" && Number.isInteger(v) && v >= 1;
 }
 
@@ -423,42 +387,40 @@ function isPositiveInteger(v) {
  *
  * End position is inclusive (points to the last byte of the span, 1-origin). Zero-length spans
  * collapse end → start.
- *
- * @param {ReturnType<typeof createSourceCache>} cache
- * @param {string} filename
- * @param {number} offset
- * @param {number} length
- * @returns {{
- *   text: string;
- *   startLine: number;
- *   startCol: number;
- *   endLine: number;
- *   endCol: number;
- * } | null}
  */
-function resolveSpan(cache, filename, offset, length) {
+function resolveSpan(
+  cache: SourceCache,
+  filename: string,
+  offset: number,
+  length: number,
+): {
+  text: string;
+  startLine: number;
+  startCol: number;
+  endLine: number;
+  endCol: number;
+} | null {
   const entry = cache.get(filename);
   if (entry === null) return null;
   const { buffer, lineStartOffsets } = entry;
   if (offset < 0 || length < 0 || offset + length > buffer.length) return null;
 
   const text = buffer.subarray(offset, offset + length).toString("utf8");
-  const startLine = findLine(lineStartOffsets, offset);
-  const startCol = offset - lineStartOffsets[startLine - 1] + 1;
+  const start = findLine(lineStartOffsets, offset);
+  const startLine = start.line;
+  const startCol = offset - start.lineStart + 1;
   const lastByte = length > 0 ? offset + length - 1 : offset;
-  const endLine = findLine(lineStartOffsets, lastByte);
-  const endCol = length > 0 ? lastByte - lineStartOffsets[endLine - 1] + 1 : startCol;
+  const end = findLine(lineStartOffsets, lastByte);
+  const endLine = end.line;
+  const endCol = length > 0 ? lastByte - end.lineStart + 1 : startCol;
   return { text, startLine, startCol, endLine, endCol };
 }
 
 /**
  * Extract the first line, truncate if too long,
  * and append a multi-line marker if more lines follow.
- *
- * @param {string} text
- * @returns {{ text: string; truncated: boolean }}
  */
-function formatCodeSlice(text) {
+function formatCodeSlice(text: string): { text: string; truncated: boolean } {
   const nlIdx = text.search(/\r?\n/);
   const hasMoreLines = nlIdx !== -1;
   const rawFirstLine = hasMoreLines ? text.slice(0, nlIdx) : text;
@@ -476,12 +438,7 @@ function formatCodeSlice(text) {
   return { text: firstLine, truncated: false };
 }
 
-/**
- * @param {ResolvedDiagnostic} a
- * @param {ResolvedDiagnostic} b
- * @returns {number}
- */
-function compareDiagnostics(a, b) {
+function compareDiagnostics(a: ResolvedDiagnostic, b: ResolvedDiagnostic): number {
   if (a.filename !== b.filename) return a.filename < b.filename ? -1 : 1;
   if (a.sortLine !== b.sortLine) return a.sortLine - b.sortLine;
   if (a.sortCol !== b.sortCol) return a.sortCol - b.sortCol;
@@ -489,13 +446,10 @@ function compareDiagnostics(a, b) {
   return 0;
 }
 
-/**
- * @param {ResolvedDiagnostic[]} resolved
- * @returns {Map<string, ResolvedDiagnostic[]>}
- */
-function groupByFilename(resolved) {
-  /** @type {Map<string, ResolvedDiagnostic[]>} */
-  const map = new Map();
+function groupByFilename(
+  resolved: readonly ResolvedDiagnostic[],
+): Map<string, ResolvedDiagnostic[]> {
+  const map = new Map<string, ResolvedDiagnostic[]>();
   for (const d of resolved) {
     const arr = map.get(d.filename);
     if (arr !== undefined) arr.push(d);
@@ -508,21 +462,14 @@ function groupByFilename(resolved) {
  * Render a single diagnostic as the head line (`<location> <slice> [<error-code>]`)
  * followed by a message continuation line. Newlines inside `message` collapse to
  * a single space so the continuation stays on one line.
- *
- * @param {ResolvedDiagnostic} d
- * @returns {string}
  */
-function formatDiagLine(d) {
+function formatDiagLine(d: ResolvedDiagnostic): string {
   const headLine = `  ${d.location} ${d.slice} [${d.errorCode}]`;
   const messageLine = d.message.replace(/\r?\n/g, " ");
   return `${headLine}\n    ${messageLine}`;
 }
 
-/**
- * @param {string} docPath
- * @returns {string[]}
- */
-function renderWeakTypingsHint(docPath) {
+function renderWeakTypingsHint(docPath: string): string[] {
   return [
     "Hint on the `no-unsafe-*` diagnostics:",
     "- Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary module with typed wrappers.",

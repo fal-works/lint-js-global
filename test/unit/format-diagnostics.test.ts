@@ -1,12 +1,10 @@
-// @ts-check
-
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 
-import { formatLintOutput } from "../../src/format-diagnostics.js";
+import { formatLintOutput } from "../../src/format-diagnostics.ts";
 
 const HINT_PATH = "/opt/lint-js/docs/guide/weak-typings.md";
 
@@ -16,24 +14,19 @@ const LEGEND = [
   "    <message>",
 ];
 
-/**
- * @typedef {{
- *   message: string;
- *   code?: string | null;
- *   severity?: string;
- *   filename: string;
- *   labels: Array<{ span: { offset: number; length: number; line: number; column: number } }>;
- * }} FakeDiag
- */
+interface FakeDiag {
+  message: string;
+  code?: string | null;
+  severity?: string;
+  filename: string;
+  labels: Array<{ span: { offset: number; length: number; line: number; column: number } }>;
+}
 
 /**
  * Wrap an array of fake diagnostics into the `{ "diagnostics": [...], ... }` shape
  * that oxlint emits from `--format=json`.
- *
- * @param {FakeDiag[]} diagnostics
- * @returns {string}
  */
-function makeStdout(diagnostics) {
+function makeStdout(diagnostics: FakeDiag[]): string {
   return JSON.stringify({
     diagnostics,
     number_of_files: 1,
@@ -45,12 +38,8 @@ function makeStdout(diagnostics) {
 
 /**
  * Make a temp dir that gets cleaned up at test teardown, and pre-populate source files into it.
- *
- * @param {import("node:test").TestContext} t
- * @param {Record<string, string>} sources
- * @returns {string}
  */
-function setupFixture(t, sources) {
+function setupFixture(t: TestContext, sources: Record<string, string>): string {
   const dir = mkdtempSync(join(tmpdir(), "lint-js-fmt-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   for (const [relPath, content] of Object.entries(sources)) {
@@ -61,11 +50,8 @@ function setupFixture(t, sources) {
 
 /**
  * Assemble an expected formatted-stdout string from section arrays.
- *
- * @param {string[][]} sections
- * @returns {string}
  */
-function joinSections(sections) {
+function joinSections(sections: string[][]): string {
   return `${sections.map((s) => s.join("\n")).join("\n\n")}\n`;
 }
 

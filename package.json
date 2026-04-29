@@ -9,7 +9,7 @@
     "url": "git+https://github.com/fal-works/lint-js-global.git"
   },
   "bin": {
-    "lint-js": "src/cli.js"
+    "lint-js": "src/cli.ts"
   },
   "files": [
     "src",
@@ -21,9 +21,9 @@
     "access": "public"
   },
   "scripts": {
-    "lint": "node src/cli.js",
+    "lint": "node src/cli.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/cli/*.test.js test/unit/*.test.js",
+    "test": "node --test test/cli/*.test.ts test/unit/*.test.ts",
     "prepublishOnly": "pnpm lint --check && pnpm typecheck && pnpm test"
   },
   "dependencies": {

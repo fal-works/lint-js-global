@@ -1,7 +1,5 @@
-// @ts-check
-
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import {
   closeSync,
   cpSync,
@@ -16,46 +14,39 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const cliPath = join(here, "..", "src", "cli.js");
+const cliPath = join(here, "..", "src", "cli.ts");
 const fixtureRoot = join(here, "fixtures");
 
 /** Fixture source with both fmt (double spaces) and lint (no-debugger) violations. */
 export const DIRTY_SOURCE = "const x  =  1;debugger\n";
 
-/**
- * @param {string} label
- * @returns {string}
- */
-export function makeTempDir(label) {
+export function makeTempDir(label: string): string {
   return mkdtempSync(join(tmpdir(), `lint-js-test-${label}-`));
 }
 
 /**
- * @param {string} fixtureName
- * @returns {string} Path to the copied directory.
+ * Copy a fixture under `test/fixtures/` to a fresh temp directory.
+ *
+ * @returns Path to the copied directory.
  */
-export function copyFixture(fixtureName) {
+export function copyFixture(fixtureName: string): string {
   const dest = makeTempDir(fixtureName);
   cpSync(join(fixtureRoot, fixtureName), dest, { recursive: true });
   return dest;
 }
 
-/**
- * Write a matching pattern into both `.prettierignore` and `.eslintignore` at `dir`.
- *
- * @param {string} dir
- * @param {string} pattern
- */
-export function writeIgnoreFiles(dir, pattern) {
+/** Write a matching pattern into both `.prettierignore` and `.eslintignore` at `dir`. */
+export function writeIgnoreFiles(dir: string, pattern: string): void {
   writeFileSync(join(dir, ".prettierignore"), `${pattern}\n`);
   writeFileSync(join(dir, ".eslintignore"), `${pattern}\n`);
 }
 
-/**
- * @param {string} cwd
- * @param {string[]} [args]
- */
-export function runCli(cwd, args = []) {
+export interface CliRunResult extends SpawnSyncReturns<Buffer | string> {
+  stdout: string;
+  stderr: string;
+}
+
+export function runCli(cwd: string, args: readonly string[] = []): CliRunResult {
   const captureDir = makeTempDir("stdio");
   const stdoutPath = join(captureDir, "stdout.txt");
   const stderrPath = join(captureDir, "stderr.txt");
@@ -87,6 +78,16 @@ export function runCli(cwd, args = []) {
   }
 }
 
+interface ProgressLineExpectations {
+  fmtMode: "default" | "check-only" | null;
+  fmtStart: boolean;
+  fmtCompletion: boolean;
+  lintMode: "with auto-fix" | "no auto-fix" | null;
+  lintStart: boolean;
+  lintCompletion: boolean;
+  summary: string;
+}
+
 /**
  * Assert the shape of every progress log line emitted by lint-js.
  *
@@ -106,26 +107,15 @@ export function runCli(cwd, args = []) {
  * Pass `fmtMode: null` (or `lintMode: null`) when the phase is skipped entirely
  * via `--lint-only` / `--format-only`; the corresponding banners are then
  * asserted absent regardless of the start/completion flags.
- *
- * @param {string} stdout
- * @param {{
- *   fmtMode: "default" | "check-only" | null;
- *   fmtStart: boolean;
- *   fmtCompletion: boolean;
- *   lintMode: "with auto-fix" | "no auto-fix" | null;
- *   lintStart: boolean;
- *   lintCompletion: boolean;
- *   summary: string;
- * }} expected
  */
-export function assertProgressLines(stdout, expected) {
+export function assertProgressLines(stdout: string, expected: ProgressLineExpectations): void {
   const lines = stdout.split("\n");
   const fmtLabel = expected.fmtMode === "check-only" ? "formatting (check-only)" : "formatting";
   const lintLabel = expected.lintMode ?? "with auto-fix";
   const fmtPhaseRuns = expected.fmtMode !== null;
   const lintPhaseRuns = expected.lintMode !== null;
-  /** @type {[string, string, boolean][]} name, line text, expected-present */
-  const specs = [
+  /** name, line text, expected-present */
+  const specs: ReadonlyArray<readonly [string, string, boolean]> = [
     ["fmt start", `${fmtLabel}...`, fmtPhaseRuns && expected.fmtStart],
     ["fmt completion", `${fmtLabel}: clean.`, fmtPhaseRuns && expected.fmtCompletion],
     ["lint start", `linting (${lintLabel})...`, lintPhaseRuns && expected.lintStart],
@@ -133,8 +123,8 @@ export function assertProgressLines(stdout, expected) {
     ["summary", expected.summary, true],
   ];
 
-  /** @type {{ name: string; idx: number }[]} present lines, in the order declared above */
-  const present = [];
+  /** present lines, in the order declared above */
+  const present: { name: string; idx: number }[] = [];
 
   for (const [name, line, expectPresent] of specs) {
     const positions = lines.flatMap((l, i) => (l === line ? [i] : []));
@@ -145,6 +135,7 @@ export function assertProgressLines(stdout, expected) {
         `${name}: expected exactly 1 occurrence of ${JSON.stringify(line)}, got ${positions.length}`,
       );
       const [idx] = positions;
+      if (idx === undefined) continue; // unreachable: assert above guarantees length === 1
       if (name === "summary") {
         assert.equal(
           lines[idx - 1],
@@ -171,6 +162,7 @@ export function assertProgressLines(stdout, expected) {
   for (let i = 1; i < present.length; i++) {
     const prev = present[i - 1];
     const curr = present[i];
+    if (prev === undefined || curr === undefined) continue; // unreachable: i-1 and i are in bounds
     assert.ok(
       prev.idx < curr.idx,
       `order: ${prev.name} (line ${prev.idx}) must precede ${curr.name} (line ${curr.idx})`,

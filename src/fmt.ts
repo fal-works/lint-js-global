@@ -1,15 +1,17 @@
-// @ts-check
-
 /**
  * Build CLI args for oxfmt.
  *
- * @param {string} config Path to the oxfmt config file.
- * @param {string[]} ignorePatterns Gitignore-style patterns.
- * @param {string[]} targets Positional paths to process.
- * @param {boolean} check Verify only; do not rewrite files.
- * @returns {string[]}
+ * @param config - Path to the oxfmt config file.
+ * @param ignorePatterns - Gitignore-style patterns.
+ * @param targets - Positional paths to process.
+ * @param check - Verify only; do not rewrite files.
  */
-export function buildOxfmtArgs(config, ignorePatterns, targets, check) {
+export function buildOxfmtArgs(
+  config: string,
+  ignorePatterns: readonly string[],
+  targets: readonly string[],
+  check: boolean,
+): string[] {
   return [
     "-c",
     config,

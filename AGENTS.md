@@ -11,6 +11,8 @@ Also aims to support LLM coding agents that iterate lint+fix autonomously while 
 
 Node >= 22.18.0, pnpm.
 Source files in `src/`, tests in `test/`.
+Both are TypeScript, executed by Node's native type stripping (no transpile step).
+Internal import specifiers use `.ts` extensions.
 `pnpm lint` dogfoods the CLI on this repo.
 
 ## Temporary files

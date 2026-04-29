@@ -1,11 +1,9 @@
-// @ts-check
-
 import assert from "node:assert/strict";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import { assertProgressLines, copyFixture, makeTempDir, runCli } from "../helpers.js";
+import { assertProgressLines, copyFixture, makeTempDir, runCli } from "../helpers.ts";
 
 void test("basic: reformats sources and reports floating promise", (t) => {
   const dir = copyFixture("basic");

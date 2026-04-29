@@ -1,10 +1,8 @@
-// @ts-check
-
 import assert from "node:assert/strict";
 import { existsSync, rmSync } from "node:fs";
 import test from "node:test";
 
-import { copyFixture, runCli } from "../helpers.js";
+import { copyFixture, runCli } from "../helpers.ts";
 
 void test("unsafe-any: weak-typings hint follows no-unsafe-* diagnostics", (t) => {
   const dir = copyFixture("unsafe-any");

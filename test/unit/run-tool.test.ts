@@ -1,22 +1,18 @@
-// @ts-check
-
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import test, { type TestContext } from "node:test";
 
-import { LintJsError } from "../../src/log.js";
-import { runTool, runToolCapturingOutput } from "../../src/run-tool.js";
+import { LintJsError } from "../../src/log.ts";
+import { runTool, runToolCapturingOutput } from "../../src/run-tool.ts";
 
 /**
  * Drop a tmp JS file `script.js` containing the given source, and clean up at teardown.
  *
- * @param {import("node:test").TestContext} t
- * @param {string} source
- * @returns {string} Absolute path to the script.
+ * @returns Absolute path to the script.
  */
-function makeScript(t, source) {
+function makeScript(t: TestContext, source: string): string {
   const dir = mkdtempSync(join(tmpdir(), "lint-js-runtool-"));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const path = join(dir, "script.js");

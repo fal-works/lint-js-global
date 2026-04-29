@@ -1,22 +1,21 @@
 #!/usr/bin/env node
-// @ts-check
 
 import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 
-import { buildOxfmtArgs } from "./fmt.js";
-import { formatLintOutput } from "./format-diagnostics.js";
-import { getSystemIgnorePatterns } from "./ignore.js";
-import { buildOxlintArgs } from "./lint.js";
-import { errorTagged, LintJsError, print, printTagged } from "./log.js";
-import { getPackageVersion, resolvePackageBin } from "./package-info.js";
+import { buildOxfmtArgs } from "./fmt.ts";
+import { formatLintOutput } from "./format-diagnostics.ts";
+import { getSystemIgnorePatterns } from "./ignore.ts";
+import { buildOxlintArgs } from "./lint.ts";
+import { errorTagged, LintJsError, print, printTagged } from "./log.ts";
+import { getPackageVersion, resolvePackageBin } from "./package-info.ts";
 import {
   NODE_MODULES_BIN,
   OXFMT_CONFIG,
   OXLINT_CONFIG,
   WEAK_TYPINGS_DOC,
-} from "./package-paths.js";
-import { buildPathInjectedEnv, runTool, runToolCapturingOutput } from "./run-tool.js";
+} from "./package-paths.ts";
+import { buildPathInjectedEnv, runTool, runToolCapturingOutput } from "./run-tool.ts";
 
 /**
  * Pick the one-line summary emitted after the run finishes.
@@ -28,14 +27,16 @@ import { buildPathInjectedEnv, runTool, runToolCapturingOutput } from "./run-too
  *
  * `null` for either status means the phase was skipped (`--format-only` /
  * `--lint-only`); skipped phases do not contribute to the verdict.
- *
- * @param {object} options
- * @param {boolean} options.check
- * @param {number | null} options.fmtStatus
- * @param {number | null} options.lintStatus
- * @returns {string}
  */
-function buildSummary({ check, fmtStatus, lintStatus }) {
+function buildSummary({
+  check,
+  fmtStatus,
+  lintStatus,
+}: {
+  check: boolean;
+  fmtStatus: number | null;
+  lintStatus: number | null;
+}): string {
   const fmtOk = fmtStatus === null || fmtStatus === 0;
   const lintOk = lintStatus === null || lintStatus === 0;
   const ok = fmtOk && lintOk;
@@ -76,13 +77,11 @@ node_modules is always skipped; each tool's standard ignore files (like .gitigno
  * - 2: expected failure raised by lint-js itself
  *
  * Anything else is re-thrown so genuine bugs surface with their full stack trace.
- *
- * @returns {number}
  */
-function main() {
+function main(): number {
   try {
     return runMain();
-  } catch (err) {
+  } catch (err: unknown) {
     if (err instanceof LintJsError) {
       errorTagged(err.message, ...err.details);
       return 2;
@@ -91,35 +90,29 @@ function main() {
   }
 }
 
-/**
- * Run-mode CLI arguments: the variant of `CliArgs` that drives an actual lint/fmt run.
- *
- * @typedef {{
- *   kind: "run";
- *   check: boolean;
- *   unix: boolean;
- *   formatOnly: boolean;
- *   lintOnly: boolean;
- *   targets: string[];
- * }} CliRunArgs
- */
+/** Run-mode CLI arguments: the variant of `CliArgs` that drives an actual lint/fmt run. */
+interface CliRunArgs {
+  kind: "run";
+  check: boolean;
+  unix: boolean;
+  formatOnly: boolean;
+  lintOnly: boolean;
+  targets: string[];
+}
 
 /**
  * Parsed and validated CLI arguments.
  *
  * `help` / `version` short-circuit the run before any other validation fires,
  * so they are modeled as their own variants and do not carry run-mode fields.
- *
- * @typedef {{ kind: "help" } | { kind: "version" } | CliRunArgs} CliArgs
  */
+type CliArgs = { kind: "help" } | { kind: "version" } | CliRunArgs;
 
 /**
  * Parse and validate `process.argv`.
  * Any usage error is raised as `LintJsError` so the boundary handler reports it and exits 2.
- *
- * @returns {CliArgs}
  */
-function parseCliArgs() {
+function parseCliArgs(): CliArgs {
   let parsed;
   try {
     parsed = parseArgs({
@@ -135,7 +128,7 @@ function parseCliArgs() {
       allowPositionals: true,
       strict: true,
     });
-  } catch (err) {
+  } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
 
     throw new LintJsError(`Argument parsing error.`, { cause: err, details: [errMsg] });
@@ -162,10 +155,7 @@ function parseCliArgs() {
   };
 }
 
-/**
- * @returns {number}
- */
-function runMain() {
+function runMain(): number {
   const args = parseCliArgs();
 
   if (args.kind === "help") {
@@ -199,8 +189,7 @@ function runMain() {
   const runFmt = !lintOnly;
   const runLint = !formatOnly;
 
-  /** @type {number | null} */
-  let fmtStatus = null;
+  let fmtStatus: number | null = null;
   if (runFmt) {
     const oxfmtBin = resolvePackageBin("oxfmt", "oxfmt");
     const fmtLabel = check ? "formatting (check-only)" : "formatting";
@@ -216,8 +205,7 @@ function runMain() {
 
   if (runFmt && runLint) print("");
 
-  /** @type {number | null} */
-  let lintStatus = null;
+  let lintStatus: number | null = null;
   if (runLint) {
     const oxlintBin = resolvePackageBin("oxlint", "oxlint");
     const lintLabel = check ? "linting (no auto-fix)" : "linting (with auto-fix)";

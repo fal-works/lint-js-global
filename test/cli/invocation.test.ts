@@ -1,10 +1,8 @@
-// @ts-check
-
 import assert from "node:assert/strict";
 import { rmSync } from "node:fs";
 import test from "node:test";
 
-import { copyFixture, makeTempDir, runCli } from "../helpers.js";
+import { copyFixture, makeTempDir, runCli } from "../helpers.ts";
 
 void test("--help: prints usage and exits 0 without requiring package.json", (t) => {
   const dir = makeTempDir("help");

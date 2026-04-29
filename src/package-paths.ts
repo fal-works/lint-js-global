@@ -1,5 +1,3 @@
-// @ts-check
-
 import { join } from "node:path";
 
 /**
@@ -10,11 +8,7 @@ import { join } from "node:path";
  * references that rot when files are moved or renamed.
  */
 
-/**
- * @param {...string} segments
- * @returns {string}
- */
-const fromRoot = (...segments) => join(import.meta.dirname, "..", ...segments);
+const fromRoot = (...segments: string[]): string => join(import.meta.dirname, "..", ...segments);
 
 export const PACKAGE_JSON = fromRoot("package.json");
 export const OXFMT_CONFIG = fromRoot("cfg", "oxfmtrc.json");

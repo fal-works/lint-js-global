@@ -1,25 +1,29 @@
-// @ts-check
-
-import { spawnSync } from "node:child_process";
+import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { LintJsError } from "./log.js";
+import { LintJsError } from "./log.ts";
+
+type SpawnResult = SpawnSyncReturns<Buffer | string>;
+
+interface RunToolOptions {
+  /** Tool name for launch-failure diagnostics. */
+  name: string;
+  /** Absolute path to the tool's JS entry point. */
+  bin: string;
+  /** Arguments passed to the tool, excluding `bin`. */
+  args: readonly string[];
+  /** Env for the child. Defaults to inherited. */
+  env?: NodeJS.ProcessEnv;
+}
 
 /**
  * Run a Node-based tool with stdio inherited (executed via `process.execPath`).
  *
  * Throws {@link LintJsError} on launch failure or signal-driven termination.
- *
- * @param {object} options
- * @param {string} options.name Tool name for launch-failure diagnostics.
- * @param {string} options.bin Absolute path to the tool's JS entry point.
- * @param {string[]} options.args Arguments passed to the tool, excluding `bin`.
- * @param {NodeJS.ProcessEnv} [options.env] Env for the child. Defaults to inherited.
- * @returns {ReturnType<typeof spawnSync>}
  */
-export function runTool({ name, bin, args, env }) {
+export function runTool({ name, bin, args, env }: RunToolOptions): SpawnResult {
   const result = spawnSync(process.execPath, [bin, ...args], {
     stdio: "inherit",
     env,
@@ -36,19 +40,12 @@ export function runTool({ name, bin, args, env }) {
  *
  * Side effect: the child's output is batched until exit instead of streaming.
  * Both streams are captured symmetrically so the caller can flush them in a deterministic order.
- *
- * @param {object} options
- * @param {string} options.name
- * @param {string} options.bin
- * @param {string[]} options.args
- * @param {NodeJS.ProcessEnv} [options.env]
- * @returns {{
- *   result: ReturnType<typeof spawnSync>;
- *   capturedStdout: string;
- *   capturedStderr: string;
- * }}
  */
-export function runToolCapturingOutput({ name, bin, args, env }) {
+export function runToolCapturingOutput({ name, bin, args, env }: RunToolOptions): {
+  result: SpawnResult;
+  capturedStdout: string;
+  capturedStderr: string;
+} {
   const dir = mkdtempSync(join(tmpdir(), "lint-js-"));
   const stdoutPath = join(dir, "stdout");
   const stderrPath = join(dir, "stderr");
@@ -85,12 +82,8 @@ export function runToolCapturingOutput({ name, bin, args, env }) {
  *
  * Without this guard, a signal-killed child surfaces as `status: null` with `error: null`,
  * which is indistinguishable from a clean exit when the caller only inspects status.
- *
- * @param {string} name Tool name for diagnostics.
- * @param {ReturnType<typeof spawnSync>} result
- * @returns {void}
  */
-function ensureNormalExit(name, result) {
+function ensureNormalExit(name: string, result: SpawnResult): void {
   if (result.error) {
     throw new LintJsError(`failed to launch ${name}: ${result.error.message}`, {
       cause: result.error,
@@ -108,14 +101,13 @@ function ensureNormalExit(name, result) {
  * For globally-installed lint-js, inject our own `node_modules/.bin` at the head of PATH
  * so the bundled oxlint-tsgolint shim is found regardless of the user project's layout.
  *
- * @param {string} binDir Directory to prepend to PATH.
- * @returns {NodeJS.ProcessEnv}
+ * @param binDir - Directory to prepend to PATH.
  */
-export function buildPathInjectedEnv(binDir) {
+export function buildPathInjectedEnv(binDir: string): NodeJS.ProcessEnv {
   const isWindows = process.platform === "win32";
   const pathKey = isWindows ? "Path" : "PATH";
   const pathSep = isWindows ? ";" : ":";
-  const env = { ...process.env };
+  const env: NodeJS.ProcessEnv = { ...process.env };
 
   // On Windows, env keys are case-insensitive but spreading preserves the parent's spelling.
   // Remove other variants so Node doesn't pick an earlier entry ("PATH" < "Path" lexicographically)

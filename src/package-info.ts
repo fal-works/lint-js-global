@@ -1,19 +1,14 @@
-// @ts-check
-
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { LintJsError } from "./log.js";
-import { PACKAGE_JSON } from "./package-paths.js";
+import { LintJsError } from "./log.ts";
+import { PACKAGE_JSON } from "./package-paths.ts";
 
 /**
  * Type predicate narrowing an arbitrary value to a string-keyed record.
- *
- * @param {unknown} value
- * @returns {value is Record<string, unknown>}
  */
-function isRecord(value) {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object";
 }
 
@@ -22,15 +17,10 @@ function isRecord(value) {
  *
  * Running the script with `process.execPath` avoids relying on platform-specific
  * shims in `node_modules/.bin`.
- *
- * @param {string} packageName
- * @param {string} binName
- * @returns {string}
  */
-export function resolvePackageBin(packageName, binName) {
+export function resolvePackageBin(packageName: string, binName: string): string {
   const packageJsonPath = fileURLToPath(import.meta.resolve(`${packageName}/package.json`));
-  /** @type {unknown} */
-  const pkg = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+  const pkg: unknown = JSON.parse(readFileSync(packageJsonPath, "utf8"));
   if (!isRecord(pkg) || !isRecord(pkg.bin)) {
     throw new LintJsError(`Missing or malformed "bin" in ${packageName}/package.json.`);
   }
@@ -43,12 +33,9 @@ export function resolvePackageBin(packageName, binName) {
 
 /**
  * Read the version field from this package's own `package.json`.
- *
- * @returns {string}
  */
-export function getPackageVersion() {
-  /** @type {unknown} */
-  const pkg = JSON.parse(readFileSync(PACKAGE_JSON, "utf8"));
+export function getPackageVersion(): string {
+  const pkg: unknown = JSON.parse(readFileSync(PACKAGE_JSON, "utf8"));
   if (!isRecord(pkg) || typeof pkg.version !== "string") {
     throw new LintJsError('Missing or malformed "version" in package.json.');
   }

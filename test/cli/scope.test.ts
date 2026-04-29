@@ -1,5 +1,3 @@
-// @ts-check
-
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -11,7 +9,7 @@ import {
   copyFixture,
   runCli,
   writeIgnoreFiles,
-} from "../helpers.js";
+} from "../helpers.ts";
 
 void test("positional path narrows scope but still honors ignore files", (t) => {
   const dir = copyFixture("basic");

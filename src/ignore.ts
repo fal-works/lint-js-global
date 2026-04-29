@@ -1,5 +1,3 @@
-// @ts-check
-
 import { statSync } from "node:fs";
 
 /**
@@ -12,9 +10,9 @@ import { statSync } from "node:fs";
  *   via `$HOME` dotfiles shadowed as character devices at the project root: always shadowed inside
  *   the sandbox, never legitimate in a JS/TS project root.
  *
- * @returns {string[]} Gitignore-style patterns.
+ * @returns Gitignore-style patterns.
  */
-export function getSystemIgnorePatterns() {
+export function getSystemIgnorePatterns(): string[] {
   const patterns = ["node_modules"];
 
   const claudeSandboxSentinels = [".bashrc", ".gitconfig"];
