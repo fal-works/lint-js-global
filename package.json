@@ -27,9 +27,9 @@
     "prepublishOnly": "pnpm lint --check && pnpm typecheck && pnpm test"
   },
   "dependencies": {
-    "oxfmt": "^0.44.0",
-    "oxlint": "^1.61.0",
-    "oxlint-tsgolint": "^0.20.0"
+    "oxfmt": "^0.47.0",
+    "oxlint": "^1.62.0",
+    "oxlint-tsgolint": "^0.22.1"
   },
   "devDependencies": {
     "@types/node": "^22.19.17",
