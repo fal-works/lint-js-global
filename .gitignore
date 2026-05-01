@@ -2,3 +2,19 @@ node_modules/
 .codex
 /dev/
 /tmp/
+
+# Claude Code sandbox bind-mount artifacts
+/.bashrc
+/.bash_profile
+/.profile
+/.zshrc
+/.zprofile
+/.ripgreprc
+/.gitconfig
+/.gitmodules
+/.mcp.json
+/.idea
+/.vscode
+/.claude/agents
+/.claude/commands
+/.claude/skills
