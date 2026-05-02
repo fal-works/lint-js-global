@@ -330,21 +330,20 @@ void test("CRLF source: span ending exactly at CR strips the trailing CR", (t) =
   );
 });
 
-void test("UTF-8 multi-byte span resolves byte offsets correctly", (t) => {
-  // "あ" is 3 bytes. Source: "const x = 'あいう';\n"
-  // "あいう" = 9 bytes. Let's pick a span around it.
-  // Full source bytes: "const x = '" (11) + "あいう" (9) + "';\n" (3) = 23 bytes.
-  const src = "const x = 'あいう';\n";
+void test("preceding multi-byte chars: start column counts bytes, slice decodes UTF-8", (t) => {
+  // Source: "// あ = 'いう';\n"
+  // Indices: 0='/' 1='/' 2=' ' 3..5=あ 6=' ' 7='=' 8=' ' 9='\'' 10..12=い 13..15=う 16='\'' 17=';' 18='\n'
+  const src = "// あ = 'いう';\n";
   const dir = setupFixture(t, { "x.ts": src });
   const file = join(dir, "x.ts");
-  // Span covers "'あいう'" : starts at byte offset 10 ("'"), length 11 (1+9+1).
+  // Span covers "'いう'": offset 9, length 8 (bytes 9..16 inclusive).
   const stdout = makeStdout([
     {
       message: "literal",
       code: "eslint(some-rule)",
       severity: "error",
       filename: file,
-      labels: [{ span: { offset: 10, length: 11, line: 1, column: 11 } }],
+      labels: [{ span: { offset: 9, length: 8, line: 1, column: 10 } }],
     },
   ]);
 
@@ -354,11 +353,79 @@ void test("UTF-8 multi-byte span resolves byte offsets correctly", (t) => {
     weakTypingsDocPath: HINT_PATH,
   });
 
-  // "'あいう'" is 5 code points, well under 40; single-line → `L:C` form.
-  // startLine=1, startCol = 10 - 0 + 1 = 11 (byte-based).
+  // startCol = 9 - 0 + 1 = 10 (byte-based; char-based would be 8 — opening "'" sits at the
+  // 8th code point on the line). Slice "'いう'" is 4 code points, well under 40, single-line.
   assert.equal(
     result.formattedStdout,
-    joinSections([[file, "  1:11 literal [eslint(some-rule)]", "    'あいう'"]]),
+    joinSections([[file, "  1:10 literal [eslint(some-rule)]", "    'いう'"]]),
+  );
+});
+
+void test("preceding multi-byte chars: end column counts bytes (multi-line span)", (t) => {
+  // Source: "x = 0;\n// あいう\n"
+  // Line 1: "x = 0;\n"            (7 bytes; line 2 starts at byte 7)
+  // Line 2: "// あいう\n"          (1+1+1+3+3+3+1 = 13 bytes; bytes 7..19)
+  //   Indices on line 2: 7='/' 8='/' 9=' ' 10..12=あ 13..15=い 16..18=う 19='\n'
+  const src = "x = 0;\n// あいう\n";
+  const dir = setupFixture(t, { "x.ts": src });
+  const file = join(dir, "x.ts");
+  // Span: offset 0, length 19 — ends at the last byte of "う" (byte 18).
+  const stdout = makeStdout([
+    {
+      message: "block",
+      code: "eslint(some-rule)",
+      severity: "error",
+      filename: file,
+      labels: [{ span: { offset: 0, length: 19, line: 1, column: 1 } }],
+    },
+  ]);
+
+  const result = formatLintOutput({
+    capturedStdout: stdout,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  // First line "x = 0;" is 6 code points (≤40) → ' ...' multi-line marker; truncated=true → L:C-L:C.
+  // endLine=2; endCol = 18 - 7 + 1 = 12 (byte-based; char-based would be 6 — "う" sits at the
+  // 6th code point on line 2).
+  assert.equal(
+    result.formattedStdout,
+    joinSections([[file, "  1:1-2:12 block [eslint(some-rule)]", "    x = 0; ..."]]),
+  );
+});
+
+void test("slice truncation counts code points, not UTF-16 units (non-BMP chars)", (t) => {
+  // "𠮷" is U+20BB7: 4 bytes UTF-8, 1 code point, but a surrogate pair (length 2) in UTF-16.
+  // 41× "𠮷" = 41 code points / 82 UTF-16 units / 164 bytes. Truncation must use code points,
+  // so the rendered slice is the first 40 "𠮷" + "...". A naive `firstLine.length`/`slice`
+  // implementation would split a surrogate pair and produce a different string.
+  const line = "𠮷".repeat(41) + ";\n";
+  const dir = setupFixture(t, { "x.ts": line });
+  const file = join(dir, "x.ts");
+  // Span covers all 41 "𠮷": offset 0, length 41*4 = 164 bytes.
+  const stdout = makeStdout([
+    {
+      message: "long ident",
+      code: "eslint(some-rule)",
+      severity: "error",
+      filename: file,
+      labels: [{ span: { offset: 0, length: 164, line: 1, column: 1 } }],
+    },
+  ]);
+
+  const result = formatLintOutput({
+    capturedStdout: stdout,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  // Single-line span; truncated by length → L:C-L:C form.
+  // endCol = 163 - 0 + 1 = 164 (byte-based; last byte of the 41st "𠮷").
+  const truncated = "𠮷".repeat(40) + "...";
+  assert.equal(
+    result.formattedStdout,
+    joinSections([[file, "  1:1-1:164 long ident [eslint(some-rule)]", `    ${truncated}`]]),
   );
 });
 
