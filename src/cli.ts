@@ -230,6 +230,7 @@ function runMain(): number {
     process.stderr.write(lintStderr);
     const { formattedStdout, linterSummary, schemaMismatch, noFilesMatched } = formatLintOutput({
       capturedStdout: lintStdout,
+      check,
       unix,
       weakTypingsDocPath: WEAK_TYPINGS_DOC,
     });

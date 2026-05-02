@@ -9,7 +9,7 @@ src/index.ts
   5:1 Promises must be awaited, add void operator to ignore. [typescript-eslint(no-floating-promises)]
     foo();
 
-Found 1 unfixed issue in 1 file.
+1 unfixed issue in 1 file.
 
 lint-js: Failed. Issues fixed where possible; unfixed issues remain.
 

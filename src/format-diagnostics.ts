@@ -58,7 +58,8 @@ export interface FormatLintResult {
   formattedStdout: string;
 
   /**
-   * A human-readable summary of the unfixed issues.
+   * A human-readable summary line stating how many issues remain.
+   * In `--check` mode the "unfixed" qualifier is omitted.
    *
    * Null when `schemaMismatch` is non-null.
    */
@@ -88,6 +89,9 @@ export interface FormatLintOptions {
   /** Raw oxlint stdout from `--format=json`. */
   capturedStdout: string;
 
+  /** Whether the run is `--check` (no auto-fix attempted). */
+  check: boolean;
+
   /** If true, pass through unchanged (no hint, no summary). */
   unix: boolean;
 
@@ -103,6 +107,7 @@ export interface FormatLintOptions {
  */
 export function formatLintOutput({
   capturedStdout,
+  check,
   unix,
   weakTypingsDocPath,
 }: FormatLintOptions): FormatLintResult {
@@ -194,7 +199,10 @@ export function formatLintOutput({
   const formattedStdout = `${sections.map((s) => s.join("\n")).join("\n\n")}\n`;
   const issueWord = resolved.length === 1 ? "issue" : "issues";
   const fileWord = fileGroups.size === 1 ? "file" : "files";
-  const linterSummary = `Found ${resolved.length} unfixed ${issueWord} in ${fileGroups.size} ${fileWord}.`;
+  // Phrased as a fragment (no verb): the trailing "lint-js: ..." banner already supplies
+  // the verb ("issues remain" / "fixes required"), so repeating it here would be redundant.
+  const qualifier = check ? "" : "unfixed ";
+  const linterSummary = `${resolved.length} ${qualifier}${issueWord} in ${fileGroups.size} ${fileWord}.`;
   return { formattedStdout, linterSummary, schemaMismatch: null, noFilesMatched: false };
 }
 

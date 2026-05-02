@@ -64,6 +64,7 @@ void test("single file, single diagnostic (short single-line slice)", (t) => {
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -74,7 +75,60 @@ void test("single file, single diagnostic (short single-line slice)", (t) => {
       [file, "  1:1 `debugger` statement is not allowed. [eslint(no-debugger)]", "    debugger"],
     ]),
   );
-  assert.equal(result.linterSummary, "Found 1 unfixed issue in 1 file.");
+  assert.equal(result.linterSummary, "1 unfixed issue in 1 file.");
+});
+
+void test("check mode summary drops the 'unfixed' qualifier (plural)", (t) => {
+  const dir = setupFixture(t, { "x.ts": "debugger;\ndebugger;\n" });
+  const file = join(dir, "x.ts");
+  const stdout = makeStdout([
+    {
+      message: "d",
+      code: "eslint(no-debugger)",
+      severity: "error",
+      filename: file,
+      labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
+    },
+    {
+      message: "d",
+      code: "eslint(no-debugger)",
+      severity: "error",
+      filename: file,
+      labels: [{ span: { offset: 10, length: 8, line: 2, column: 1 } }],
+    },
+  ]);
+
+  const result = formatLintOutput({
+    capturedStdout: stdout,
+    check: true,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(result.linterSummary, "2 issues in 1 file.");
+});
+
+void test("check mode summary drops the 'unfixed' qualifier (singular)", (t) => {
+  const dir = setupFixture(t, { "x.ts": "debugger;\n" });
+  const file = join(dir, "x.ts");
+  const stdout = makeStdout([
+    {
+      message: "d",
+      code: "eslint(no-debugger)",
+      severity: "error",
+      filename: file,
+      labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
+    },
+  ]);
+
+  const result = formatLintOutput({
+    capturedStdout: stdout,
+    check: true,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(result.linterSummary, "1 issue in 1 file.");
 });
 
 void test("single file, multiple diagnostics sort by (line, col, error-code)", (t) => {
@@ -111,6 +165,7 @@ void test("single file, multiple diagnostics sort by (line, col, error-code)", (
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -129,7 +184,7 @@ void test("single file, multiple diagnostics sort by (line, col, error-code)", (
       ],
     ]),
   );
-  assert.equal(result.linterSummary, "Found 3 unfixed issues in 1 file.");
+  assert.equal(result.linterSummary, "3 unfixed issues in 1 file.");
 });
 
 void test("multiple files sort lexicographically", (t) => {
@@ -158,6 +213,7 @@ void test("multiple files sort lexicographically", (t) => {
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -169,7 +225,7 @@ void test("multiple files sort lexicographically", (t) => {
       [fileB, "  1:1 d [eslint(no-debugger)]", "    debugger"],
     ]),
   );
-  assert.equal(result.linterSummary, "Found 2 unfixed issues in 2 files.");
+  assert.equal(result.linterSummary, "2 unfixed issues in 2 files.");
 });
 
 void test("long single-line slice truncates at 40 characters with no leading space", (t) => {
@@ -192,6 +248,7 @@ void test("long single-line slice truncates at 40 characters with no leading spa
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -221,6 +278,7 @@ void test("multi-line span with first line ≤40 chars gets the ' ...' multi-lin
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -253,6 +311,7 @@ void test("multi-line span with first line >40 chars suppresses the multi-line m
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -287,6 +346,7 @@ void test("CRLF source: multi-line span strips the CR before the multi-line mark
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -317,6 +377,7 @@ void test("CRLF source: span ending exactly at CR strips the trailing CR", (t) =
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -349,6 +410,7 @@ void test("preceding multi-byte chars: start column counts bytes, slice decodes 
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -382,6 +444,7 @@ void test("preceding multi-byte chars: end column counts bytes (multi-line span)
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -416,6 +479,7 @@ void test("slice truncation counts code points, not UTF-16 units (non-BMP chars)
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -444,6 +508,7 @@ void test("no-unsafe-* diagnostic triggers the weak-typings hint block", (t) => 
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -460,7 +525,7 @@ void test("no-unsafe-* diagnostic triggers the weak-typings hint block", (t) => 
       ],
     ]),
   );
-  assert.equal(result.linterSummary, "Found 1 unfixed issue in 1 file.");
+  assert.equal(result.linterSummary, "1 unfixed issue in 1 file.");
 });
 
 void test("tsgolint-style typescript(TS\\d+) code is rendered raw inside the brackets", (t) => {
@@ -483,6 +548,7 @@ void test("tsgolint-style typescript(TS\\d+) code is rendered raw inside the bra
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -508,6 +574,7 @@ void test("newlines in message are collapsed to single spaces on the head line",
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -535,6 +602,7 @@ void test("diagnostic without `code` renders as [parse-error]", (t) => {
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -550,6 +618,7 @@ void test("zero diagnostics yields empty formattedStdout and null linterSummary"
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -565,6 +634,7 @@ void test("valid JSON without `diagnostics` array flags schemaMismatch and relay
 
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -584,6 +654,7 @@ void test("valid JSON with non-array `diagnostics` is treated as schemaMismatch"
 
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -597,6 +668,7 @@ void test("non-object JSON (e.g. bare array) is treated as schemaMismatch", () =
 
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -608,6 +680,7 @@ void test("non-object JSON (e.g. bare array) is treated as schemaMismatch", () =
 void test("non-empty broken JSON flags schemaMismatch (output-contract failure)", () => {
   const result = formatLintOutput({
     capturedStdout: "{not valid json",
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -625,6 +698,7 @@ void test("empty stdout in JSON mode is clean-compatible (no schemaMismatch)", (
   // edge case (no payload at all) and should not be escalated to a contract failure.
   const result = formatLintOutput({
     capturedStdout: "",
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -641,6 +715,7 @@ void test('"No files found to lint." prefix is treated as a clean no-files run',
   const result = formatLintOutput({
     capturedStdout:
       'No files found to lint. Please check your paths and ignore patterns.\n{ "diagnostics": [], "number_of_files": 0 }\n',
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -657,6 +732,7 @@ void test('"No files found to lint." prefix sets noFilesMatched in --unix mode t
   const raw = "No files found to lint. Please check your paths and ignore patterns.\n";
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: true,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -681,6 +757,7 @@ void test("entry missing `filename` is treated as schemaMismatch with index in r
 
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -705,6 +782,7 @@ void test("entry missing `labels[0].span` is treated as schemaMismatch", () => {
 
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -727,6 +805,7 @@ void test("entry with non-numeric span field is treated as schemaMismatch", () =
 
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -749,6 +828,7 @@ void test("entry with negative span.offset is treated as schemaMismatch", () => 
 
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -771,6 +851,7 @@ void test("entry with fractional span.length is treated as schemaMismatch", () =
 
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -793,6 +874,7 @@ void test("entry with span.line below 1 is treated as schemaMismatch", () => {
 
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -815,6 +897,7 @@ void test("entry with span.column below 1 is treated as schemaMismatch", () => {
 
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -839,6 +922,7 @@ void test("entry missing `message` is treated as schemaMismatch (even when `code
 
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -864,6 +948,7 @@ void test("entry with non-string `code` (object) is treated as schemaMismatch", 
 
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -888,6 +973,7 @@ void test("entry with non-string `message` (number) is treated as schemaMismatch
 
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -916,6 +1002,7 @@ void test("entry with explicit null `code` (and valid `message`) renders the par
 
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -949,6 +1036,7 @@ void test("schemaMismatch reports the first failing entry index when later entri
 
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -973,6 +1061,7 @@ void test("unreadable source file falls back to placeholder slice and reported L
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -981,7 +1070,7 @@ void test("unreadable source file falls back to placeholder slice and reported L
     result.formattedStdout,
     joinSections([[file, "  3:5 something [eslint(no-debugger)]", "    <unreadable>"]]),
   );
-  assert.equal(result.linterSummary, "Found 1 unfixed issue in 1 file.");
+  assert.equal(result.linterSummary, "1 unfixed issue in 1 file.");
 });
 
 void test("out-of-bounds span falls back to placeholder", (t) => {
@@ -999,6 +1088,7 @@ void test("out-of-bounds span falls back to placeholder", (t) => {
 
   const result = formatLintOutput({
     capturedStdout: stdout,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -1014,6 +1104,7 @@ void test("broken JSON is relayed verbatim and surfaced via schemaMismatch", () 
 
   const result = formatLintOutput({
     capturedStdout: broken,
+    check: false,
     unix: false,
     weakTypingsDocPath: HINT_PATH,
   });
@@ -1028,6 +1119,7 @@ void test("--unix mode passes stdout through unchanged", () => {
 
   const result = formatLintOutput({
     capturedStdout: raw,
+    check: false,
     unix: true,
     weakTypingsDocPath: HINT_PATH,
   });

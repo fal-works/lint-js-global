@@ -54,7 +54,7 @@ Hint on the `no-unsafe-*` diagnostics:
 - ...
 - See: <package>/docs/guide/weak-typings.md
 
-Found 2 unfixed issues in 1 file.
+2 unfixed issues in 1 file.
 ```
 
 The bracketed error code is the raw oxlint `code` field in `plugin(rule)` form (e.g. `eslint(no-debugger)`, `typescript-eslint(no-floating-promises)`, `typescript(TS2591)`).
