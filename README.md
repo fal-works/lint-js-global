@@ -26,7 +26,7 @@ Target paths themselves may point anywhere.
 - `--check` verifies formatting and lint without rewriting files.
 - `--format-only` runs only the format phase; the lint phase (and its banners) is skipped entirely.
 - `--lint-only` is the symmetric counterpart (runs only the lint phase).
-- `--unix` passes oxlint's `--format=unix` output through unchanged.
+- `--unix` emits oxlint's `--format=unix` output on stdout instead of the default LLM-friendly layout.
 
 `--format-only` and `--lint-only` are mutually exclusive.
 
@@ -39,6 +39,9 @@ Each path must be an existing file or directory.
 Each tool's standard ignore files (like `.gitignore`) are respected.
 
 ### Output
+
+stdout carries lint-result text only, so it can be piped into another tool without further filtering.
+Phase banners, oxfmt output, the issue-count summary, and the final tagged status line all go to stderr.
 
 Default lint output groups diagnostics per file.
 Each diagnostic occupies two lines: a head line with the byte-accurate location (`L:C` or `L:C-L:C`), the diagnostic message, and the bracketed error code; followed by a continuation line carrying the exact source-code slice the rule points at.
@@ -53,12 +56,13 @@ src/index.ts
 Hint on the `no-unsafe-*` diagnostics:
 - ...
 - See: <package>/docs/guide/weak-typings.md
-
-2 unfixed issues in 1 file.
 ```
 
 The bracketed error code is the raw oxlint `code` field in `plugin(rule)` form (e.g. `eslint(no-debugger)`, `typescript-eslint(no-floating-promises)`, `typescript(TS2591)`).
 For oxc parser errors, which carry no rule code, the placeholder `parse-error` appears in the brackets instead.
+
+Under `--unix`, stdout carries oxlint's `--format=unix` lines (one per diagnostic).
+The wrapper does not inject the issue-count summary or the weak-typings hint, and reroutes oxlint's `No files found to lint.` line to stderr so stdout stays clean.
 
 ## Type-aware linting
 

@@ -1,4 +1,5 @@
 import { statSync } from "node:fs";
+import { resolve } from "node:path";
 
 /**
  * Returns ignore patterns that apply regardless of project configuration.
@@ -10,15 +11,16 @@ import { statSync } from "node:fs";
  *   via `$HOME` dotfiles shadowed as character devices at the project root: always shadowed inside
  *   the sandbox, never legitimate in a JS/TS project root.
  *
+ * @param cwd - Project root.
  * @returns Gitignore-style patterns.
  */
-export function getSystemIgnorePatterns(): string[] {
+export function getSystemIgnorePatterns(cwd: string): string[] {
   const patterns = ["node_modules"];
 
   const claudeSandboxSentinels = [".bashrc", ".gitconfig"];
   const inClaudeSandbox = claudeSandboxSentinels.some((path) => {
     try {
-      return statSync(path).isCharacterDevice();
+      return statSync(resolve(cwd, path)).isCharacterDevice();
     } catch {
       return false;
     }

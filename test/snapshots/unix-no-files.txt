@@ -1,0 +1,10 @@
+ERR formatting...
+ERR No files found matching the given patterns.
+ERR Finished in <DUR>ms on <N> files using <T> threads.
+ERR
+ERR linting (with auto-fix)...
+ERR No files found to lint.
+ERR linting (with auto-fix): clean.
+ERR
+ERR lint-js: Completed successfully. Issues fixed where possible.
+EXIT 0

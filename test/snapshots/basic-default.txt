@@ -1,16 +1,12 @@
-exit: 1
-
-==== stdout ====
-formatting...
-Finished in <DUR>ms on <N> files using <T> threads.
-
-linting (with auto-fix)...
-src/index.ts
-  5:1 Promises must be awaited, add void operator to ignore. [typescript-eslint(no-floating-promises)]
-    foo();
-
-1 unfixed issue in 1 file.
-
-lint-js: Failed. Issues fixed where possible; unfixed issues remain.
-
-==== stderr ====
+ERR formatting...
+ERR Finished in <DUR>ms on <N> files using <T> threads.
+ERR
+ERR linting (with auto-fix)...
+OUT src/index.ts
+OUT   5:1 Promises must be awaited, add void operator to ignore. [typescript-eslint(no-floating-promises)]
+OUT     foo();
+ERR
+ERR 1 unfixed issue in 1 file.
+ERR
+ERR lint-js: Failed. Issues fixed where possible; unfixed issues remain.
+EXIT 1

@@ -1,59 +1,10 @@
 #!/usr/bin/env node
 
-import { existsSync } from "node:fs";
 import { parseArgs } from "node:util";
 
-import { buildOxfmtArgs } from "./fmt.ts";
-import { formatLintOutput } from "./format-diagnostics.ts";
-import { getSystemIgnorePatterns } from "./ignore.ts";
-import { buildOxlintArgs } from "./lint.ts";
-import { errorTagged, LintJsError, print, printTagged } from "./log.ts";
-import { getPackageVersion, resolvePackageBin } from "./package-info.ts";
-import {
-  NODE_MODULES_BIN,
-  OXFMT_CONFIG,
-  OXLINT_CONFIG,
-  WEAK_TYPINGS_DOC,
-} from "./package-paths.ts";
-import { buildPathInjectedEnv, runTool, runToolCapturingOutput } from "./run-tool.ts";
-
-interface BuildSummaryOptions {
-  check: boolean;
-
-  /**
-   * `null` if the format phase was skipped (`--lint-only`);
-   * skipped phases do not contribute to the verdict.
-   */
-  fmtStatus: number | null;
-
-  /**
-   * `null` if the lint phase was skipped (`--format-only`);
-   * skipped phases do not contribute to the verdict.
-   */
-  lintStatus: number | null;
-}
-
-/**
- * Pick the one-line summary emitted after the run finishes.
- *
- * Binary verdict only (success/failure).
- * Which phase failed is readable from the tool output above,
- * so the summary only needs to convey overall outcome
- * and whether fixes may have been applied.
- */
-function buildSummary({ check, fmtStatus, lintStatus }: BuildSummaryOptions): string {
-  const fmtOk = fmtStatus === null || fmtStatus === 0;
-  const lintOk = lintStatus === null || lintStatus === 0;
-  const ok = fmtOk && lintOk;
-  if (check) {
-    return ok
-      ? "Completed successfully. No issues found."
-      : "Failed. Issues found; fixes required.";
-  }
-  return ok
-    ? "Completed successfully. Issues fixed where possible."
-    : "Failed. Issues fixed where possible; unfixed issues remain.";
-}
+import { createConsoleLogger, LintJsError, type Logger } from "./log.ts";
+import { getPackageVersion } from "./package-info.ts";
+import { run, type RunArgs } from "./runner.ts";
 
 const HELP_TEXT = `Usage: lint-js [--check] [--format-only | --lint-only] [--unix] [path...]
 
@@ -74,54 +25,22 @@ Without paths, the whole project is processed.
 node_modules is always skipped; each tool's standard ignore files (like .gitignore) are respected.`;
 
 /**
- * CLI entry point. Returns the process exit code.
- *
- * Exit codes:
- * - 0: success (any auto-fixable issues were fixed and nothing remains)
- * - 1: unfixed fmt/lint findings remain and are reported
- * - 2: expected failure raised by lint-js itself
- *
- * Anything else is re-thrown so genuine bugs surface with their full stack trace.
- */
-function main(): number {
-  try {
-    return runMain();
-  } catch (err: unknown) {
-    if (err instanceof LintJsError) {
-      errorTagged(err.message, ...err.details);
-      return 2;
-    }
-    throw err;
-  }
-}
-
-/** Run-mode CLI arguments: the variant of `CliArgs` that drives an actual lint/fmt run. */
-interface CliRunArgs {
-  kind: "run";
-  check: boolean;
-  unix: boolean;
-  formatOnly: boolean;
-  lintOnly: boolean;
-  targets: string[];
-}
-
-/**
  * Parsed and validated CLI arguments.
  *
  * `help` / `version` short-circuit the run before any other validation fires,
  * so they are modeled as their own variants and do not carry run-mode fields.
  */
-type CliArgs = { kind: "help" } | { kind: "version" } | CliRunArgs;
+type CliArgs = { kind: "help" } | { kind: "version" } | { kind: "run"; args: RunArgs };
 
 /**
- * Parse and validate `process.argv`.
+ * Parse and validate `argv` (the slice after node + script).
  * Any usage error is raised as `LintJsError` so the boundary handler reports it and exits 2.
  */
-function parseCliArgs(): CliArgs {
+function parseCliArgs(argv: readonly string[]): CliArgs {
   let parsed;
   try {
     parsed = parseArgs({
-      args: process.argv.slice(2),
+      args: [...argv],
       options: {
         check: { type: "boolean" },
         "format-only": { type: "boolean" },
@@ -152,112 +71,45 @@ function parseCliArgs(): CliArgs {
 
   return {
     kind: "run",
-    check: values.check === true,
-    unix: values.unix === true,
-    formatOnly,
-    lintOnly,
-    targets: positionals.length > 0 ? positionals : ["."],
+    args: {
+      check: values.check === true,
+      unix: values.unix === true,
+      formatOnly,
+      lintOnly,
+      targets: positionals.length > 0 ? positionals : ["."],
+    },
   };
 }
 
-function runMain(): number {
-  const args = parseCliArgs();
-
-  if (args.kind === "help") {
-    print(HELP_TEXT);
-    return 0;
-  }
-  if (args.kind === "version") {
-    print(`lint-js ${getPackageVersion()}`);
-    return 0;
-  }
-
-  const { check, unix, formatOnly, lintOnly, targets } = args;
-
-  if (!existsSync("package.json")) {
-    throw new LintJsError("no package.json in current directory.", {
-      details: [
-        "Run lint-js from the root of a JS/TS project.",
-        "(Required as a guard against accidental runs)",
-      ],
-    });
-  }
-
-  const ignorePatterns = getSystemIgnorePatterns();
-
-  for (const target of targets) {
-    if (!existsSync(target)) {
-      throw new LintJsError(`target not found: ${target}`);
+/**
+ * CLI entry point. Returns the process exit code.
+ *
+ * Exit codes:
+ * - 0: success (any auto-fixable issues were fixed and nothing remains)
+ * - 1: unfixed fmt/lint findings remain and are reported
+ * - 2: expected failure raised by lint-js itself
+ *
+ * Anything else is re-thrown so genuine bugs surface with their full stack trace.
+ */
+function main(logger: Logger): number {
+  try {
+    const cliArgs = parseCliArgs(process.argv.slice(2));
+    if (cliArgs.kind === "help") {
+      logger.writeOut(`${HELP_TEXT}\n`);
+      return 0;
     }
-  }
-
-  const runFmt = !lintOnly;
-  const runLint = !formatOnly;
-
-  let fmtStatus: number | null = null;
-  if (runFmt) {
-    const oxfmtBin = resolvePackageBin("oxfmt", "oxfmt");
-    const fmtLabel = check ? "formatting (check-only)" : "formatting";
-    print(`${fmtLabel}...`);
-    const fmtResult = runTool({
-      name: "oxfmt",
-      bin: oxfmtBin,
-      args: buildOxfmtArgs(OXFMT_CONFIG, ignorePatterns, targets, check),
-    });
-    // No fmt completion banner: oxfmt prints its own summary and ours would duplicate.
-    fmtStatus = fmtResult.status;
-  }
-
-  if (runFmt && runLint) print("");
-
-  let lintStatus: number | null = null;
-  if (runLint) {
-    const oxlintBin = resolvePackageBin("oxlint", "oxlint");
-    const lintLabel = check ? "linting (no auto-fix)" : "linting (with auto-fix)";
-    print(`${lintLabel}...`);
-    const {
-      result: lintResult,
-      capturedStdout: lintStdout,
-      capturedStderr: lintStderr,
-    } = runToolCapturingOutput({
-      name: "oxlint",
-      bin: oxlintBin,
-      args: buildOxlintArgs(OXLINT_CONFIG, ignorePatterns, targets, check, unix),
-      env: buildPathInjectedEnv(NODE_MODULES_BIN),
-    });
-    // Replay stderr first, then stdout. Both are batched (Codex-sandbox workaround)
-    // so emission timing is lost; this fixed order keeps the relayed sequence deterministic.
-    process.stderr.write(lintStderr);
-    const { formattedStdout, linterSummary, schemaMismatch, noFilesMatched } = formatLintOutput({
-      capturedStdout: lintStdout,
-      check,
-      unix,
-      weakTypingsDocPath: WEAK_TYPINGS_DOC,
-    });
-    process.stdout.write(formattedStdout);
-    if (schemaMismatch !== null) {
-      // Raw stdout was relayed above; route the contract failure through LintJsError.
-      throw new LintJsError("oxlint output contract mismatch.", {
-        details: [schemaMismatch.reason, "Raw payload relayed to stdout above."],
-      });
+    if (cliArgs.kind === "version") {
+      logger.writeOut(`lint-js ${getPackageVersion()}\n`);
+      return 0;
     }
-    // oxlint ≥1.61 exits non-zero when no files match the targets; treat that as clean.
-    const lintCleanish = lintResult.status === 0 || noFilesMatched;
-    if (lintCleanish) print(`${lintLabel}: clean.`);
-    if (linterSummary !== null) {
-      print("");
-      print(linterSummary);
+    return run(cliArgs.args, { cwd: process.cwd(), logger });
+  } catch (err: unknown) {
+    if (err instanceof LintJsError) {
+      logger.writeErrTagged(err.message, ...err.details);
+      return 2;
     }
-    lintStatus = lintCleanish ? 0 : lintResult.status;
+    throw err;
   }
-
-  print("");
-  printTagged(buildSummary({ check, fmtStatus, lintStatus }));
-
-  // Collapse any non-zero child status to 1; exit 2 is reserved for LintJsError.
-  const fmtFailed = fmtStatus !== null && fmtStatus !== 0;
-  const lintFailed = lintStatus !== null && lintStatus !== 0;
-  return fmtFailed || lintFailed ? 1 : 0;
 }
 
-process.exitCode = main();
+process.exitCode = main(createConsoleLogger());

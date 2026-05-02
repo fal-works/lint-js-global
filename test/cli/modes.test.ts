@@ -3,7 +3,7 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import { assertProgressLines, copyFixture, makeTempDir, runCli } from "../helpers.ts";
+import { copyFixture, makeTempDir, runCli } from "../helpers.ts";
 
 void test("basic: reformats sources and reports floating promise", (t) => {
   const dir = copyFixture("basic");
@@ -35,20 +35,16 @@ void test("basic: reformats sources and reports floating promise", (t) => {
     "expected bracketed error-code (raw plugin(rule) form) in the head line",
   );
   assert.match(
-    result.stdout,
+    result.stderr,
     /^1 unfixed issue in 1 file\.$/m,
-    "expected issue-count summary line after the diagnostic block",
+    "expected issue-count summary on stderr",
   );
-  // Scenario: default mode + not clean (unfixed lint remains).
-  assertProgressLines(result.stdout, {
-    fmtMode: "default",
-    fmtStart: true,
-    fmtCompletion: false,
-    lintMode: "with auto-fix",
-    lintStart: true,
-    lintCompletion: false,
-    summary: "lint-js: Failed. Issues fixed where possible; unfixed issues remain.",
-  });
+  assert.match(
+    result.stderr,
+    /^lint-js: Failed\. Issues fixed where possible; unfixed issues remain\.$/m,
+    "expected final tagged status on stderr",
+  );
+  assert.doesNotMatch(result.stdout, /^lint-js:/m, "tagged status must not leak to stdout");
 });
 
 void test("--unix: oxlint unix output passes through, no issue-count summary or hint", (t) => {
@@ -58,11 +54,11 @@ void test("--unix: oxlint unix output passes through, no issue-count summary or 
   const result = runCli(dir, ["--unix"]);
 
   assert.equal(result.status, 1, "expected exit 1 from unfixed lint error");
-  // Classic `--format=unix` tag appears verbatim.
+  // Classic `--format=unix` tag appears verbatim on stdout.
   assert.match(
     result.stdout,
     /typescript-eslint\(no-floating-promises\)/,
-    "expected unix-format rule tag to appear verbatim",
+    "expected unix-format rule tag to appear verbatim on stdout",
   );
   // None of the default formatter's framing survives.
   assert.doesNotMatch(
@@ -75,6 +71,8 @@ void test("--unix: oxlint unix output passes through, no issue-count summary or 
     /weak-typings\.md/,
     "hint block must be suppressed under --unix",
   );
+  assert.match(result.stderr, /^linting \(with auto-fix\)\.\.\.$/m);
+  assert.match(result.stderr, /^lint-js: Failed\./m);
 });
 
 void test("oxfmt failure propagates to exit code even when lint is clean", (t) => {
@@ -104,23 +102,19 @@ void test("--check: does not modify files and reports both fmt and lint violatio
 
   assert.equal(result.status, 1, "expected exit 1 from fmt or lint violations");
   assert.equal(readFileSync(target, "utf8"), before, "sources must not be rewritten in check mode");
-  assert.match(result.stdout, /Format issues found/, "oxfmt --check must report format violations");
-  assert.match(result.stdout, /no-floating-promises/, "lint violation should still be reported");
+  // oxfmt's check-mode stderr/stdout (incl. "Format issues found") routes through stderr.
+  assert.match(result.stderr, /Format issues found/, "oxfmt --check report belongs on stderr");
+  assert.match(result.stdout, /no-floating-promises/, "lint diagnostic stays on stdout");
   assert.doesNotMatch(
     result.stdout,
     /weak-typings\.md/,
     "weak-typings hint must not fire for non-unsafe lint failures under --check",
   );
-  // Scenario: --check + not clean.
-  assertProgressLines(result.stdout, {
-    fmtMode: "check-only",
-    fmtStart: true,
-    fmtCompletion: false,
-    lintMode: "no auto-fix",
-    lintStart: true,
-    lintCompletion: false,
-    summary: "lint-js: Failed. Issues found; fixes required.",
-  });
+  assert.match(
+    result.stderr,
+    /^lint-js: Failed\. Issues found; fixes required\.$/m,
+    "expected --check failure status on stderr",
+  );
 });
 
 void test("--check: clean project exits 0", (t) => {
@@ -135,16 +129,12 @@ void test("--check: clean project exits 0", (t) => {
     /weak-typings\.md/,
     "weak-typings hint must not fire on a clean lint",
   );
-  // Scenario: --check + clean.
-  assertProgressLines(result.stdout, {
-    fmtMode: "check-only",
-    fmtStart: true,
-    fmtCompletion: false,
-    lintMode: "no auto-fix",
-    lintStart: true,
-    lintCompletion: true,
-    summary: "lint-js: Completed successfully. No issues found.",
-  });
+  assert.match(
+    result.stderr,
+    /^lint-js: Completed successfully\. No issues found\.$/m,
+    "expected clean --check status on stderr",
+  );
+  assert.equal(result.stdout, "", "stdout must stay empty on a clean run");
 });
 
 void test("--format-only: runs fmt phase, skips lint phase entirely", (t) => {
@@ -167,17 +157,12 @@ void test("--format-only: runs fmt phase, skips lint phase entirely", (t) => {
     /no-floating-promises/,
     "lint diagnostics must not appear under --format-only",
   );
-  // Scenario: --format-only on a fixture whose only lint issue is unfixable.
-  // Skipping lint is what makes the run pass.
-  assertProgressLines(result.stdout, {
-    fmtMode: "default",
-    fmtStart: true,
-    fmtCompletion: false,
-    lintMode: null,
-    lintStart: false,
-    lintCompletion: false,
-    summary: "lint-js: Completed successfully. Issues fixed where possible.",
-  });
+  assert.doesNotMatch(
+    result.stderr,
+    /^linting/m,
+    "lint phase banner must not appear under --format-only",
+  );
+  assert.match(result.stderr, /^lint-js: Completed successfully\. Issues fixed where possible\.$/m);
 });
 
 void test("--lint-only: runs lint phase, skips fmt phase entirely", (t) => {
@@ -192,9 +177,14 @@ void test("--lint-only: runs lint phase, skips fmt phase entirely", (t) => {
   assert.equal(result.status, 1, "expected exit 1 from unfixed lint error");
   assert.match(result.stdout, /no-floating-promises/, "expected lint diagnostic on stdout");
   assert.doesNotMatch(
-    result.stdout,
+    result.stderr,
     /Finished in .* on .* files using .* threads\./,
-    "oxfmt summary must not appear under --lint-only",
+    "oxfmt summary must not appear under --lint-only (fmt phase skipped)",
+  );
+  assert.doesNotMatch(
+    result.stderr,
+    /^formatting/m,
+    "fmt phase banner must not appear under --lint-only",
   );
   // Asserting bytes-equal is meaningful only because the basic fixture has
   // formatting violations oxfmt would otherwise rewrite.
@@ -203,16 +193,6 @@ void test("--lint-only: runs lint phase, skips fmt phase entirely", (t) => {
     before,
     "source must not be reformatted when fmt phase is skipped",
   );
-  // Scenario: --lint-only + unfixed lint findings.
-  assertProgressLines(result.stdout, {
-    fmtMode: null,
-    fmtStart: false,
-    fmtCompletion: false,
-    lintMode: "with auto-fix",
-    lintStart: true,
-    lintCompletion: false,
-    summary: "lint-js: Failed. Issues fixed where possible; unfixed issues remain.",
-  });
 });
 
 void test("--format-only and --lint-only are mutually exclusive", (t) => {
@@ -231,7 +211,7 @@ void test("--format-only and --lint-only are mutually exclusive", (t) => {
     "argument validation should fail before the package.json check",
   );
   assert.doesNotMatch(
-    result.stdout,
+    result.stderr,
     /^formatting/m,
     "no phase banner should be emitted before the validation error",
   );

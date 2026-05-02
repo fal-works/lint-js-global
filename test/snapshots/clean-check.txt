@@ -1,15 +1,11 @@
-exit: 0
-
-==== stdout ====
-formatting (check-only)...
-Checking formatting...
-
-All matched files use the correct format.
-Finished in <DUR>ms on <N> files using <T> threads.
-
-linting (no auto-fix)...
-linting (no auto-fix): clean.
-
-lint-js: Completed successfully. No issues found.
-
-==== stderr ====
+ERR formatting (check-only)...
+ERR Checking formatting...
+ERR
+ERR All matched files use the correct format.
+ERR Finished in <DUR>ms on <N> files using <T> threads.
+ERR
+ERR linting (no auto-fix)...
+ERR linting (no auto-fix): clean.
+ERR
+ERR lint-js: Completed successfully. No issues found.
+EXIT 0

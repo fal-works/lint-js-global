@@ -5,7 +5,7 @@ import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 
 import { LintJsError } from "../../src/log.ts";
-import { runTool, runToolCapturingOutput } from "../../src/run-tool.ts";
+import { runToolCapturingOutput } from "../../src/run-tool.ts";
 
 /**
  * Drop a tmp JS file `script.js` containing the given source, and clean up at teardown.
@@ -20,19 +20,8 @@ function makeScript(t: TestContext, source: string): string {
   return path;
 }
 
-void test("runTool: signal-driven termination throws LintJsError", (t) => {
-  // Self-kill via SIGTERM. Linux only; project test target is WSL2.
-  const bin = makeScript(t, "process.kill(process.pid, 'SIGTERM');\n");
-
-  assert.throws(
-    () => runTool({ name: "self-killer", bin, args: [] }),
-    (err) =>
-      err instanceof LintJsError &&
-      /self-killer was terminated by signal SIGTERM/.test(err.message),
-  );
-});
-
 void test("runToolCapturingOutput: signal-driven termination throws LintJsError", (t) => {
+  // Self-kill via SIGTERM. Linux only; project test target is WSL2.
   const bin = makeScript(t, "process.kill(process.pid, 'SIGTERM');\n");
 
   assert.throws(
@@ -43,10 +32,10 @@ void test("runToolCapturingOutput: signal-driven termination throws LintJsError"
   );
 });
 
-void test("runTool: non-zero exit propagates via result.status (no throw)", (t) => {
+void test("runToolCapturingOutput: non-zero exit propagates via result.status (no throw)", (t) => {
   const bin = makeScript(t, "process.exit(7);\n");
 
-  const result = runTool({ name: "exit7", bin, args: [] });
+  const { result } = runToolCapturingOutput({ name: "exit7", bin, args: [] });
 
   assert.equal(result.status, 7, "non-zero status passes through to the caller");
   assert.equal(result.signal, null);

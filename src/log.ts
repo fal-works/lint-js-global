@@ -1,7 +1,7 @@
 const LOG_PREFIX = "lint-js:";
 
 export interface LintJsErrorOptions extends ErrorOptions {
-  /** Free-form detail lines emitted under the headline by {@link errorTagged}. */
+  /** Free-form detail lines emitted under the headline by {@link Logger.writeErrTagged}. */
   details?: readonly string[];
 }
 
@@ -19,26 +19,39 @@ export class LintJsError extends Error {
 }
 
 /**
- * Plain stdout line. Used for help, version, blank separators.
+ * Sink for every line lint-js writes to the user-facing channels.
  *
- * Use also for phase banners; they sit inline with oxfmt/oxlint output
- * and prefixing would break visual cohesion.
+ * stdout carries text intended for downstream consumption.
+ * stderr carries everything else.
+ *
+ * `writeOut` / `writeErr` accept the message verbatim; callers append `"\n"` to close a line
+ * so blocks already terminated with `\n` pass through unchanged.
  */
-export function print(msg: string): void {
-  console.log(msg);
+export interface Logger {
+  writeOut(msg: string): void;
+  writeErr(msg: string): void;
+
+  /**
+   * Tagged stderr block: a `lint-js: <headline>` line followed by 2-space-indented
+   * detail lines. Used for the end-of-run outcome and {@link LintJsError} notifications.
+   */
+  writeErrTagged(headline: string, ...details: readonly string[]): void;
 }
 
 /**
- * Tagged stdout line. Used for the end-of-run outcome.
+ * Default {@link Logger} backed by `process.stdout` / `process.stderr`.
  */
-export function printTagged(msg: string): void {
-  console.log(`${LOG_PREFIX} ${msg}`);
-}
-
-/**
- * Tagged stderr headline followed by plain-text detail lines.
- */
-export function errorTagged(headline: string, ...details: readonly string[]): void {
-  console.error(`${LOG_PREFIX} ${headline}`);
-  for (const line of details) console.error(`  ${line}`);
+export function createConsoleLogger(): Logger {
+  return {
+    writeOut(msg) {
+      process.stdout.write(msg);
+    },
+    writeErr(msg) {
+      process.stderr.write(msg);
+    },
+    writeErrTagged(headline, ...details) {
+      process.stderr.write(`${LOG_PREFIX} ${headline}\n`);
+      for (const line of details) process.stderr.write(`  ${line}\n`);
+    },
+  };
 }

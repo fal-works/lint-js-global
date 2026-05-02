@@ -1,21 +1,17 @@
-exit: 1
-
-==== stdout ====
-formatting (check-only)...
-Checking formatting...
-
-src/index.ts (<DUR>ms)
-
-Format issues found in above 1 files. Run without `--check` to fix.
-Finished in <DUR>ms on <N> files using <T> threads.
-
-linting (no auto-fix)...
-src/index.ts
-  5:1 Promises must be awaited, add void operator to ignore. [typescript-eslint(no-floating-promises)]
-    foo( );
-
-1 issue in 1 file.
-
-lint-js: Failed. Issues found; fixes required.
-
-==== stderr ====
+ERR formatting (check-only)...
+ERR Checking formatting...
+ERR
+ERR src/index.ts (<DUR>ms)
+ERR
+ERR Format issues found in above 1 files. Run without `--check` to fix.
+ERR Finished in <DUR>ms on <N> files using <T> threads.
+ERR
+ERR linting (no auto-fix)...
+OUT src/index.ts
+OUT   5:1 Promises must be awaited, add void operator to ignore. [typescript-eslint(no-floating-promises)]
+OUT     foo( );
+ERR
+ERR 1 issue in 1 file.
+ERR
+ERR lint-js: Failed. Issues found; fixes required.
+EXIT 1

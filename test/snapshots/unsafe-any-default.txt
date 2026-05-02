@@ -1,23 +1,19 @@
-exit: 1
-
-==== stdout ====
-formatting...
-Finished in <DUR>ms on <N> files using <T> threads.
-
-linting (with auto-fix)...
-src/index.ts
-  1:7 Unsafe assignment of an any value. [typescript-eslint(no-unsafe-assignment)]
-    data = JSON.parse("{}")
-  2:18 Unsafe member access .foo on an `any` value. [typescript-eslint(no-unsafe-member-access)]
-    foo
-
-Hint on the `no-unsafe-*` diagnostics:
-- Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary module with typed wrappers.
-- Inline disable (`// oxlint-disable-next-line`) is not a fix; use only when explicitly permitted by the project maintainer.
-- See: <PACKAGE_ROOT>/docs/guide/weak-typings.md
-
-2 unfixed issues in 1 file.
-
-lint-js: Failed. Issues fixed where possible; unfixed issues remain.
-
-==== stderr ====
+ERR formatting...
+ERR Finished in <DUR>ms on <N> files using <T> threads.
+ERR
+ERR linting (with auto-fix)...
+OUT src/index.ts
+OUT   1:7 Unsafe assignment of an any value. [typescript-eslint(no-unsafe-assignment)]
+OUT     data = JSON.parse("{}")
+OUT   2:18 Unsafe member access .foo on an `any` value. [typescript-eslint(no-unsafe-member-access)]
+OUT     foo
+OUT
+OUT Hint on the `no-unsafe-*` diagnostics:
+OUT - Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary module with typed wrappers.
+OUT - Inline disable (`// oxlint-disable-next-line`) is not a fix; use only when explicitly permitted by the project maintainer.
+OUT - See: <PACKAGE_ROOT>/docs/guide/weak-typings.md
+ERR
+ERR 2 unfixed issues in 1 file.
+ERR
+ERR lint-js: Failed. Issues fixed where possible; unfixed issues remain.
+EXIT 1

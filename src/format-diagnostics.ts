@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { isAbsolute, resolve } from "node:path";
 
 /**
  * LLM-friendly formatter for oxlint's `--format=json` output.
@@ -83,7 +84,7 @@ export interface FormatLintResult {
 }
 
 /** Prefix oxlint ≥1.61 prepends to stdout when no files match the targets. */
-const NO_FILES_PREFIX = "No files found to lint.";
+export const NO_FILES_PREFIX = "No files found to lint.";
 
 export interface FormatLintOptions {
   /** Raw oxlint stdout from `--format=json`. */
@@ -97,6 +98,12 @@ export interface FormatLintOptions {
 
   /** Absolute path used in the weak-typings hint. */
   weakTypingsDocPath: string;
+
+  /**
+   * Working directory against which oxlint's relative `filename` fields are resolved
+   * when reading the source for span-slice extraction. Defaults to `process.cwd()`.
+   */
+  cwd?: string;
 }
 
 /**
@@ -110,6 +117,7 @@ export function formatLintOutput({
   check,
   unix,
   weakTypingsDocPath,
+  cwd,
 }: FormatLintOptions): FormatLintResult {
   // Detected before mode branching: the prefix appears in --format=unix output too,
   // so unix mode also needs the exit-normalization signal.
@@ -180,7 +188,7 @@ export function formatLintOutput({
     };
   }
 
-  const cache = createSourceCache();
+  const cache = createSourceCache(cwd ?? process.cwd());
   const resolved = validated.map((d) => resolveDiagnostic(d, cache));
   resolved.sort(compareDiagnostics);
 
@@ -287,14 +295,15 @@ interface SourceCache {
   get(filename: string): SourceEntry | null;
 }
 
-function createSourceCache(): SourceCache {
+function createSourceCache(cwd: string): SourceCache {
   const cache = new Map<string, SourceEntry | null>();
   return {
     get(filename) {
       const cached = cache.get(filename);
       if (cached !== undefined) return cached;
       try {
-        const buffer = readFileSync(filename);
+        const path = isAbsolute(filename) ? filename : resolve(cwd, filename);
+        const buffer = readFileSync(path);
         const entry: SourceEntry = { buffer, lineStartOffsets: buildLineStartOffsets(buffer) };
         cache.set(filename, entry);
         return entry;

@@ -24,11 +24,11 @@ void test("unsafe-any: weak-typings hint follows no-unsafe-* diagnostics", (t) =
     .map((l) => l.match(/^- See: ((?:.*[/\\])?weak-typings\.md)$/))
     .find((m) => m !== null);
   const seeIdx = seeMatch ? lines.indexOf(seeMatch.input ?? "") : -1;
-  const summaryIdx = lines.findIndex((l) => l.startsWith("lint-js:"));
   assert.ok(
-    firstUnsafeIdx >= 0 && seeIdx > firstUnsafeIdx && summaryIdx > seeIdx,
-    `expected order: first no-unsafe-* diag (${firstUnsafeIdx}) < See: line (${seeIdx}) < summary (${summaryIdx})`,
+    firstUnsafeIdx >= 0 && seeIdx > firstUnsafeIdx,
+    `expected order on stdout: first no-unsafe-* diag (${firstUnsafeIdx}) < See: line (${seeIdx})`,
   );
+  assert.match(result.stderr, /^lint-js: Failed\./m, "expected final tagged status on stderr");
   // Detect link rot: the path printed in the hint must resolve to an existing file.
   const docPath = seeMatch?.[1] ?? "";
   assert.ok(

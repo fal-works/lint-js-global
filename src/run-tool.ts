@@ -17,34 +17,27 @@ interface RunToolOptions {
   /** Arguments passed to the tool, excluding `bin`. */
   args: readonly string[];
 
+  /** Working directory for the child. Defaults to the parent's cwd. */
+  cwd?: string;
+
   /** Env for the child. Defaults to inherited. */
   env?: NodeJS.ProcessEnv;
 }
 
 /**
- * Run a Node-based tool with stdio inherited (executed via `process.execPath`).
- *
- * Throws {@link LintJsError} on launch failure or signal-driven termination.
- */
-export function runTool({ name, bin, args, env }: RunToolOptions): SpawnResult {
-  const result = spawnSync(process.execPath, [bin, ...args], {
-    stdio: "inherit",
-    env,
-  });
-  ensureNormalExit(name, result);
-  return result;
-}
-
-/**
- * Like {@link runTool} but also captures stdout and stderr for post-run inspection.
+ * Run a Node-based tool (executed via `process.execPath`) and capture stdout/stderr
+ * for post-run inspection. Use this when the caller treats the two streams differently
+ * (e.g. parses stdout, relays stderr).
  *
  * File-backed stdio (not pipes): workaround for https://github.com/openai/codex/issues/18473,
  * where captured pipe-backed output from a nested Node child can be dropped in the Codex sandbox.
  *
  * Side effect: the child's output is batched until exit instead of streaming.
  * Both streams are captured symmetrically so the caller can flush them in a deterministic order.
+ *
+ * Throws {@link LintJsError} on launch failure or signal-driven termination.
  */
-export function runToolCapturingOutput({ name, bin, args, env }: RunToolOptions): {
+export function runToolCapturingOutput({ name, bin, args, cwd, env }: RunToolOptions): {
   result: SpawnResult;
   capturedStdout: string;
   capturedStderr: string;
@@ -59,6 +52,7 @@ export function runToolCapturingOutput({ name, bin, args, env }: RunToolOptions)
     stderrFd = openSync(stderrPath, "w");
     const result = spawnSync(process.execPath, [bin, ...args], {
       stdio: ["inherit", stdoutFd, stderrFd],
+      cwd,
       env,
     });
     closeSync(stdoutFd);
@@ -74,6 +68,40 @@ export function runToolCapturingOutput({ name, bin, args, env }: RunToolOptions)
   } finally {
     if (stdoutFd !== -1) closeSync(stdoutFd);
     if (stderrFd !== -1) closeSync(stderrFd);
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Like {@link runToolCapturingOutput}, but binds the child's stdout and stderr to the same fd
+ * so their natural emission order is preserved in the captured text. Use this when the caller
+ * routes the whole thing into one sink (and merging post-hoc would risk reordering).
+ *
+ * Throws {@link LintJsError} on launch failure or signal-driven termination.
+ */
+export function runToolCapturingCombined({ name, bin, args, cwd, env }: RunToolOptions): {
+  result: SpawnResult;
+  captured: string;
+} {
+  const dir = mkdtempSync(join(tmpdir(), "lint-js-"));
+  const path = join(dir, "combined");
+  let fd = -1;
+  try {
+    fd = openSync(path, "w");
+    const result = spawnSync(process.execPath, [bin, ...args], {
+      stdio: ["inherit", fd, fd],
+      cwd,
+      env,
+    });
+    closeSync(fd);
+    fd = -1;
+    ensureNormalExit(name, result);
+    return {
+      result,
+      captured: readFileSync(path, "utf8"),
+    };
+  } finally {
+    if (fd !== -1) closeSync(fd);
     rmSync(dir, { recursive: true, force: true });
   }
 }

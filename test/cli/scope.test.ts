@@ -3,13 +3,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import {
-  DIRTY_SOURCE,
-  assertProgressLines,
-  copyFixture,
-  runCli,
-  writeIgnoreFiles,
-} from "../helpers.ts";
+import { DIRTY_SOURCE, copyFixture, runCli, writeIgnoreFiles } from "../helpers.ts";
 
 void test("positional path narrows scope but still honors ignore files", (t) => {
   const dir = copyFixture("basic");
@@ -46,18 +40,8 @@ void test("fully-ignored single-file target exits cleanly", (t) => {
 
   assert.equal(result.status, 0, "expected exit 0 when the only target is ignored");
   assert.equal(readFileSync(ignored, "utf8"), DIRTY_SOURCE, "ignored file must not be touched");
-  // Scenario: default + fully-ignored target.
-  // oxfmt emits no stdout in this case ("No files found ..." goes to stderr),
-  // so the "formatting..." label is what marks the fmt phase on stdout.
-  assertProgressLines(result.stdout, {
-    fmtMode: "default",
-    fmtStart: true,
-    fmtCompletion: false,
-    lintMode: "with auto-fix",
-    lintStart: true,
-    lintCompletion: true,
-    summary: "lint-js: Completed successfully. Issues fixed where possible.",
-  });
+  assert.equal(result.stdout, "", "stdout must stay empty when no diagnostic is produced");
+  assert.match(result.stderr, /^lint-js: Completed successfully\. Issues fixed where possible\.$/m);
 });
 
 void test("--check + fully-ignored target: fmt phase label still fires", (t) => {
@@ -71,17 +55,13 @@ void test("--check + fully-ignored target: fmt phase label still fires", (t) => 
   const result = runCli(dir, ["--check", "src/ignored.ts"]);
 
   assert.equal(result.status, 0, "expected exit 0 when the only target is ignored");
-  // Without an unconditional fmt phase label, --check zero-match would leave no fmt-phase marker
-  // on stdout at all (oxfmt's "No files found ..." goes to stderr). Verify the label fires.
-  assertProgressLines(result.stdout, {
-    fmtMode: "check-only",
-    fmtStart: true,
-    fmtCompletion: false,
-    lintMode: "no auto-fix",
-    lintStart: true,
-    lintCompletion: true,
-    summary: "lint-js: Completed successfully. No issues found.",
-  });
+  // Without an unconditional fmt phase label, --check zero-match would leave no fmt-phase
+  // marker on stderr.
+  assert.match(
+    result.stderr,
+    /^formatting \(check-only\)\.\.\.$/m,
+    "fmt-phase banner must fire under --check even with zero-match targets",
+  );
 });
 
 void test("target dir with no lintable files exits cleanly", (t) => {
@@ -95,15 +75,7 @@ void test("target dir with no lintable files exits cleanly", (t) => {
   const result = runCli(dir, ["empty-dir"]);
 
   assert.equal(result.status, 0, "expected exit 0 when the target has no lintable files");
-  assertProgressLines(result.stdout, {
-    fmtMode: "default",
-    fmtStart: true,
-    fmtCompletion: false,
-    lintMode: "with auto-fix",
-    lintStart: true,
-    lintCompletion: true,
-    summary: "lint-js: Completed successfully. Issues fixed where possible.",
-  });
+  assert.equal(result.stdout, "", "stdout must stay empty when no diagnostic is produced");
 });
 
 void test("--unix + fully-ignored target exits cleanly", (t) => {
@@ -120,15 +92,13 @@ void test("--unix + fully-ignored target exits cleanly", (t) => {
 
   assert.equal(result.status, 0, "expected exit 0 when the only target is ignored");
   assert.equal(readFileSync(ignored, "utf8"), DIRTY_SOURCE, "ignored file must not be touched");
-  assertProgressLines(result.stdout, {
-    fmtMode: "default",
-    fmtStart: true,
-    fmtCompletion: false,
-    lintMode: "with auto-fix",
-    lintStart: true,
-    lintCompletion: true,
-    summary: "lint-js: Completed successfully. Issues fixed where possible.",
-  });
+  // Even under --unix, the no-files signal must not pollute stdout: it routes to stderr.
+  assert.equal(result.stdout, "", "stdout must stay clean under --unix when no files match");
+  assert.match(
+    result.stderr,
+    /^No files found to lint\.$/m,
+    "no-files signal should be reported on stderr",
+  );
 });
 
 void test("node_modules is ignored", (t) => {
@@ -149,14 +119,4 @@ void test("node_modules is ignored", (t) => {
     brokenContent,
     "files under node_modules must not be touched",
   );
-  // Scenario: default mode + clean.
-  assertProgressLines(result.stdout, {
-    fmtMode: "default",
-    fmtStart: true,
-    fmtCompletion: false,
-    lintMode: "with auto-fix",
-    lintStart: true,
-    lintCompletion: true,
-    summary: "lint-js: Completed successfully. Issues fixed where possible.",
-  });
 });

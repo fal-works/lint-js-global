@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { copyFixture, runCli, type CliRunResult } from "../helpers.ts";
+import { copyFixture, renderSnapshot, runRecording, type RecordedEvent } from "../helpers.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const snapshotDir = join(here, "..", "snapshots");
@@ -28,20 +28,9 @@ function normalize(text: string): string {
     .replaceAll(packageRoot, "<PACKAGE_ROOT>");
 }
 
-function renderSnapshot(result: CliRunResult): string {
-  return [
-    `exit: ${result.status}`,
-    "",
-    "==== stdout ====",
-    normalize(result.stdout),
-    "==== stderr ====",
-    normalize(result.stderr),
-  ].join("\n");
-}
-
-function matchSnapshot(name: string, result: CliRunResult): void {
+function matchSnapshot(name: string, events: readonly RecordedEvent[], exitCode: number): void {
   const path = join(snapshotDir, `${name}.txt`);
-  const actual = renderSnapshot(result);
+  const actual = normalize(renderSnapshot(events, exitCode));
   if (UPDATE) {
     writeFileSync(path, actual);
     return;
@@ -54,32 +43,89 @@ function matchSnapshot(name: string, result: CliRunResult): void {
   );
 }
 
+const DEFAULT_TARGETS = ["."];
+
 void test("snapshot: default mode on dirty source (diag + summary)", (t) => {
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  matchSnapshot("basic-default", runCli(dir));
+  const { events, exitCode } = runRecording(dir, {
+    check: false,
+    unix: false,
+    formatOnly: false,
+    lintOnly: false,
+    targets: DEFAULT_TARGETS,
+  });
+  matchSnapshot("basic-default", events, exitCode);
 });
 
 void test("snapshot: --unix mode passes oxlint output through unchanged", (t) => {
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  matchSnapshot("basic-unix", runCli(dir, ["--unix"]));
+  const { events, exitCode } = runRecording(dir, {
+    check: false,
+    unix: true,
+    formatOnly: false,
+    lintOnly: false,
+    targets: DEFAULT_TARGETS,
+  });
+  matchSnapshot("basic-unix", events, exitCode);
 });
 
 void test("snapshot: --check reports both fmt and lint violations without rewriting", (t) => {
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  matchSnapshot("basic-check", runCli(dir, ["--check"]));
+  const target = join(dir, "src", "index.ts");
+  const before = readFileSync(target, "utf8");
+  const { events, exitCode } = runRecording(dir, {
+    check: true,
+    unix: false,
+    formatOnly: false,
+    lintOnly: false,
+    targets: DEFAULT_TARGETS,
+  });
+  assert.equal(readFileSync(target, "utf8"), before, "sources must not be rewritten in check mode");
+  matchSnapshot("basic-check", events, exitCode);
 });
 
 void test("snapshot: --check on a clean project emits the success banner", (t) => {
   const dir = copyFixture("with-node-modules");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  matchSnapshot("clean-check", runCli(dir, ["--check"]));
+  const { events, exitCode } = runRecording(dir, {
+    check: true,
+    unix: false,
+    formatOnly: false,
+    lintOnly: false,
+    targets: DEFAULT_TARGETS,
+  });
+  matchSnapshot("clean-check", events, exitCode);
 });
 
 void test("snapshot: unsafe-any rules trigger the weak-typings hint block", (t) => {
   const dir = copyFixture("unsafe-any");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  matchSnapshot("unsafe-any-default", runCli(dir));
+  const { events, exitCode } = runRecording(dir, {
+    check: false,
+    unix: false,
+    formatOnly: false,
+    lintOnly: false,
+    targets: DEFAULT_TARGETS,
+  });
+  matchSnapshot("unsafe-any-default", events, exitCode);
+});
+
+void test("snapshot: --unix with fully-ignored target keeps stdout empty", (t) => {
+  const dir = copyFixture("basic");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const ignored = join(dir, "src", "ignored.ts");
+  writeFileSync(ignored, "const x  =  1;debugger\n");
+  writeFileSync(join(dir, ".prettierignore"), "ignored.ts\n");
+  writeFileSync(join(dir, ".eslintignore"), "ignored.ts\n");
+  const { events, exitCode } = runRecording(dir, {
+    check: false,
+    unix: true,
+    formatOnly: false,
+    lintOnly: false,
+    targets: ["src/ignored.ts"],
+  });
+  matchSnapshot("unix-no-files", events, exitCode);
 });
