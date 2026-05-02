@@ -4,7 +4,6 @@ import { readFileSync } from "node:fs";
  * LLM-friendly formatter for oxlint's `--format=json` output.
  */
 
-const LEGEND = "diagnostic legend:\n  <location> <source-code-slice> [<error-code>]\n    <message>";
 const PARSE_ERROR_CODE = "parse-error";
 const SLICE_MAX_LEN = 40;
 const UNREADABLE_SLICE = "<unreadable>";
@@ -89,7 +88,7 @@ export interface FormatLintOptions {
   /** Raw oxlint stdout from `--format=json`. */
   capturedStdout: string;
 
-  /** If true, pass through unchanged (no legend, no hint, no summary). */
+  /** If true, pass through unchanged (no hint, no summary). */
   unix: boolean;
 
   /** Absolute path used in the weak-typings hint. */
@@ -182,7 +181,7 @@ export function formatLintOutput({
 
   const fileGroups = groupByFilename(resolved);
 
-  const sections: string[][] = [[LEGEND]];
+  const sections: string[][] = [];
   for (const [filename, diags] of fileGroups) {
     sections.push([filename, ...diags.map(formatDiagLine)]);
   }
@@ -477,14 +476,14 @@ function groupByFilename(
 }
 
 /**
- * Render a single diagnostic as the head line (`<location> <slice> [<error-code>]`)
- * followed by a message continuation line. Newlines inside `message` collapse to
- * a single space so the continuation stays on one line.
+ * Render a single diagnostic as the head line (`<location> <message> [<error-code>]`)
+ * followed by a source-slice continuation line. Newlines inside `message` collapse to
+ * a single space so the head line stays on one line.
  */
 function formatDiagLine(d: ResolvedDiagnostic): string {
-  const headLine = `  ${d.location} ${d.slice} [${d.errorCode}]`;
-  const messageLine = d.message.replace(/\r?\n/g, " ");
-  return `${headLine}\n    ${messageLine}`;
+  const message = d.message.replace(/\r?\n/g, " ");
+  const headLine = `  ${d.location} ${message} [${d.errorCode}]`;
+  return `${headLine}\n    ${d.slice}`;
 }
 
 function renderWeakTypingsHint(docPath: string): string[] {

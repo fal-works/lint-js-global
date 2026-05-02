@@ -5,15 +5,11 @@ formatting...
 Finished in <DUR>ms on <N> files using <T> threads.
 
 linting (with auto-fix)...
-diagnostic legend:
-  <location> <source-code-slice> [<error-code>]
-    <message>
-
 src/index.ts
-  1:7 data = JSON.parse("{}") [typescript-eslint(no-unsafe-assignment)]
-    Unsafe assignment of an any value.
-  2:18 foo [typescript-eslint(no-unsafe-member-access)]
-    Unsafe member access .foo on an `any` value.
+  1:7 Unsafe assignment of an any value. [typescript-eslint(no-unsafe-assignment)]
+    data = JSON.parse("{}")
+  2:18 Unsafe member access .foo on an `any` value. [typescript-eslint(no-unsafe-member-access)]
+    foo
 
 Hint on the `no-unsafe-*` diagnostics:
 - Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary module with typed wrappers.

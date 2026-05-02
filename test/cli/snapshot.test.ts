@@ -54,7 +54,7 @@ function matchSnapshot(name: string, result: CliRunResult): void {
   );
 }
 
-void test("snapshot: default mode on dirty source (legend + diag + summary)", (t) => {
+void test("snapshot: default mode on dirty source (diag + summary)", (t) => {
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   matchSnapshot("basic-default", runCli(dir));

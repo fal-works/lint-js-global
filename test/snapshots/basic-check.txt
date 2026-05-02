@@ -10,13 +10,9 @@ Format issues found in above 1 files. Run without `--check` to fix.
 Finished in <DUR>ms on <N> files using <T> threads.
 
 linting (no auto-fix)...
-diagnostic legend:
-  <location> <source-code-slice> [<error-code>]
-    <message>
-
 src/index.ts
-  5:1 foo( ); [typescript-eslint(no-floating-promises)]
-    Promises must be awaited, add void operator to ignore.
+  5:1 Promises must be awaited, add void operator to ignore. [typescript-eslint(no-floating-promises)]
+    foo( );
 
 Found 1 unfixed issue in 1 file.
 

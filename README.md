@@ -40,20 +40,15 @@ Each tool's standard ignore files (like `.gitignore`) are respected.
 
 ### Output
 
-Default lint output groups diagnostics per file with a self-describing legend block,
-byte-accurate spans shown as `L:C` or `L:C-L:C`, the exact source-code slice the rule points at,
-and the diagnostic message on a continuation line:
+Default lint output groups diagnostics per file.
+Each diagnostic occupies two lines: a head line with the byte-accurate location (`L:C` or `L:C-L:C`), the diagnostic message, and the bracketed error code; followed by a continuation line carrying the exact source-code slice the rule points at.
 
 ```
-diagnostic legend:
-  <location> <source-code-slice> [<error-code>]
-    <message>
-
 src/index.ts
-  1:7 data = JSON.parse("{}") [typescript-eslint(no-unsafe-assignment)]
-    Unsafe assignment of an `any` value.
-  2:18 foo [typescript-eslint(no-unsafe-member-access)]
-    Unsafe member access .foo on an `any` value.
+  1:7 Unsafe assignment of an `any` value. [typescript-eslint(no-unsafe-assignment)]
+    data = JSON.parse("{}")
+  2:18 Unsafe member access .foo on an `any` value. [typescript-eslint(no-unsafe-member-access)]
+    foo
 
 Hint on the `no-unsafe-*` diagnostics:
 - ...
@@ -61,6 +56,9 @@ Hint on the `no-unsafe-*` diagnostics:
 
 Found 2 unfixed issues in 1 file.
 ```
+
+The bracketed error code is the raw oxlint `code` field in `plugin(rule)` form (e.g. `eslint(no-debugger)`, `typescript-eslint(no-floating-promises)`, `typescript(TS2591)`).
+For oxc parser errors, which carry no rule code, the placeholder `parse-error` appears in the brackets instead.
 
 ## Type-aware linting
 

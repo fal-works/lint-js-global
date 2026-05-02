@@ -8,12 +8,6 @@ import { formatLintOutput } from "../../src/format-diagnostics.ts";
 
 const HINT_PATH = "/opt/lint-js/docs/guide/weak-typings.md";
 
-const LEGEND = [
-  "diagnostic legend:",
-  "  <location> <source-code-slice> [<error-code>]",
-  "    <message>",
-];
-
 interface FakeDiag {
   message: string;
   code?: string | null;
@@ -77,8 +71,7 @@ void test("single file, single diagnostic (short single-line slice)", (t) => {
   assert.equal(
     result.formattedStdout,
     joinSections([
-      LEGEND,
-      [file, "  1:1 debugger [eslint(no-debugger)]", "    `debugger` statement is not allowed."],
+      [file, "  1:1 `debugger` statement is not allowed. [eslint(no-debugger)]", "    debugger"],
     ]),
   );
   assert.equal(result.linterSummary, "Found 1 unfixed issue in 1 file.");
@@ -125,15 +118,14 @@ void test("single file, multiple diagnostics sort by (line, col, error-code)", (
   assert.equal(
     result.formattedStdout,
     joinSections([
-      LEGEND,
       [
         file,
-        "  1:7 x [eslint(no-unused-vars)]",
-        "    a",
-        "  2:7 y [eslint(no-unused-vars)]",
-        "    b",
-        "  3:1 debugger [eslint(no-debugger)]",
-        "    d",
+        "  1:7 a [eslint(no-unused-vars)]",
+        "    x",
+        "  2:7 b [eslint(no-unused-vars)]",
+        "    y",
+        "  3:1 d [eslint(no-debugger)]",
+        "    debugger",
       ],
     ]),
   );
@@ -173,9 +165,8 @@ void test("multiple files sort lexicographically", (t) => {
   assert.equal(
     result.formattedStdout,
     joinSections([
-      LEGEND,
-      [fileA, "  1:1 debugger [eslint(no-debugger)]", "    d"],
-      [fileB, "  1:1 debugger [eslint(no-debugger)]", "    d"],
+      [fileA, "  1:1 d [eslint(no-debugger)]", "    debugger"],
+      [fileB, "  1:1 d [eslint(no-debugger)]", "    debugger"],
     ]),
   );
   assert.equal(result.linterSummary, "Found 2 unfixed issues in 2 files.");
@@ -208,10 +199,7 @@ void test("long single-line slice truncates at 40 characters with no leading spa
   const truncated = "a".repeat(40) + "...";
   assert.equal(
     result.formattedStdout,
-    joinSections([
-      LEGEND,
-      [file, `  1:1-1:45 ${truncated} [eslint(no-unused-vars)]`, "    unused"],
-    ]),
+    joinSections([[file, "  1:1-1:45 unused [eslint(no-unused-vars)]", `    ${truncated}`]]),
   );
 });
 
@@ -240,8 +228,7 @@ void test("multi-line span with first line ≤40 chars gets the ' ...' multi-lin
   assert.equal(
     result.formattedStdout,
     joinSections([
-      LEGEND,
-      [file, "  1:1-3:1 function foo() { ... [eslint(some-rule)]", "    bad function"],
+      [file, "  1:1-3:1 bad function [eslint(some-rule)]", "    function foo() { ..."],
     ]),
   );
 });
@@ -276,7 +263,7 @@ void test("multi-line span with first line >40 chars suppresses the multi-line m
   // lastByte = offset 54 (last non-newline byte of 'more' = 'e'); endLine = 2; endCol = 54 - 51 + 1 = 4.
   assert.equal(
     result.formattedStdout,
-    joinSections([LEGEND, [file, `  1:1-2:4 ${truncated} [eslint(some-rule)]`, "    bad"]]),
+    joinSections([[file, "  1:1-2:4 bad [eslint(some-rule)]", `    ${truncated}`]]),
   );
 });
 
@@ -308,10 +295,7 @@ void test("CRLF source: multi-line span strips the CR before the multi-line mark
   // endCol = 11 - 9 + 1 = 3.
   assert.equal(
     result.formattedStdout,
-    joinSections([
-      LEGEND,
-      [file, "  1:1-2:3 foo bar ... [eslint(some-rule)]", "    multi-line crlf"],
-    ]),
+    joinSections([[file, "  1:1-2:3 multi-line crlf [eslint(some-rule)]", "    foo bar ..."]]),
   );
 });
 
@@ -342,7 +326,7 @@ void test("CRLF source: span ending exactly at CR strips the trailing CR", (t) =
   // truncated = false (length ≤ 40 and no further lines), so location uses `L:C` form.
   assert.equal(
     result.formattedStdout,
-    joinSections([LEGEND, [file, "  1:1 foo [eslint(some-rule)]", "    trailing cr"]]),
+    joinSections([[file, "  1:1 trailing cr [eslint(some-rule)]", "    foo"]]),
   );
 });
 
@@ -374,7 +358,7 @@ void test("UTF-8 multi-byte span resolves byte offsets correctly", (t) => {
   // startLine=1, startCol = 10 - 0 + 1 = 11 (byte-based).
   assert.equal(
     result.formattedStdout,
-    joinSections([LEGEND, [file, "  1:11 'あいう' [eslint(some-rule)]", "    literal"]]),
+    joinSections([[file, "  1:11 literal [eslint(some-rule)]", "    'あいう'"]]),
   );
 });
 
@@ -400,8 +384,7 @@ void test("no-unsafe-* diagnostic triggers the weak-typings hint block", (t) => 
   assert.equal(
     result.formattedStdout,
     joinSections([
-      LEGEND,
-      [file, "  1:7 x = foo [typescript-eslint(no-unsafe-assignment)]", "    Unsafe assignment"],
+      [file, "  1:7 Unsafe assignment [typescript-eslint(no-unsafe-assignment)]", "    x = foo"],
       [
         "Hint on the `no-unsafe-*` diagnostics:",
         "- Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary module with typed wrappers.",
@@ -413,12 +396,11 @@ void test("no-unsafe-* diagnostic triggers the weak-typings hint block", (t) => 
   assert.equal(result.linterSummary, "Found 1 unfixed issue in 1 file.");
 });
 
-void test("tsgolint-style typescript(TS\\d+) code renders raw with message on continuation line", (t) => {
-  // The motivating case for spec 011 §3.3 / §3.4 (2026-04-27 revision):
+void test("tsgolint-style typescript(TS\\d+) code is rendered raw inside the brackets", (t) => {
   // tsgolint emits TypeScript compile errors with `code: typescript(TS<NNNN>)`. The whole `code`
   // is passed through as the error-code (no inner-paren extraction), preserving the `typescript`
-  // plugin prefix. The continuation line carries the actual diagnostic content, since the bare
-  // numeric `TS2591` is opaque on its own.
+  // plugin prefix. The bare numeric `TS2591` is opaque on its own, so the head-line message
+  // carries the actual diagnostic content.
   const dir = setupFixture(t, { "x.ts": "import 'node:fs';\n" });
   const file = join(dir, "x.ts");
   const stdout = makeStdout([
@@ -440,14 +422,11 @@ void test("tsgolint-style typescript(TS\\d+) code renders raw with message on co
 
   assert.equal(
     result.formattedStdout,
-    joinSections([
-      LEGEND,
-      [file, "  1:9 node:fs [typescript(TS2591)]", "    Cannot find name 'node:fs'."],
-    ]),
+    joinSections([[file, "  1:9 Cannot find name 'node:fs'. [typescript(TS2591)]", "    node:fs"]]),
   );
 });
 
-void test("newlines in message are collapsed to single spaces on the continuation line", (t) => {
+void test("newlines in message are collapsed to single spaces on the head line", (t) => {
   const dir = setupFixture(t, { "x.ts": "debugger;\n" });
   const file = join(dir, "x.ts");
   const stdout = makeStdout([
@@ -469,13 +448,12 @@ void test("newlines in message are collapsed to single spaces on the continuatio
   assert.equal(
     result.formattedStdout,
     joinSections([
-      LEGEND,
-      [file, "  1:1 debugger [eslint(no-debugger)]", "    first line second line third line"],
+      [file, "  1:1 first line second line third line [eslint(no-debugger)]", "    debugger"],
     ]),
   );
 });
 
-void test("diagnostic without `code` renders as [parse-error] with message on continuation line", (t) => {
+void test("diagnostic without `code` renders as [parse-error]", (t) => {
   const dir = setupFixture(t, { "x.ts": "const x = ;\n" });
   const file = join(dir, "x.ts");
   const stdout = makeStdout([
@@ -496,7 +474,7 @@ void test("diagnostic without `code` renders as [parse-error] with message on co
 
   assert.equal(
     result.formattedStdout,
-    joinSections([LEGEND, [file, "  1:11 ; [parse-error]", "    Unexpected token"]]),
+    joinSections([[file, "  1:11 Unexpected token [parse-error]", "    ;"]]),
   );
 });
 
@@ -878,7 +856,7 @@ void test("entry with explicit null `code` (and valid `message`) renders the par
   assert.equal(result.schemaMismatch, null);
   assert.equal(
     result.formattedStdout,
-    joinSections([LEGEND, [file, "  1:11 ; [parse-error]", "    Unexpected token"]]),
+    joinSections([[file, "  1:11 Unexpected token [parse-error]", "    ;"]]),
   );
 });
 
@@ -934,7 +912,7 @@ void test("unreadable source file falls back to placeholder slice and reported L
 
   assert.equal(
     result.formattedStdout,
-    joinSections([LEGEND, [file, "  3:5 <unreadable> [eslint(no-debugger)]", "    something"]]),
+    joinSections([[file, "  3:5 something [eslint(no-debugger)]", "    <unreadable>"]]),
   );
   assert.equal(result.linterSummary, "Found 1 unfixed issue in 1 file.");
 });
@@ -960,7 +938,7 @@ void test("out-of-bounds span falls back to placeholder", (t) => {
 
   assert.equal(
     result.formattedStdout,
-    joinSections([LEGEND, [file, "  1:1 <unreadable> [eslint(no-debugger)]", "    oob"]]),
+    joinSections([[file, "  1:1 oob [eslint(no-debugger)]", "    <unreadable>"]]),
   );
 });
 
