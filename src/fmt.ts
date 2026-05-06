@@ -44,17 +44,12 @@ export interface FmtPhaseContext {
 export interface FmtPhaseResult {
   /** oxfmt's exit code. */
   status: number;
-
-  /** True iff this phase wrote anything to the logger. */
-  emitted: boolean;
 }
 
 /**
  * Run the format phase: spawn oxfmt against `opts.targets` under `ctx.cwd`.
- *
- * Per ADR-0006, format is auxiliary: nothing is written on success
- * (no banner, no relayed text). Only formatter failures surface;
- * on a non-zero exit the banner and the captured output go to stderr together.
+ * On success, emits nothing. On a non-zero exit, relays oxfmt's captured
+ * output to stderr verbatim.
  *
  * @throws {LintJsError} on launch failure or signal-driven termination
  *   (propagated from `runToolCapturingCombined`).
@@ -74,11 +69,9 @@ export function runFmtPhase(opts: FmtPhaseOptions, ctx: FmtPhaseContext): FmtPha
   });
 
   if (result.status === 0) {
-    return { status: 0, emitted: false };
+    return { status: 0 };
   }
 
-  const label = check ? "formatting (check-only)" : "formatting";
-  logger.writeErr(`${label}...\n`);
   logger.writeErr(captured);
-  return { status: result.status ?? 0, emitted: true };
+  return { status: result.status ?? 0 };
 }

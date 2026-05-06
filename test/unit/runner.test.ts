@@ -87,7 +87,7 @@ void test("snapshot: --check reports both fmt and lint violations without rewrit
   matchSnapshot("basic-check", events, exitCode);
 });
 
-void test("snapshot: --check on a clean project emits the success banner", (t) => {
+void test("snapshot: --check on a clean project", (t) => {
   const dir = copyFixture("with-node-modules");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const { events, exitCode } = runRecording(dir, {

@@ -1,5 +1,2 @@
-ERR linting (no auto-fix)...
-ERR linting (no auto-fix): clean.
-ERR
 ERR lint-js: Completed successfully. No issues found.
 EXIT 0

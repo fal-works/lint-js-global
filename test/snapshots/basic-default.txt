@@ -1,4 +1,3 @@
-ERR linting (with auto-fix)...
 OUT src/index.ts
 OUT   5:1 Promises must be awaited, add void operator to ignore. [typescript-eslint(no-floating-promises)]
 OUT     foo();

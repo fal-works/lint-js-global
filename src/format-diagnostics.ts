@@ -207,8 +207,6 @@ export function formatLintOutput({
   const formattedStdout = `${sections.map((s) => s.join("\n")).join("\n\n")}\n`;
   const issueWord = resolved.length === 1 ? "issue" : "issues";
   const fileWord = fileGroups.size === 1 ? "file" : "files";
-  // Phrased as a fragment (no verb): the trailing "lint-js: ..." banner already supplies
-  // the verb ("issues remain" / "fixes required"), so repeating it here would be redundant.
   const qualifier = check ? "" : "unfixed ";
   const linterSummary = `${resolved.length} ${qualifier}${issueWord} in ${fileGroups.size} ${fileWord}.`;
   return { formattedStdout, linterSummary, schemaMismatch: null, noFilesMatched: false };

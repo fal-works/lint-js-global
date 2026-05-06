@@ -97,13 +97,24 @@ interface Recorder {
  * cross-stream call order.
  *
  * `writeOut` / `writeErr` arguments are split on `"\n"` and pushed line-by-line.
- * A trailing `"\n"` (closing the last line) is stripped before splitting; an empty
- * call (no `"\n"` at all) records nothing.
+ * A trailing `"\n"` (closing the last line) is stripped before splitting;
+ * an empty call (no `"\n"` at all) records nothing.
+ * Empty arguments are no-ops.
  */
 function createRecordingLogger(): Recorder {
   const events: RecordedEvent[] = [];
+  let hasWritten = false;
+  let pendingBlank = false;
+
+  const flushPending = (): void => {
+    if (pendingBlank && hasWritten) events.push({ stream: "err", line: "" });
+    pendingBlank = false;
+  };
+
   const pushLines = (stream: "out" | "err", msg: string): void => {
     if (msg === "") return;
+    flushPending();
+    hasWritten = true;
     const parts = msg.split("\n");
     if (msg.endsWith("\n")) parts.pop();
     for (const line of parts) events.push({ stream, line });
@@ -116,8 +127,13 @@ function createRecordingLogger(): Recorder {
       pushLines("err", msg);
     },
     writeErrTagged(headline, ...details) {
+      flushPending();
+      hasWritten = true;
       events.push({ stream: "err", line: `lint-js: ${headline}` });
       for (const detail of details) events.push({ stream: "err", line: `  ${detail}` });
+    },
+    markBlankSeparator() {
+      pendingBlank = true;
     },
   };
   return { logger, events };

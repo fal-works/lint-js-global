@@ -24,7 +24,7 @@ Target paths themselves may point anywhere.
 ### Options
 
 - `--check` verifies formatting and lint without rewriting files.
-- `--format-only` runs only the format phase; the lint phase (and its banners) is skipped entirely.
+- `--format-only` runs only the format phase; the lint phase is skipped entirely.
 - `--lint-only` is the symmetric counterpart (runs only the lint phase).
 - `--unix` emits oxlint's `--format=unix` output on stdout instead of the default LLM-friendly layout.
 
@@ -41,7 +41,7 @@ Each tool's standard ignore files (like `.gitignore`) are respected.
 ### Output
 
 stdout carries lint-result text only, so it can be piped into another tool without further filtering.
-The lint phase banner, the issue-count summary, and the final tagged status line all go to stderr.
+The issue-count summary and the final tagged status line go to stderr.
 The format phase is silent on success; only formatter failures surface as stderr output.
 
 Default lint output groups diagnostics per file.

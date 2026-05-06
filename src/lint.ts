@@ -51,16 +51,11 @@ export interface LintPhaseContext {
 export interface LintPhaseResult {
   /** oxlint's exit code, normalized: a no-files-matched signal collapses to 0. */
   status: number;
-
-  /** True iff this phase wrote anything to the logger. */
-  emitted: boolean;
 }
 
 /**
  * Run the lint phase: spawn oxlint, parse its JSON stdout via {@link formatLintOutput},
- * and emit progress / diagnostics / per-run summary through `ctx.logger`.
- *
- * Per ADR-0006, lint is primary: the phase always emits (at minimum the banner).
+ * and emit diagnostics plus linter summary through `ctx.logger`.
  *
  * @throws {LintJsError} on launch failure, signal-driven termination,
  *   or oxlint output-contract mismatch.
@@ -70,8 +65,6 @@ export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): Lin
   const { cwd, logger } = ctx;
 
   const oxlintBin = resolvePackageBin("oxlint", "oxlint");
-  const label = check ? "linting (no auto-fix)" : "linting (with auto-fix)";
-  logger.writeErr(`${label}...\n`);
 
   const { result, capturedStdout, capturedStderr } = runToolCapturingOutput({
     name: "oxlint",
@@ -108,9 +101,9 @@ export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): Lin
 
   // oxlint ≥1.61 exits non-zero when no files match the targets; treat that as clean.
   const cleanish = result.status === 0 || noFilesMatched;
-  if (cleanish) logger.writeErr(`${label}: clean.\n`);
   if (linterSummary !== null) {
-    logger.writeErr(`\n${linterSummary}\n`);
+    logger.markBlankSeparator();
+    logger.writeErr(`${linterSummary}\n`);
   }
-  return { status: cleanish ? 0 : (result.status ?? 0), emitted: true };
+  return { status: cleanish ? 0 : (result.status ?? 0) };
 }

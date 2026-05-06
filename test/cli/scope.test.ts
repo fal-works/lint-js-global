@@ -59,14 +59,11 @@ void test("--check + fully-ignored target: fmt phase stays silent on success (AD
   // (oxfmt exits 0 thanks to --no-error-on-unmatched-pattern).
   assert.doesNotMatch(
     result.stderr,
-    /^formatting/m,
-    "fmt-phase banner must not fire when oxfmt exits 0",
-  );
-  assert.doesNotMatch(
-    result.stderr,
     /No files found matching the given patterns/,
     "oxfmt's own zero-match line must not surface when the phase succeeded",
   );
+  assert.equal(result.stdout, "", "stdout must stay empty when no fmt/lint output applies");
+  assert.match(result.stderr, /^lint-js: Completed successfully\. No issues found\.$/m);
 });
 
 void test("target dir with no lintable files exits cleanly", (t) => {

@@ -66,9 +66,6 @@ function buildSummary({ check, fmtStatus, lintStatus }: BuildSummaryOptions): st
  * Execute the format and lint phases against `args.targets` under `ctx.cwd`,
  * writing user-facing output through `ctx.logger`. Returns the process exit code.
  *
- * The format phase is silent on success (ADR-0006); only lint output and the
- * end-of-run summary are emitted in the common clean case.
- *
  * Exit codes follow the wrapper-wide convention (see `src/cli.ts`):
  * 0 success, 1 fmt/lint findings remain, 2 reserved for {@link LintJsError}.
  *
@@ -98,22 +95,19 @@ export function run(args: RunArgs, ctx: RunContext): number {
 
   let fmtStatus: number | null = null;
   let lintStatus: number | null = null;
-  let emittedAny = false;
 
   if (!lintOnly) {
     const r = runFmtPhase({ check, targets, ignorePatterns }, phaseCtx);
     fmtStatus = r.status;
-    emittedAny ||= r.emitted;
   }
 
   if (!formatOnly) {
-    if (emittedAny) logger.writeErr("\n");
+    logger.markBlankSeparator();
     const r = runLintPhase({ check, unix, targets, ignorePatterns }, phaseCtx);
     lintStatus = r.status;
-    emittedAny ||= r.emitted;
   }
 
-  if (emittedAny) logger.writeErr("\n");
+  logger.markBlankSeparator();
   logger.writeErrTagged(buildSummary({ check, fmtStatus, lintStatus }));
 
   // Collapse any non-zero child status to 1; exit 2 is reserved for LintJsError.

@@ -1,4 +1,3 @@
-ERR linting (with auto-fix)...
 OUT src/index.ts
 OUT   1:7 Unsafe assignment of an any value. [typescript-eslint(no-unsafe-assignment)]
 OUT     data = JSON.parse("{}")

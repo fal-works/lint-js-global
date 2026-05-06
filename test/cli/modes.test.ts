@@ -71,7 +71,6 @@ void test("--unix: oxlint unix output passes through, no issue-count summary or 
     /weak-typings\.md/,
     "hint block must be suppressed under --unix",
   );
-  assert.match(result.stderr, /^linting \(with auto-fix\)\.\.\.$/m);
   assert.match(result.stderr, /^lint-js: Failed\./m);
 });
 
@@ -90,11 +89,7 @@ void test("oxfmt failure propagates to exit code even when lint is clean", (t) =
   // any non-zero child status must collapse to 1 (fmt/lint findings).
   assert.equal(result.status, 1, "oxfmt parse-error exit must be normalized to 1");
   // ADR-0006 silences the fmt phase only on success; a failure must surface.
-  assert.match(
-    result.stderr,
-    /^formatting\.\.\.$/m,
-    "fmt-phase banner must fire when oxfmt exits non-zero",
-  );
+  assert.match(result.stderr, /Unexpected token/, "oxfmt parse error must surface");
 });
 
 void test("--check: does not modify files and reports both fmt and lint violations", (t) => {
@@ -163,17 +158,7 @@ void test("--format-only: runs fmt phase, skips lint phase entirely", (t) => {
     /no-floating-promises/,
     "lint diagnostics must not appear under --format-only",
   );
-  assert.doesNotMatch(
-    result.stderr,
-    /^linting/m,
-    "lint phase banner must not appear under --format-only",
-  );
   // ADR-0006: even when fmt is the only phase, success means silent fmt output.
-  assert.doesNotMatch(
-    result.stderr,
-    /^formatting/m,
-    "fmt phase banner must not appear on success even under --format-only",
-  );
   assert.doesNotMatch(
     result.stderr,
     /Finished in/,
@@ -199,11 +184,6 @@ void test("--lint-only: runs lint phase, skips fmt phase entirely", (t) => {
     /Finished in .* on .* files using .* threads\./,
     "oxfmt summary must not appear under --lint-only (fmt phase skipped)",
   );
-  assert.doesNotMatch(
-    result.stderr,
-    /^formatting/m,
-    "fmt phase banner must not appear under --lint-only",
-  );
   // Asserting bytes-equal is meaningful only because the basic fixture has
   // formatting violations oxfmt would otherwise rewrite.
   assert.equal(
@@ -227,10 +207,5 @@ void test("--format-only and --lint-only are mutually exclusive", (t) => {
     result.stderr,
     /no package\.json/,
     "argument validation should fail before the package.json check",
-  );
-  assert.doesNotMatch(
-    result.stderr,
-    /^formatting/m,
-    "no phase banner should be emitted before the validation error",
   );
 });
