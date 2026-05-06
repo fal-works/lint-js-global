@@ -6,7 +6,7 @@ date: 2026-05-06
 
 ## Context and Problem Statement
 
-Per ADR-0005, default mode runs `oxfmt` twice. A co-equal presentation would flank the lint phase with two format banners and two blocks of formatter output, forcing the consumer to skim past chatter to reach the actionable signal.
+Per ADR-0005, default mode runs `oxfmt` twice when it succeeds. A co-equal presentation would flank the lint phase with two format banners and two blocks of formatter output, forcing the consumer to skim past chatter to reach the actionable signal.
 
 The existing `--unix` flag is shaped for lint output (VS Code terminal link detection) and has no formatter equivalent. Format output has never been a channel consumers act on.
 
