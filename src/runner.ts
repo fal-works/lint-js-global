@@ -78,6 +78,8 @@ function buildSummary({
  *
  * Default mode runs `oxfmt` → `oxlint` → `oxfmt` (ADR-0005).
  * A fatal failure in the leading fmt pass halts the run, skipping lint and the trailing pass.
+ * The trailing pass is also skipped when lint findings remain, so reported `L:C` positions
+ * match the file the consumer opens next.
  *
  * `--check` runs only the leading fmt pass before lint.
  * `--format-only` and `--lint-only` collapse to a single phase as named.
@@ -126,10 +128,11 @@ export function run(args: RunArgs, ctx: RunContext): number {
     lint = runLintPhase({ check, unix, targets, ignorePatterns }, phaseCtx);
   }
 
-  // Trailing pass: default mode only, after a successful leading + lint flow. Its job is
-  // to normalize any drift introduced by `oxlint --fix`; in `--check` lint applies no
-  // fixes, so the leading pass is sufficient.
-  if (!lintOnly && !formatOnly && !check && !halted) {
+  // Trailing pass: default mode only, after the leading pass and lint both succeed. Its
+  // job is to normalize any drift introduced by `oxlint --fix`. Skipped when lint findings
+  // remain, so reported `L:C` positions match the file the consumer opens next; in
+  // `--check` lint applies no fixes, so the leading pass is sufficient.
+  if (!lintOnly && !formatOnly && !check && !halted && lint?.kind === "ok") {
     logger.markBlankSeparator();
     trailingFmt = runFmtPhase({ check: false, targets, ignorePatterns }, phaseCtx);
   }

@@ -1,0 +1,5 @@
+{
+  "name": "lint-fix-position-stability-fixture",
+  "private": true,
+  "type": "module"
+}

@@ -23,10 +23,12 @@ Chosen option: **format around lint**, because it gives both location accuracy a
 
 A fatal failure in the leading pass (e.g. a parse error) halts the run; lint and the trailing pass are skipped.
 
+The trailing pass also skips when lint findings remain. This keeps lint `L:C` locations valid against the file the consumer opens next; any auto-fix drift left in the file is normalized by the leading pass on the next run.
+
 `--check` runs only the leading pass; lint applies no fixes there.
 
 ### Consequences
 
 - Good, because lint `L:C` locations always reference the file the consumer opens next.
 - Good, because exit 0 strictly means lint-clean and format-clean.
-- Bad, because format runs twice in default mode. The runtime cost is negligible; the log-noise cost is addressed in ADR-0006.
+- Bad, because format runs twice when default mode succeeds. The runtime cost is negligible; the log-noise cost is addressed in ADR-0006.

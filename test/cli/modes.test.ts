@@ -244,6 +244,25 @@ void test("default mode: trailing fmt normalizes drift left by oxlint --fix (ADR
   assert.ok(after.includes(`import type { ExampleType } from "./types.ts";`));
 });
 
+void test("default mode: trailing fmt is skipped when lint findings remain so L:C matches final file (ADR-0005)", (t) => {
+  const dir = copyFixture("lint-fix-position-stability");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const result = runCli(dir);
+
+  assert.equal(result.status, 1, "expected exit 1 from unfixed lint error");
+  // Locate the diagnostic head line "  L:C ..." emitted by the JSON formatter.
+  const match = result.stdout.match(/^ {2}(\d+):(\d+) /m);
+  assert.ok(match, "expected a diagnostic head line with an L:C prefix");
+  const line = Number(match[1]);
+  const finalLines = readFileSync(join(dir, "src", "index.ts"), "utf8").split("\n");
+  assert.equal(
+    finalLines[line - 1],
+    "f();",
+    `diagnostic line ${line} must point at "f();" in the file the consumer opens next`,
+  );
+});
+
 void test("--lint-only: drift left by oxlint --fix is preserved (no trailing fmt)", (t) => {
   const dir = copyFixture("lint-fix-drift");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
