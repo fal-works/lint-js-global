@@ -89,6 +89,12 @@ void test("oxfmt failure propagates to exit code even when lint is clean", (t) =
   // oxfmt itself returns 2 on parse errors, but lint-js reserves 2 for LintJsError;
   // any non-zero child status must collapse to 1 (fmt/lint findings).
   assert.equal(result.status, 1, "oxfmt parse-error exit must be normalized to 1");
+  // ADR-0006 silences the fmt phase only on success; a failure must surface.
+  assert.match(
+    result.stderr,
+    /^formatting\.\.\.$/m,
+    "fmt-phase banner must fire when oxfmt exits non-zero",
+  );
 });
 
 void test("--check: does not modify files and reports both fmt and lint violations", (t) => {
@@ -162,6 +168,18 @@ void test("--format-only: runs fmt phase, skips lint phase entirely", (t) => {
     /^linting/m,
     "lint phase banner must not appear under --format-only",
   );
+  // ADR-0006: even when fmt is the only phase, success means silent fmt output.
+  assert.doesNotMatch(
+    result.stderr,
+    /^formatting/m,
+    "fmt phase banner must not appear on success even under --format-only",
+  );
+  assert.doesNotMatch(
+    result.stderr,
+    /Finished in/,
+    "oxfmt's own summary must not surface on success",
+  );
+  assert.equal(result.stdout, "", "stdout must stay empty under --format-only on success");
   assert.match(result.stderr, /^lint-js: Completed successfully\. Issues fixed where possible\.$/m);
 });
 

@@ -1,23 +1,10 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { buildOxfmtArgs } from "./fmt.ts";
-import { formatLintOutput } from "./format-diagnostics.ts";
+import { runFmtPhase } from "./fmt.ts";
 import { getSystemIgnorePatterns } from "./ignore.ts";
-import { buildOxlintArgs } from "./lint.ts";
+import { runLintPhase } from "./lint.ts";
 import { LintJsError, type Logger } from "./log.ts";
-import { resolvePackageBin } from "./package-info.ts";
-import {
-  NODE_MODULES_BIN,
-  OXFMT_CONFIG,
-  OXLINT_CONFIG,
-  WEAK_TYPINGS_DOC,
-} from "./package-paths.ts";
-import {
-  buildPathInjectedEnv,
-  runToolCapturingCombined,
-  runToolCapturingOutput,
-} from "./run-tool.ts";
 
 /** Run-mode arguments. */
 export interface RunArgs {
@@ -79,6 +66,9 @@ function buildSummary({ check, fmtStatus, lintStatus }: BuildSummaryOptions): st
  * Execute the format and lint phases against `args.targets` under `ctx.cwd`,
  * writing user-facing output through `ctx.logger`. Returns the process exit code.
  *
+ * The format phase is silent on success (ADR-0006); only lint output and the
+ * end-of-run summary are emitted in the common clean case.
+ *
  * Exit codes follow the wrapper-wide convention (see `src/cli.ts`):
  * 0 success, 1 fmt/lint findings remain, 2 reserved for {@link LintJsError}.
  *
@@ -97,84 +87,33 @@ export function run(args: RunArgs, ctx: RunContext): number {
     });
   }
 
-  const ignorePatterns = getSystemIgnorePatterns(cwd);
-
   for (const target of targets) {
     if (!existsSync(resolve(cwd, target))) {
       throw new LintJsError(`target not found: ${target}`);
     }
   }
 
-  const runFmt = !lintOnly;
-  const runLint = !formatOnly;
+  const ignorePatterns = getSystemIgnorePatterns(cwd);
+  const phaseCtx = { cwd, logger };
 
   let fmtStatus: number | null = null;
-  if (runFmt) {
-    const oxfmtBin = resolvePackageBin("oxfmt", "oxfmt");
-    const fmtLabel = check ? "formatting (check-only)" : "formatting";
-    logger.writeErr(`${fmtLabel}...\n`);
-    // Combined capture: oxfmt's output is auxiliary text routed to stderr as a single block,
-    // so capturing the streams together preserves the child's natural emission order.
-    const { result: fmtResult, captured: fmtOutput } = runToolCapturingCombined({
-      name: "oxfmt",
-      bin: oxfmtBin,
-      args: buildOxfmtArgs(OXFMT_CONFIG, ignorePatterns, targets, check),
-      cwd,
-    });
-    logger.writeErr(fmtOutput);
-    // No fmt completion banner: oxfmt prints its own summary and ours would duplicate.
-    fmtStatus = fmtResult.status;
-  }
-
-  if (runFmt && runLint) logger.writeErr("\n");
-
   let lintStatus: number | null = null;
-  if (runLint) {
-    const oxlintBin = resolvePackageBin("oxlint", "oxlint");
-    const lintLabel = check ? "linting (no auto-fix)" : "linting (with auto-fix)";
-    logger.writeErr(`${lintLabel}...\n`);
-    const {
-      result: lintResult,
-      capturedStdout: lintStdout,
-      capturedStderr: lintStderr,
-    } = runToolCapturingOutput({
-      name: "oxlint",
-      bin: oxlintBin,
-      args: buildOxlintArgs(OXLINT_CONFIG, ignorePatterns, targets, check, unix),
-      cwd,
-      env: buildPathInjectedEnv(NODE_MODULES_BIN),
-    });
-    logger.writeErr(lintStderr);
-    const { formattedStdout, linterSummary, schemaMismatch, noFilesMatched } = formatLintOutput({
-      capturedStdout: lintStdout,
-      check,
-      unix,
-      weakTypingsDocPath: WEAK_TYPINGS_DOC,
-      cwd,
-    });
-    if (noFilesMatched) {
-      // oxlint ≥1.61 emits "No files found to lint." on stdout when no files match;
-      // rewrite it to stderr so stdout stays clean for downstream consumers.
-      logger.writeErr("No files found to lint.\n");
-    } else {
-      logger.writeOut(formattedStdout);
-    }
-    if (schemaMismatch !== null) {
-      // Raw stdout was relayed above; route the contract failure through LintJsError.
-      throw new LintJsError("oxlint output contract mismatch.", {
-        details: [schemaMismatch.reason, "Raw payload relayed to stdout above."],
-      });
-    }
-    // oxlint ≥1.61 exits non-zero when no files match the targets; treat that as clean.
-    const lintCleanish = lintResult.status === 0 || noFilesMatched;
-    if (lintCleanish) logger.writeErr(`${lintLabel}: clean.\n`);
-    if (linterSummary !== null) {
-      logger.writeErr(`\n${linterSummary}\n`);
-    }
-    lintStatus = lintCleanish ? 0 : lintResult.status;
+  let emittedAny = false;
+
+  if (!lintOnly) {
+    const r = runFmtPhase({ check, targets, ignorePatterns }, phaseCtx);
+    fmtStatus = r.status;
+    emittedAny ||= r.emitted;
   }
 
-  logger.writeErr("\n");
+  if (!formatOnly) {
+    if (emittedAny) logger.writeErr("\n");
+    const r = runLintPhase({ check, unix, targets, ignorePatterns }, phaseCtx);
+    lintStatus = r.status;
+    emittedAny ||= r.emitted;
+  }
+
+  if (emittedAny) logger.writeErr("\n");
   logger.writeErrTagged(buildSummary({ check, fmtStatus, lintStatus }));
 
   // Collapse any non-zero child status to 1; exit 2 is reserved for LintJsError.

@@ -44,7 +44,7 @@ void test("fully-ignored single-file target exits cleanly", (t) => {
   assert.match(result.stderr, /^lint-js: Completed successfully\. Issues fixed where possible\.$/m);
 });
 
-void test("--check + fully-ignored target: fmt phase label still fires", (t) => {
+void test("--check + fully-ignored target: fmt phase stays silent on success (ADR-0006)", (t) => {
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -55,12 +55,17 @@ void test("--check + fully-ignored target: fmt phase label still fires", (t) => 
   const result = runCli(dir, ["--check", "src/ignored.ts"]);
 
   assert.equal(result.status, 0, "expected exit 0 when the only target is ignored");
-  // Without an unconditional fmt phase label, --check zero-match would leave no fmt-phase
-  // marker on stderr.
-  assert.match(
+  // Per ADR-0006 the fmt phase is silent on success, including the zero-match case
+  // (oxfmt exits 0 thanks to --no-error-on-unmatched-pattern).
+  assert.doesNotMatch(
     result.stderr,
-    /^formatting \(check-only\)\.\.\.$/m,
-    "fmt-phase banner must fire under --check even with zero-match targets",
+    /^formatting/m,
+    "fmt-phase banner must not fire when oxfmt exits 0",
+  );
+  assert.doesNotMatch(
+    result.stderr,
+    /No files found matching the given patterns/,
+    "oxfmt's own zero-match line must not surface when the phase succeeded",
   );
 });
 

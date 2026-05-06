@@ -1,3 +1,8 @@
+import type { Logger } from "./log.ts";
+import { resolvePackageBin } from "./package-info.ts";
+import { OXFMT_CONFIG } from "./package-paths.ts";
+import { runToolCapturingCombined } from "./run-tool.ts";
+
 /**
  * Build CLI args for oxfmt.
  *
@@ -23,4 +28,57 @@ export function buildOxfmtArgs(
     ...targets,
     ...ignorePatterns.map((pattern) => `!${pattern}`),
   ];
+}
+
+export interface FmtPhaseOptions {
+  check: boolean;
+  targets: readonly string[];
+  ignorePatterns: readonly string[];
+}
+
+export interface FmtPhaseContext {
+  cwd: string;
+  logger: Logger;
+}
+
+export interface FmtPhaseResult {
+  /** oxfmt's exit code. */
+  status: number;
+
+  /** True iff this phase wrote anything to the logger. */
+  emitted: boolean;
+}
+
+/**
+ * Run the format phase: spawn oxfmt against `opts.targets` under `ctx.cwd`.
+ *
+ * Per ADR-0006, format is auxiliary: nothing is written on success
+ * (no banner, no relayed text). Only formatter failures surface;
+ * on a non-zero exit the banner and the captured output go to stderr together.
+ *
+ * @throws {LintJsError} on launch failure or signal-driven termination
+ *   (propagated from `runToolCapturingCombined`).
+ */
+export function runFmtPhase(opts: FmtPhaseOptions, ctx: FmtPhaseContext): FmtPhaseResult {
+  const { check, targets, ignorePatterns } = opts;
+  const { cwd, logger } = ctx;
+
+  const oxfmtBin = resolvePackageBin("oxfmt", "oxfmt");
+  // Combined capture: oxfmt's output is auxiliary text routed to stderr as a single block,
+  // so capturing the streams together preserves the child's natural emission order.
+  const { result, captured } = runToolCapturingCombined({
+    name: "oxfmt",
+    bin: oxfmtBin,
+    args: buildOxfmtArgs(OXFMT_CONFIG, ignorePatterns, targets, check),
+    cwd,
+  });
+
+  if (result.status === 0) {
+    return { status: 0, emitted: false };
+  }
+
+  const label = check ? "formatting (check-only)" : "formatting";
+  logger.writeErr(`${label}...\n`);
+  logger.writeErr(captured);
+  return { status: result.status ?? 0, emitted: true };
 }

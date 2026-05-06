@@ -41,7 +41,8 @@ Each tool's standard ignore files (like `.gitignore`) are respected.
 ### Output
 
 stdout carries lint-result text only, so it can be piped into another tool without further filtering.
-Phase banners, oxfmt output, the issue-count summary, and the final tagged status line all go to stderr.
+The lint phase banner, the issue-count summary, and the final tagged status line all go to stderr.
+The format phase is silent on success; only formatter failures surface as stderr output.
 
 Default lint output groups diagnostics per file.
 Each diagnostic occupies two lines: a head line with the byte-accurate location (`L:C` or `L:C-L:C`), the diagnostic message, and the bracketed error code; followed by a continuation line carrying the exact source-code slice the rule points at.

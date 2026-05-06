@@ -1,9 +1,3 @@
-ERR formatting (check-only)...
-ERR Checking formatting...
-ERR
-ERR All matched files use the correct format.
-ERR Finished in <DUR>ms on <N> files using <T> threads.
-ERR
 ERR linting (no auto-fix)...
 ERR linting (no auto-fix): clean.
 ERR
