@@ -113,9 +113,10 @@ void test("--check: fatal oxfmt failure halts the run before lint", (t) => {
   );
 });
 
-void test("--format-only: fatal oxfmt failure does not trigger halt summary", (t) => {
+void test("--format-only: fatal oxfmt failure surfaces a fmt-specific failure summary", (t) => {
   // Halt's purpose is to suppress duplicate parse-error output across phases; with no
   // downstream phase, it has nothing to suppress and falls through to a regular failure.
+  // The summary uses fmt-specific wording so a parse error is not misread as a lint issue.
   const dir = copyFixture("with-node-modules");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -126,9 +127,11 @@ void test("--format-only: fatal oxfmt failure does not trigger halt summary", (t
   assert.equal(result.status, 1, "fmt-only fmt failure still exits 1");
   assert.match(result.stderr, /Unexpected token/);
   assert.doesNotMatch(result.stderr, /Halted\./, "halt summary must not fire under --format-only");
-  assert.match(
+  assert.match(result.stderr, /^lint-js: Failed\. Format errors remain\.$/m);
+  assert.doesNotMatch(
     result.stderr,
-    /^lint-js: Failed\. Issues fixed where possible; unfixed issues remain\.$/m,
+    /Issues fixed where possible/,
+    "the lint-flavored failure wording must not appear under --format-only",
   );
 });
 

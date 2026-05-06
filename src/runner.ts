@@ -26,6 +26,7 @@ export interface RunContext {
 
 interface BuildSummaryOptions {
   check: boolean;
+  formatOnly: boolean;
 
   /** True when the leading fmt phase halted the run; lint and trailing fmt were skipped. */
   halted: boolean;
@@ -43,12 +44,16 @@ interface BuildSummaryOptions {
 /**
  * Pick the one-line summary emitted after the run finishes.
  *
- * Halted runs get a dedicated summary.
+ * Halted runs and non-check `--format-only` failures get dedicated summaries; the latter has
+ * no lint phase and applies no fixes when it fails (the only failure mode is a parse error
+ * in the leading pass), so the generic "fixed where possible; unfixed issues remain" wording
+ * would misrepresent a fmt-only failure as a lint issue.
  * Otherwise the verdict is binary; which phase failed is readable from tool output above,
  * so the summary only conveys overall outcome and whether fixes may have been applied.
  */
 function buildSummary({
   check,
+  formatOnly,
   halted,
   leadingFmt,
   lint,
@@ -62,6 +67,9 @@ function buildSummary({
     (trailingFmt === null || trailingFmt.kind === "ok");
   const lintOk = lint === null || lint.kind === "ok";
   const ok = fmtOk && lintOk;
+  if (formatOnly && !check && !ok) {
+    return "Failed. Format errors remain.";
+  }
   if (check) {
     return ok
       ? "Completed successfully. No issues found."
@@ -138,7 +146,7 @@ export function run(args: RunArgs, ctx: RunContext): number {
   }
 
   logger.markBlankSeparator();
-  logger.writeErrTagged(buildSummary({ check, halted, leadingFmt, lint, trailingFmt }));
+  logger.writeErrTagged(buildSummary({ check, formatOnly, halted, leadingFmt, lint, trailingFmt }));
 
   // Collapse any non-`ok` outcome to exit 1; exit 2 is reserved for LintJsError.
   const fmtFailed =
