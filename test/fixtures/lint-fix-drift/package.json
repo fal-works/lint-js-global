@@ -1,0 +1,5 @@
+{
+  "name": "lint-fix-drift-fixture",
+  "private": true,
+  "type": "module"
+}

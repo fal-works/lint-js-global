@@ -48,10 +48,13 @@ export interface LintPhaseContext {
   logger: Logger;
 }
 
-export interface LintPhaseResult {
-  /** oxlint's exit code, normalized: a no-files-matched signal collapses to 0. */
-  status: number;
-}
+/**
+ * Outcome of a single oxlint invocation.
+ *
+ * - `ok`: oxlint exited 0, or returned the no-files-matched signal that collapses to clean.
+ * - `findings`: oxlint reported diagnostics that remain after `--fix` (or in `--check` mode).
+ */
+export type LintPhaseOutcome = { kind: "ok" } | { kind: "findings" };
 
 /**
  * Run the lint phase: spawn oxlint, parse its JSON stdout via {@link formatLintOutput},
@@ -60,7 +63,7 @@ export interface LintPhaseResult {
  * @throws {LintJsError} on launch failure, signal-driven termination,
  *   or oxlint output-contract mismatch.
  */
-export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): LintPhaseResult {
+export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): LintPhaseOutcome {
   const { check, unix, targets, ignorePatterns } = opts;
   const { cwd, logger } = ctx;
 
@@ -105,5 +108,5 @@ export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): Lin
     logger.markBlankSeparator();
     logger.writeErr(`${linterSummary}\n`);
   }
-  return { status: cleanish ? 0 : (result.status ?? 0) };
+  return cleanish ? { kind: "ok" } : { kind: "findings" };
 }

@@ -129,3 +129,17 @@ void test("snapshot: --unix with fully-ignored target keeps stdout empty", (t) =
   });
   matchSnapshot("unix-no-files", events, exitCode);
 });
+
+void test("snapshot: fatal fmt failure halts before lint", (t) => {
+  const dir = copyFixture("with-node-modules");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(join(dir, "broken.ts"), "const x = ;\n");
+  const { events, exitCode } = runRecording(dir, {
+    check: false,
+    unix: false,
+    formatOnly: false,
+    lintOnly: false,
+    targets: DEFAULT_TARGETS,
+  });
+  matchSnapshot("halt-fmt-fatal", events, exitCode);
+});

@@ -1,0 +1,10 @@
+ERR
+ERR   x Unexpected token
+ERR    ,-[broken.ts:1:11]
+ERR  1 | const x = ;
+ERR    :           ^
+ERR    `----
+ERR Error occurred when checking code style in the above files.
+ERR
+ERR lint-js: Halted. Resolve format errors above and re-run.
+EXIT 1

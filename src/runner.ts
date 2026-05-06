@@ -1,9 +1,9 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { runFmtPhase } from "./fmt.ts";
+import { type FmtPhaseOutcome, runFmtPhase } from "./fmt.ts";
 import { getSystemIgnorePatterns } from "./ignore.ts";
-import { runLintPhase } from "./lint.ts";
+import { type LintPhaseOutcome, runLintPhase } from "./lint.ts";
 import { LintJsError, type Logger } from "./log.ts";
 
 /** Run-mode arguments. */
@@ -27,30 +27,40 @@ export interface RunContext {
 interface BuildSummaryOptions {
   check: boolean;
 
-  /**
-   * `null` if the format phase was skipped (`--lint-only`);
-   * skipped phases do not contribute to the verdict.
-   */
-  fmtStatus: number | null;
+  /** True when the leading fmt phase halted the run; lint and trailing fmt were skipped. */
+  halted: boolean;
 
-  /**
-   * `null` if the lint phase was skipped (`--format-only`);
-   * skipped phases do not contribute to the verdict.
-   */
-  lintStatus: number | null;
+  /** `null` if the phase was skipped (`--lint-only`). */
+  leadingFmt: FmtPhaseOutcome | null;
+
+  /** `null` if the phase was skipped (`--format-only`, or halted before it ran). */
+  lint: LintPhaseOutcome | null;
+
+  /** `null` if the phase was skipped (`--check`, `--format-only`, `--lint-only`, or halted). */
+  trailingFmt: FmtPhaseOutcome | null;
 }
 
 /**
  * Pick the one-line summary emitted after the run finishes.
  *
- * Binary verdict only (success/failure).
- * Which phase failed is readable from the tool output above,
- * so the summary only needs to convey overall outcome
- * and whether fixes may have been applied.
+ * Halted runs get a dedicated summary.
+ * Otherwise the verdict is binary; which phase failed is readable from tool output above,
+ * so the summary only conveys overall outcome and whether fixes may have been applied.
  */
-function buildSummary({ check, fmtStatus, lintStatus }: BuildSummaryOptions): string {
-  const fmtOk = fmtStatus === null || fmtStatus === 0;
-  const lintOk = lintStatus === null || lintStatus === 0;
+function buildSummary({
+  check,
+  halted,
+  leadingFmt,
+  lint,
+  trailingFmt,
+}: BuildSummaryOptions): string {
+  if (halted) {
+    return "Halted. Resolve format errors above and re-run.";
+  }
+  const fmtOk =
+    (leadingFmt === null || leadingFmt.kind === "ok") &&
+    (trailingFmt === null || trailingFmt.kind === "ok");
+  const lintOk = lint === null || lint.kind === "ok";
   const ok = fmtOk && lintOk;
   if (check) {
     return ok
@@ -66,8 +76,14 @@ function buildSummary({ check, fmtStatus, lintStatus }: BuildSummaryOptions): st
  * Execute the format and lint phases against `args.targets` under `ctx.cwd`,
  * writing user-facing output through `ctx.logger`. Returns the process exit code.
  *
+ * Default mode runs `oxfmt` → `oxlint` → `oxfmt` (ADR-0005).
+ * A fatal failure in the leading fmt pass halts the run, skipping lint and the trailing pass.
+ *
+ * `--check` runs only the leading fmt pass before lint.
+ * `--format-only` and `--lint-only` collapse to a single phase as named.
+ *
  * Exit codes follow the wrapper-wide convention (see `src/cli.ts`):
- * 0 success, 1 fmt/lint findings remain, 2 reserved for {@link LintJsError}.
+ * 0 success, 1 fmt/lint findings remain or run halted, 2 reserved for {@link LintJsError}.
  *
  * May throw {@link LintJsError}; the CLI boundary catches it and maps to exit 2.
  */
@@ -93,25 +109,38 @@ export function run(args: RunArgs, ctx: RunContext): number {
   const ignorePatterns = getSystemIgnorePatterns(cwd);
   const phaseCtx = { cwd, logger };
 
-  let fmtStatus: number | null = null;
-  let lintStatus: number | null = null;
+  let leadingFmt: FmtPhaseOutcome | null = null;
+  let lint: LintPhaseOutcome | null = null;
+  let trailingFmt: FmtPhaseOutcome | null = null;
 
   if (!lintOnly) {
-    const r = runFmtPhase({ check, targets, ignorePatterns }, phaseCtx);
-    fmtStatus = r.status;
+    leadingFmt = runFmtPhase({ check, targets, ignorePatterns }, phaseCtx);
   }
 
-  if (!formatOnly) {
+  // Halt only when there is something downstream to skip; in `--format-only` the leading
+  // pass is the entire run, so a fatal exit there falls through as a regular failure.
+  const halted = leadingFmt?.kind === "fatal" && !formatOnly;
+
+  if (!formatOnly && !halted) {
     logger.markBlankSeparator();
-    const r = runLintPhase({ check, unix, targets, ignorePatterns }, phaseCtx);
-    lintStatus = r.status;
+    lint = runLintPhase({ check, unix, targets, ignorePatterns }, phaseCtx);
+  }
+
+  // Trailing pass: default mode only, after a successful leading + lint flow. Its job is
+  // to normalize any drift introduced by `oxlint --fix`; in `--check` lint applies no
+  // fixes, so the leading pass is sufficient.
+  if (!lintOnly && !formatOnly && !check && !halted) {
+    logger.markBlankSeparator();
+    trailingFmt = runFmtPhase({ check: false, targets, ignorePatterns }, phaseCtx);
   }
 
   logger.markBlankSeparator();
-  logger.writeErrTagged(buildSummary({ check, fmtStatus, lintStatus }));
+  logger.writeErrTagged(buildSummary({ check, halted, leadingFmt, lint, trailingFmt }));
 
-  // Collapse any non-zero child status to 1; exit 2 is reserved for LintJsError.
-  const fmtFailed = fmtStatus !== null && fmtStatus !== 0;
-  const lintFailed = lintStatus !== null && lintStatus !== 0;
+  // Collapse any non-`ok` outcome to exit 1; exit 2 is reserved for LintJsError.
+  const fmtFailed =
+    (leadingFmt !== null && leadingFmt.kind !== "ok") ||
+    (trailingFmt !== null && trailingFmt.kind !== "ok");
+  const lintFailed = lint !== null && lint.kind !== "ok";
   return fmtFailed || lintFailed ? 1 : 0;
 }

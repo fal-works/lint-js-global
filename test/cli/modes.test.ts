@@ -74,22 +74,62 @@ void test("--unix: oxlint unix output passes through, no issue-count summary or 
   assert.match(result.stderr, /^lint-js: Failed\./m);
 });
 
-void test("oxfmt failure propagates to exit code even when lint is clean", (t) => {
+void test("fatal oxfmt failure halts the run before lint", (t) => {
   const dir = copyFixture("with-node-modules");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
-  // Inject an unparseable source to fail oxfmt while keeping oxlint clean
-  // (oxlint respects .eslintignore, so broken.ts is skipped there).
+  // Parse error in the leading fmt pass is the sole halt trigger (ADR-0005).
   writeFileSync(join(dir, "broken.ts"), "const x = ;\n");
-  writeFileSync(join(dir, ".eslintignore"), "broken.ts\n");
 
   const result = runCli(dir);
 
   // oxfmt itself returns 2 on parse errors, but lint-js reserves 2 for LintJsError;
-  // any non-zero child status must collapse to 1 (fmt/lint findings).
-  assert.equal(result.status, 1, "oxfmt parse-error exit must be normalized to 1");
-  // ADR-0006 silences the fmt phase only on success; a failure must surface.
-  assert.match(result.stderr, /Unexpected token/, "oxfmt parse error must surface");
+  // any non-zero child status must collapse to 1.
+  assert.equal(result.status, 1, "halt collapses to exit 1; LintJsError reserves 2");
+  assert.match(result.stderr, /Unexpected token/, "leading fmt's parse error must surface");
+  assert.equal(result.stdout, "", "halt produces no stdout because the lint phase is skipped");
+  assert.match(
+    result.stderr,
+    /^lint-js: Halted\. Resolve format errors above and re-run\.$/m,
+    "halt summary must announce the halt",
+  );
+});
+
+void test("--check: fatal oxfmt failure halts the run before lint", (t) => {
+  const dir = copyFixture("with-node-modules");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  writeFileSync(join(dir, "broken.ts"), "const x = ;\n");
+
+  const result = runCli(dir, ["--check"]);
+
+  assert.equal(result.status, 1, "halt collapses to exit 1 under --check too");
+  assert.match(result.stderr, /Unexpected token/, "leading fmt's parse error must surface");
+  assert.equal(result.stdout, "", "halt produces no stdout because the lint phase is skipped");
+  assert.match(
+    result.stderr,
+    /^lint-js: Halted\. Resolve format errors above and re-run\.$/m,
+    "halt summary fires under --check too",
+  );
+});
+
+void test("--format-only: fatal oxfmt failure does not trigger halt summary", (t) => {
+  // Halt's purpose is to suppress duplicate parse-error output across phases; with no
+  // downstream phase, it has nothing to suppress and falls through to a regular failure.
+  const dir = copyFixture("with-node-modules");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  writeFileSync(join(dir, "broken.ts"), "const x = ;\n");
+
+  const result = runCli(dir, ["--format-only"]);
+
+  assert.equal(result.status, 1, "fmt-only fmt failure still exits 1");
+  assert.match(result.stderr, /Unexpected token/);
+  assert.doesNotMatch(result.stderr, /Halted\./, "halt summary must not fire under --format-only");
+  assert.match(
+    result.stderr,
+    /^lint-js: Failed\. Issues fixed where possible; unfixed issues remain\.$/m,
+  );
 });
 
 void test("--check: does not modify files and reports both fmt and lint violations", (t) => {
@@ -191,6 +231,28 @@ void test("--lint-only: runs lint phase, skips fmt phase entirely", (t) => {
     before,
     "source must not be reformatted when fmt phase is skipped",
   );
+});
+
+void test("default mode: trailing fmt normalizes drift left by oxlint --fix (ADR-0005)", (t) => {
+  const dir = copyFixture("lint-fix-drift");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const result = runCli(dir);
+
+  assert.equal(result.status, 0);
+  const after = readFileSync(join(dir, "src", "index.ts"), "utf8");
+  assert.ok(after.includes(`import type { ExampleType } from "./types.ts";`));
+});
+
+void test("--lint-only: drift left by oxlint --fix is preserved (no trailing fmt)", (t) => {
+  const dir = copyFixture("lint-fix-drift");
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+
+  const result = runCli(dir, ["--lint-only"]);
+
+  assert.equal(result.status, 0);
+  const after = readFileSync(join(dir, "src", "index.ts"), "utf8");
+  assert.ok(after.includes(`import type { ExampleType} from "./types.ts";`));
 });
 
 void test("--format-only and --lint-only are mutually exclusive", (t) => {

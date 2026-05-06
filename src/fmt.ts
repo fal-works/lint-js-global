@@ -41,20 +41,24 @@ export interface FmtPhaseContext {
   logger: Logger;
 }
 
-export interface FmtPhaseResult {
-  /** oxfmt's exit code. */
-  status: number;
-}
+/**
+ * Outcome of a single oxfmt invocation.
+ *
+ * - `ok`: oxfmt exited 0.
+ * - `findings`: `--check` reported files needing formatting (oxfmt exit 1).
+ * - `fatal`: parse errors or other tool failures (oxfmt exit ≥ 2, or any non-zero in write mode).
+ */
+export type FmtPhaseOutcome = { kind: "ok" } | { kind: "findings" } | { kind: "fatal" };
 
 /**
  * Run the format phase: spawn oxfmt against `opts.targets` under `ctx.cwd`.
- * On success, emits nothing. On a non-zero exit, relays oxfmt's captured
- * output to stderr verbatim.
+ * On success, emits nothing. On any non-zero exit, relays oxfmt's captured output
+ * to stderr verbatim.
  *
  * @throws {LintJsError} on launch failure or signal-driven termination
  *   (propagated from `runToolCapturingCombined`).
  */
-export function runFmtPhase(opts: FmtPhaseOptions, ctx: FmtPhaseContext): FmtPhaseResult {
+export function runFmtPhase(opts: FmtPhaseOptions, ctx: FmtPhaseContext): FmtPhaseOutcome {
   const { check, targets, ignorePatterns } = opts;
   const { cwd, logger } = ctx;
 
@@ -68,10 +72,12 @@ export function runFmtPhase(opts: FmtPhaseOptions, ctx: FmtPhaseContext): FmtPha
     cwd,
   });
 
-  if (result.status === 0) {
-    return { status: 0 };
-  }
+  const status = result.status ?? 0;
+  if (status === 0) return { kind: "ok" };
 
   logger.writeErr(captured);
-  return { status: result.status ?? 0 };
+  // oxfmt's exit-code contract: 0 = clean, 1 = `--check` found formatting drift,
+  // anything else = parse error or tool failure. Write mode never legitimately exits 1.
+  if (check && status === 1) return { kind: "findings" };
+  return { kind: "fatal" };
 }
