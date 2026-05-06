@@ -21,6 +21,8 @@ Two single-pass orderings of `oxfmt` and `oxlint` each have a real cost:
 
 Chosen option: **format around lint**, because it gives both location accuracy and a strict success contract: lint sees a format-stable file, and the trailing pass normalizes any auto-fix drift.
 
+A fatal failure in the leading pass (e.g. a parse error) halts the run; lint and the trailing pass are skipped.
+
 `--check` runs only the leading pass; lint applies no fixes there.
 
 ### Consequences
