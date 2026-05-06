@@ -75,7 +75,7 @@ void test("single file, single diagnostic (short single-line slice)", (t) => {
       [file, "  1:1 `debugger` statement is not allowed. [eslint(no-debugger)]", "    debugger"],
     ]),
   );
-  assert.equal(result.linterSummary, "1 unfixed issue in 1 file.");
+  assert.equal(result.linterSummary, "1 unfixed lint issue in 1 file.");
 });
 
 void test("check mode summary drops the 'unfixed' qualifier (plural)", (t) => {
@@ -105,7 +105,7 @@ void test("check mode summary drops the 'unfixed' qualifier (plural)", (t) => {
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.linterSummary, "2 issues in 1 file.");
+  assert.equal(result.linterSummary, "2 lint issues in 1 file.");
 });
 
 void test("check mode summary drops the 'unfixed' qualifier (singular)", (t) => {
@@ -128,7 +128,7 @@ void test("check mode summary drops the 'unfixed' qualifier (singular)", (t) => 
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.linterSummary, "1 issue in 1 file.");
+  assert.equal(result.linterSummary, "1 lint issue in 1 file.");
 });
 
 void test("single file, multiple diagnostics sort by (line, col, error-code)", (t) => {
@@ -184,7 +184,7 @@ void test("single file, multiple diagnostics sort by (line, col, error-code)", (
       ],
     ]),
   );
-  assert.equal(result.linterSummary, "3 unfixed issues in 1 file.");
+  assert.equal(result.linterSummary, "3 unfixed lint issues in 1 file.");
 });
 
 void test("multiple files sort lexicographically", (t) => {
@@ -225,7 +225,7 @@ void test("multiple files sort lexicographically", (t) => {
       [fileB, "  1:1 d [eslint(no-debugger)]", "    debugger"],
     ]),
   );
-  assert.equal(result.linterSummary, "2 unfixed issues in 2 files.");
+  assert.equal(result.linterSummary, "2 unfixed lint issues in 2 files.");
 });
 
 void test("long single-line slice truncates at 40 characters with no leading space", (t) => {
@@ -525,7 +525,7 @@ void test("no-unsafe-* diagnostic triggers the weak-typings hint block", (t) => 
       ],
     ]),
   );
-  assert.equal(result.linterSummary, "1 unfixed issue in 1 file.");
+  assert.equal(result.linterSummary, "1 unfixed lint issue in 1 file.");
 });
 
 void test("tsgolint-style typescript(TS\\d+) code is rendered raw inside the brackets", (t) => {
@@ -1070,7 +1070,7 @@ void test("unreadable source file falls back to placeholder slice and reported L
     result.formattedStdout,
     joinSections([[file, "  3:5 something [eslint(no-debugger)]", "    <unreadable>"]]),
   );
-  assert.equal(result.linterSummary, "1 unfixed issue in 1 file.");
+  assert.equal(result.linterSummary, "1 unfixed lint issue in 1 file.");
 });
 
 void test("out-of-bounds span falls back to placeholder", (t) => {

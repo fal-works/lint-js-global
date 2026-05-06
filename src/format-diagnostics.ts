@@ -205,7 +205,7 @@ export function formatLintOutput({
   }
 
   const formattedStdout = `${sections.map((s) => s.join("\n")).join("\n\n")}\n`;
-  const issueWord = resolved.length === 1 ? "issue" : "issues";
+  const issueWord = resolved.length === 1 ? "lint issue" : "lint issues";
   const fileWord = fileGroups.size === 1 ? "file" : "files";
   const qualifier = check ? "" : "unfixed ";
   const linterSummary = `${resolved.length} ${qualifier}${issueWord} in ${fileGroups.size} ${fileWord}.`;

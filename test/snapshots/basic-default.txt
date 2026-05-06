@@ -2,7 +2,7 @@ OUT src/index.ts
 OUT   5:1 Promises must be awaited, add void operator to ignore. [typescript-eslint(no-floating-promises)]
 OUT     foo();
 ERR
-ERR 1 unfixed issue in 1 file.
+ERR 1 unfixed lint issue in 1 file.
 ERR
 ERR lint-js: Failed. Issues fixed where possible; unfixed issues remain.
 EXIT 1

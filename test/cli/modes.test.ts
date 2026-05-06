@@ -36,7 +36,7 @@ void test("basic: reformats sources and reports floating promise", (t) => {
   );
   assert.match(
     result.stderr,
-    /^1 unfixed issue in 1 file\.$/m,
+    /^1 unfixed lint issue in 1 file\.$/m,
     "expected issue-count summary on stderr",
   );
   assert.match(
@@ -63,7 +63,7 @@ void test("--unix: oxlint unix output passes through, no issue-count summary or 
   // None of the default formatter's framing survives.
   assert.doesNotMatch(
     result.stdout,
-    /^\d+ unfixed issues/m,
+    /^\d+ unfixed lint issues?/m,
     "issue-count summary must be suppressed under --unix",
   );
   assert.doesNotMatch(
