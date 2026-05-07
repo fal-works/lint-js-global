@@ -4,11 +4,11 @@ import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { copyFixture, renderSnapshot, runRecording, type RecordedEvent } from "../helpers.ts";
+import { copyFixture, renderSnapshot, runRecording, type RecordedEvent } from "../test/helpers.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const snapshotDir = join(here, "..", "snapshots");
-const packageRoot = resolve(here, "..", "..");
+const snapshotDir = join(here, "..", "test", "snapshots");
+const packageRoot = resolve(here, "..");
 const UPDATE = process.env.UPDATE_SNAPSHOTS === "1";
 
 /**

@@ -2,15 +2,15 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import test from "node:test";
 
+import { setupFixture } from "../../test/format-diagnostics-helpers.ts";
+import type { ValidatedDiagnostic } from "../oxlint-json-schema.ts";
+import { createSourceCache } from "../source.ts";
 import {
   formatCodeSlice,
   PARSE_ERROR_CODE,
   resolveDiagnostic,
   UNREADABLE_SLICE,
-} from "../../../src/format-diagnostics/resolve.ts";
-import type { ValidatedDiagnostic } from "../../../src/oxlint-json-schema.ts";
-import { createSourceCache } from "../../../src/source.ts";
-import { setupFixture } from "./_helpers.ts";
+} from "./resolve.ts";
 
 function makeValidated(overrides: Partial<ValidatedDiagnostic> = {}): ValidatedDiagnostic {
   return {

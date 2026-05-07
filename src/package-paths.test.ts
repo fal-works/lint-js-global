@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { statSync } from "node:fs";
 import test from "node:test";
 
-import * as paths from "../../src/package-paths.ts";
+import * as paths from "./package-paths.ts";
 
 void test("package-paths: every exported path resolves to an existing file or directory", () => {
   const entries = Object.entries(paths);

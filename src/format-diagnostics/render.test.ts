@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { HINT_PATH, joinSections } from "../../test/format-diagnostics-helpers.ts";
 import {
   compareDiagnostics,
   formatDiagLine,
   formatSummary,
   renderDiagnostics,
   renderWeakTypingsHint,
-} from "../../../src/format-diagnostics/render.ts";
-import type { ResolvedDiagnostic } from "../../../src/format-diagnostics/resolve.ts";
-import { HINT_PATH, joinSections } from "./_helpers.ts";
+} from "./render.ts";
+import type { ResolvedDiagnostic } from "./resolve.ts";
 
 function makeResolved(overrides: Partial<ResolvedDiagnostic> = {}): ResolvedDiagnostic {
   return {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test, { type TestContext } from "node:test";
 
-import { createConsoleLogger } from "../../src/log.ts";
+import { createConsoleLogger } from "./log.ts";
 
 function captureConsole(t: TestContext): { stdout(): string; stderr(): string } {
   let stdout = "";

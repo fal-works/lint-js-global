@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 
-import { LintJsError } from "../../src/error.ts";
-import { runToolCapturingOutput } from "../../src/run-tool.ts";
+import { LintJsError } from "./error.ts";
+import { runToolCapturingOutput } from "./run-tool.ts";
 
 /**
  * Drop a tmp JS file `script.js` containing the given source, and clean up at teardown.

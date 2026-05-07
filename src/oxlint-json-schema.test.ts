@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { validatePayload } from "../../src/oxlint-json-schema.ts";
+import { validatePayload } from "./oxlint-json-schema.ts";
 
 void test("valid payload with one diagnostic resolves to ValidatedDiagnostic[]", () => {
   const result = validatePayload({

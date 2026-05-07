@@ -2,8 +2,13 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import test from "node:test";
 
-import { formatLintOutput } from "../../../src/format-diagnostics/index.ts";
-import { HINT_PATH, joinSections, makeStdout, setupFixture } from "./_helpers.ts";
+import {
+  HINT_PATH,
+  joinSections,
+  makeStdout,
+  setupFixture,
+} from "../../test/format-diagnostics-helpers.ts";
+import { formatLintOutput } from "./index.ts";
 
 void test("happy path: single file, single diagnostic produces formatted output and summary", (t) => {
   const dir = setupFixture(t, { "x.ts": "debugger;\n" });

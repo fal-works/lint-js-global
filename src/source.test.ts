@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 
-import { createSourceCache, resolveSpan } from "../../src/source.ts";
+import { createSourceCache, resolveSpan } from "./source.ts";
 
 /**
  * Make a temp dir that gets cleaned up at test teardown, and pre-populate source files into it.
