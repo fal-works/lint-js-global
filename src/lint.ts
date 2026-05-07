@@ -93,38 +93,43 @@ export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): Lin
 
   logger.writeErr(capturedStderr);
 
-  const { formattedDiagnostics, weakTypingsHint, linterSummary, schemaMismatch, noFilesMatched } =
-    formatLintOutput({
-      capturedStdout,
-      check,
-      outputMode,
-      weakTypingsDocPath: WEAK_TYPINGS_DOC,
-      cwd,
-    });
+  const formatted = formatLintOutput({
+    capturedStdout,
+    check,
+    outputMode,
+    weakTypingsDocPath: WEAK_TYPINGS_DOC,
+    cwd,
+  });
 
-  if (noFilesMatched) {
-    // oxlint ≥1.61 emits "No files found to lint." on stdout when no files match;
-    // rewrite it to stderr so stdout stays clean for downstream consumers.
-    logger.writeErr("No files found to lint.\n");
-  } else {
-    logger.writeOut(formattedDiagnostics);
-  }
+  switch (formatted.kind) {
+    case "no-files":
+      // Rewrite to stderr so stdout stays clean for downstream consumers.
+      logger.writeErr("No files found to lint.\n");
+      return { kind: "no-files" };
 
-  if (schemaMismatch !== null) {
-    // Raw stdout was relayed above; route the contract failure through LintJsError.
-    throw new LintJsError("oxlint output contract mismatch.", {
-      details: [schemaMismatch.reason, "Raw payload relayed to stdout above."],
-    });
-  }
+    case "contract-failure":
+      // Route the raw payload through LintJsError.details so stdout stays reserved for diagnostics
+      // and stderr stays reserved for wrapper notifications.
+      throw new LintJsError("oxlint output contract mismatch.", {
+        details: [
+          formatted.reason,
+          "--- raw stdout ---",
+          ...formatted.rawStdout.trimEnd().split("\n"),
+        ],
+      });
 
-  if (weakTypingsHint !== null) {
-    logger.markBlankSeparator();
-    logger.writeErr(weakTypingsHint);
+    case "diagnostics": {
+      const { formattedDiagnostics, weakTypingsHint, linterSummary } = formatted;
+      logger.writeOut(formattedDiagnostics);
+      if (weakTypingsHint !== null) {
+        logger.markBlankSeparator();
+        logger.writeErr(weakTypingsHint);
+      }
+      if (linterSummary !== null) {
+        logger.markBlankSeparator();
+        logger.writeErr(`${linterSummary}\n`);
+      }
+      return result.status === 0 ? { kind: "ok" } : { kind: "findings" };
+    }
   }
-  if (linterSummary !== null) {
-    logger.markBlankSeparator();
-    logger.writeErr(`${linterSummary}\n`);
-  }
-  if (noFilesMatched) return { kind: "no-files" };
-  return result.status === 0 ? { kind: "ok" } : { kind: "findings" };
 }

@@ -30,16 +30,14 @@ void test("stylish mode: single file, single diagnostic produces grouped output 
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(
-    result.formattedDiagnostics,
-    joinSections([
+  assert.deepEqual(result, {
+    kind: "diagnostics",
+    formattedDiagnostics: joinSections([
       [file, "  1:1 `debugger` statement is not allowed. [eslint(no-debugger)]", "    debugger"],
     ]),
-  );
-  assert.equal(result.weakTypingsHint, null);
-  assert.equal(result.linterSummary, "1 unfixed lint issue in 1 file.");
-  assert.equal(result.schemaMismatch, null);
-  assert.equal(result.noFilesMatched, false);
+    weakTypingsHint: null,
+    linterSummary: "1 unfixed lint issue in 1 file.",
+  });
 });
 
 void test("unix mode: single file, single diagnostic produces a single flat line and summary", (t) => {
@@ -62,14 +60,12 @@ void test("unix mode: single file, single diagnostic produces a single flat line
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(
-    result.formattedDiagnostics,
-    `${file}:1:1: \`debugger\` statement is not allowed. [eslint(no-debugger)]\n`,
-  );
-  assert.equal(result.weakTypingsHint, null);
-  assert.equal(result.linterSummary, "1 unfixed lint issue in 1 file.");
-  assert.equal(result.schemaMismatch, null);
-  assert.equal(result.noFilesMatched, false);
+  assert.deepEqual(result, {
+    kind: "diagnostics",
+    formattedDiagnostics: `${file}:1:1: \`debugger\` statement is not allowed. [eslint(no-debugger)]\n`,
+    weakTypingsHint: null,
+    linterSummary: "1 unfixed lint issue in 1 file.",
+  });
 });
 
 void test("no-unsafe-* diagnostic surfaces weakTypingsHint alongside the diagnostics (stylish mode)", (t) => {
@@ -92,6 +88,8 @@ void test("no-unsafe-* diagnostic surfaces weakTypingsHint alongside the diagnos
     weakTypingsDocPath: HINT_PATH,
   });
 
+  assert.equal(result.kind, "diagnostics");
+  if (result.kind !== "diagnostics") return;
   assert.match(result.formattedDiagnostics, /no-unsafe-member-access/);
   assert.ok(!result.formattedDiagnostics.includes("Hint on the"));
   assert.ok(result.weakTypingsHint !== null);
@@ -121,6 +119,8 @@ void test("no-unsafe-* diagnostic surfaces weakTypingsHint under unix mode too",
     weakTypingsDocPath: HINT_PATH,
   });
 
+  assert.equal(result.kind, "diagnostics");
+  if (result.kind !== "diagnostics") return;
   assert.equal(
     result.formattedDiagnostics,
     `${file}:2:5: Unsafe member access .foo on an \`any\` value. [typescript-eslint(no-unsafe-member-access)]\n`,
@@ -138,10 +138,12 @@ void test("zero diagnostics yields empty payload and null aux fields (stylish mo
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.formattedDiagnostics, "");
-  assert.equal(result.weakTypingsHint, null);
-  assert.equal(result.linterSummary, null);
-  assert.equal(result.schemaMismatch, null);
+  assert.deepEqual(result, {
+    kind: "diagnostics",
+    formattedDiagnostics: "",
+    weakTypingsHint: null,
+    linterSummary: null,
+  });
 });
 
 void test("zero diagnostics yields empty payload and null aux fields (unix mode)", () => {
@@ -152,15 +154,15 @@ void test("zero diagnostics yields empty payload and null aux fields (unix mode)
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.formattedDiagnostics, "");
-  assert.equal(result.weakTypingsHint, null);
-  assert.equal(result.linterSummary, null);
-  assert.equal(result.schemaMismatch, null);
+  assert.deepEqual(result, {
+    kind: "diagnostics",
+    formattedDiagnostics: "",
+    weakTypingsHint: null,
+    linterSummary: null,
+  });
 });
 
-void test("empty stdout is clean-compatible (no schemaMismatch)", () => {
-  // oxlint should always emit JSON in normal operation, but empty stdout is a benign
-  // edge case (no payload at all) and should not be escalated to a contract failure.
+void test("empty stdout is treated as a clean diagnostics run, not a contract failure", () => {
   const result = formatLintOutput({
     capturedStdout: "",
     check: false,
@@ -168,14 +170,15 @@ void test("empty stdout is clean-compatible (no schemaMismatch)", () => {
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.schemaMismatch, null);
-  assert.equal(result.formattedDiagnostics, "");
-  assert.equal(result.weakTypingsHint, null);
-  assert.equal(result.linterSummary, null);
-  assert.equal(result.noFilesMatched, false);
+  assert.deepEqual(result, {
+    kind: "diagnostics",
+    formattedDiagnostics: "",
+    weakTypingsHint: null,
+    linterSummary: null,
+  });
 });
 
-void test("broken JSON is relayed verbatim and surfaced via schemaMismatch (stylish mode)", () => {
+void test("broken JSON surfaces as contract-failure carrying the raw payload (stylish mode)", () => {
   const broken = "{not valid json";
 
   const result = formatLintOutput({
@@ -185,14 +188,13 @@ void test("broken JSON is relayed verbatim and surfaced via schemaMismatch (styl
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.formattedDiagnostics, broken);
-  assert.equal(result.weakTypingsHint, null);
-  assert.equal(result.linterSummary, null);
-  assert.notEqual(result.schemaMismatch, null);
-  assert.match(result.schemaMismatch?.reason ?? "", /JSON/);
+  assert.equal(result.kind, "contract-failure");
+  if (result.kind !== "contract-failure") return;
+  assert.equal(result.rawStdout, broken);
+  assert.match(result.reason, /JSON/);
 });
 
-void test("broken JSON surfaces via schemaMismatch under unix mode (tool-failure path)", () => {
+void test("broken JSON surfaces as contract-failure under unix mode (tool-failure path)", () => {
   // Free-form tool-failure text from oxlint (e.g. tsgolint resolution failure, missing config)
   // is not parseable as JSON, so unix mode must surface it through the same contract-failure
   // channel as stylish mode rather than passing it through to stdout as a fake lint finding.
@@ -205,14 +207,14 @@ void test("broken JSON surfaces via schemaMismatch under unix mode (tool-failure
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.formattedDiagnostics, broken);
-  assert.equal(result.linterSummary, null);
-  assert.notEqual(result.schemaMismatch, null);
-  assert.match(result.schemaMismatch?.reason ?? "", /JSON/);
+  assert.equal(result.kind, "contract-failure");
+  if (result.kind !== "contract-failure") return;
+  assert.equal(result.rawStdout, broken);
+  assert.match(result.reason, /JSON/);
 });
 
-void test("schema-mismatch from validator is relayed verbatim with the validator's reason", () => {
-  // Smoke test that the validator's failure reason flows through to schemaMismatch.reason.
+void test("schema-mismatch from validator surfaces as contract-failure with the validator's reason", () => {
+  // Smoke test that the validator's failure reason flows through to contract-failure.reason.
   // Detail-level cases live in oxlint-json-schema.test.ts.
   const raw = JSON.stringify({ fatal: "internal error", number_of_files: 0 });
 
@@ -223,10 +225,10 @@ void test("schema-mismatch from validator is relayed verbatim with the validator
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.formattedDiagnostics, raw, "raw payload must be relayed verbatim");
-  assert.equal(result.weakTypingsHint, null);
-  assert.notEqual(result.schemaMismatch, null);
-  assert.match(result.schemaMismatch?.reason ?? "", /diagnostics/);
+  assert.equal(result.kind, "contract-failure");
+  if (result.kind !== "contract-failure") return;
+  assert.equal(result.rawStdout, raw);
+  assert.match(result.reason, /diagnostics/);
 });
 
 void test("oxc parse-error diagnostic stays a lint finding (stylish mode)", (t) => {
@@ -252,7 +254,8 @@ void test("oxc parse-error diagnostic stays a lint finding (stylish mode)", (t) 
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.schemaMismatch, null);
+  assert.equal(result.kind, "diagnostics");
+  if (result.kind !== "diagnostics") return;
   assert.match(result.formattedDiagnostics, /\[parse-error\]/);
   assert.equal(result.linterSummary, "1 unfixed lint issue in 1 file.");
 });
@@ -277,13 +280,15 @@ void test("oxc parse-error diagnostic stays a lint finding (unix mode)", (t) => 
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.schemaMismatch, null);
-  assert.equal(result.formattedDiagnostics, `${file}:1:11: Unexpected token. [parse-error]\n`);
+  assert.deepEqual(result, {
+    kind: "diagnostics",
+    formattedDiagnostics: `${file}:1:11: Unexpected token. [parse-error]\n`,
+    weakTypingsHint: null,
+    linterSummary: "1 unfixed lint issue in 1 file.",
+  });
 });
 
-void test('"No files found to lint." prefix is treated as a clean no-files run (stylish mode)', () => {
-  // oxlint ≥1.61 prepends "No files found to lint." to stdout when no files match the targets,
-  // breaking JSON parsing. Surfaced as `noFilesMatched`.
+void test('"No files found to lint." prefix is treated as a no-files run (stylish mode)', () => {
   const result = formatLintOutput({
     capturedStdout:
       'No files found to lint. Please check your paths and ignore patterns.\n{ "diagnostics": [], "number_of_files": 0 }\n',
@@ -292,14 +297,10 @@ void test('"No files found to lint." prefix is treated as a clean no-files run (
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.noFilesMatched, true);
-  assert.equal(result.schemaMismatch, null);
-  assert.equal(result.formattedDiagnostics, "");
-  assert.equal(result.weakTypingsHint, null);
-  assert.equal(result.linterSummary, null);
+  assert.deepEqual(result, { kind: "no-files" });
 });
 
-void test('"No files found to lint." prefix is treated as a clean no-files run (unix mode)', () => {
+void test('"No files found to lint." prefix is treated as a no-files run (unix mode)', () => {
   const result = formatLintOutput({
     capturedStdout: "No files found to lint. Please check your paths and ignore patterns.\n",
     check: false,
@@ -307,9 +308,5 @@ void test('"No files found to lint." prefix is treated as a clean no-files run (
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.noFilesMatched, true);
-  assert.equal(result.schemaMismatch, null);
-  assert.equal(result.formattedDiagnostics, "");
-  assert.equal(result.weakTypingsHint, null);
-  assert.equal(result.linterSummary, null);
+  assert.deepEqual(result, { kind: "no-files" });
 });
