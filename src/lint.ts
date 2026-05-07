@@ -94,20 +94,21 @@ export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): Lin
 
   logger.writeErr(capturedStderr);
 
-  const { formattedStdout, linterSummary, schemaMismatch, noFilesMatched } = formatLintOutput({
-    capturedStdout,
-    check,
-    unix,
-    weakTypingsDocPath: WEAK_TYPINGS_DOC,
-    cwd,
-  });
+  const { formattedDiagnostics, weakTypingsHint, linterSummary, schemaMismatch, noFilesMatched } =
+    formatLintOutput({
+      capturedStdout,
+      check,
+      unix,
+      weakTypingsDocPath: WEAK_TYPINGS_DOC,
+      cwd,
+    });
 
   if (noFilesMatched) {
     // oxlint ≥1.61 emits "No files found to lint." on stdout when no files match;
     // rewrite it to stderr so stdout stays clean for downstream consumers.
     logger.writeErr("No files found to lint.\n");
   } else {
-    logger.writeOut(formattedStdout);
+    logger.writeOut(formattedDiagnostics);
   }
 
   if (schemaMismatch !== null) {
@@ -117,6 +118,10 @@ export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): Lin
     });
   }
 
+  if (weakTypingsHint !== null) {
+    logger.markBlankSeparator();
+    logger.writeErr(weakTypingsHint);
+  }
   if (linterSummary !== null) {
     logger.markBlankSeparator();
     logger.writeErr(`${linterSummary}\n`);

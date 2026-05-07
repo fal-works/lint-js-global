@@ -44,7 +44,7 @@ export function setupFixture(t: TestContext, sources: Record<string, string>): s
 }
 
 /**
- * Assemble an expected formatted-stdout string from section arrays.
+ * Assemble an expected formatted-diagnostics string from section arrays.
  */
 export function joinSections(sections: string[][]): string {
   return `${sections.map((s) => s.join("\n")).join("\n\n")}\n`;

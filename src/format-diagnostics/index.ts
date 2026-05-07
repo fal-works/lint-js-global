@@ -12,15 +12,29 @@ const OXLINT_NO_FILES_RE = /^No files found to lint\./;
 
 /**
  * Result of {@link formatLintOutput}.
+ *
+ * The three payload fields (`formattedDiagnostics`, `weakTypingsHint`, `linterSummary`)
+ * are independent; the caller chooses a destination for each.
  */
 export interface FormatLintResult {
-  formattedStdout: string;
+  /**
+   * Per-file diagnostic sections, joined into a single string with a trailing newline.
+   * Empty when there are no diagnostics to report.
+   */
+  formattedDiagnostics: string;
 
   /**
-   * A human-readable summary line stating how many issues remain.
+   * Weak-typings hint block, non-null when any `no-unsafe-*` diagnostic is present.
+   * Ends with a trailing newline.
+   */
+  weakTypingsHint: string | null;
+
+  /**
+   * Human-readable summary line stating how many issues remain.
    * In `--check` mode the "unfixed" qualifier is omitted.
    *
-   * Null when `schemaMismatch` is non-null.
+   * Null when there is nothing to summarize (no diagnostics, unix passthrough,
+   * or `schemaMismatch` is non-null).
    */
   linterSummary: string | null;
 
@@ -80,7 +94,8 @@ export function formatLintOutput({
 
   if (unix) {
     return {
-      formattedStdout: capturedStdout,
+      formattedDiagnostics: capturedStdout,
+      weakTypingsHint: null,
       linterSummary: null,
       schemaMismatch: null,
       noFilesMatched,
@@ -91,7 +106,8 @@ export function formatLintOutput({
   // which is benign and should not be escalated to a contract failure.
   if (capturedStdout === "") {
     return {
-      formattedStdout: "",
+      formattedDiagnostics: "",
+      weakTypingsHint: null,
       linterSummary: null,
       schemaMismatch: null,
       noFilesMatched: false,
@@ -101,7 +117,8 @@ export function formatLintOutput({
   // The prefix breaks JSON parsing; short-circuit to a clean result.
   if (noFilesMatched) {
     return {
-      formattedStdout: "",
+      formattedDiagnostics: "",
+      weakTypingsHint: null,
       linterSummary: null,
       schemaMismatch: null,
       noFilesMatched: true,
@@ -117,7 +134,8 @@ export function formatLintOutput({
     // schema drift so the wrapper exits 2 instead of misreporting the run as clean.
     const message = err instanceof Error ? err.message : String(err);
     return {
-      formattedStdout: capturedStdout,
+      formattedDiagnostics: capturedStdout,
+      weakTypingsHint: null,
       linterSummary: null,
       schemaMismatch: { reason: `stdout is not valid JSON: ${message}` },
       noFilesMatched: false,
@@ -127,7 +145,8 @@ export function formatLintOutput({
   const validation = validatePayload(parsed);
   if (!validation.ok) {
     return {
-      formattedStdout: capturedStdout,
+      formattedDiagnostics: capturedStdout,
+      weakTypingsHint: null,
       linterSummary: null,
       schemaMismatch: { reason: validation.reason },
       noFilesMatched: false,
@@ -136,7 +155,8 @@ export function formatLintOutput({
   const validated = validation.value;
   if (validated.length === 0) {
     return {
-      formattedStdout: "",
+      formattedDiagnostics: "",
+      weakTypingsHint: null,
       linterSummary: null,
       schemaMismatch: null,
       noFilesMatched: false,
@@ -145,7 +165,16 @@ export function formatLintOutput({
 
   const cache = createSourceCache(cwd ?? process.cwd());
   const resolved = validated.map((d) => resolveDiagnostic(d, cache));
-  const { formattedStdout, fileCount } = renderDiagnostics(resolved, weakTypingsDocPath);
+  const { formattedDiagnostics, weakTypingsHint, fileCount } = renderDiagnostics(
+    resolved,
+    weakTypingsDocPath,
+  );
   const linterSummary = formatSummary(check, resolved.length, fileCount);
-  return { formattedStdout, linterSummary, schemaMismatch: null, noFilesMatched: false };
+  return {
+    formattedDiagnostics,
+    weakTypingsHint,
+    linterSummary,
+    schemaMismatch: null,
+    noFilesMatched: false,
+  };
 }

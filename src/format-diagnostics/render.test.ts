@@ -123,7 +123,7 @@ void test("renderDiagnostics: groups by filename, sorts, returns fileCount", () 
 
   assert.equal(result.fileCount, 2);
   assert.equal(
-    result.formattedStdout,
+    result.formattedDiagnostics,
     joinSections([
       [
         "/a.ts",
@@ -135,9 +135,10 @@ void test("renderDiagnostics: groups by filename, sorts, returns fileCount", () 
       ["/b.ts", "  3:5 c [eslint(no-debugger)]", "    y"],
     ]),
   );
+  assert.equal(result.weakTypingsHint, null);
 });
 
-void test("renderDiagnostics: appends weak-typings hint when any no-unsafe-* code is present", () => {
+void test("renderDiagnostics: surfaces weak-typings hint as a separate field on no-unsafe-*", () => {
   const file = "/x.ts";
   const d = makeResolved({
     filename: file,
@@ -152,21 +153,25 @@ void test("renderDiagnostics: appends weak-typings hint when any no-unsafe-* cod
 
   assert.equal(result.fileCount, 1);
   assert.equal(
-    result.formattedStdout,
+    result.formattedDiagnostics,
     joinSections([
       [file, "  1:7 Unsafe assignment [typescript-eslint(no-unsafe-assignment)]", "    x = foo"],
-      [
-        "Hint on the `no-unsafe-*` diagnostics:",
-        "- Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary module with typed wrappers.",
-        "- Inline disable (`// oxlint-disable-next-line`) is not a fix; use only when explicitly permitted by the project maintainer.",
-        `- See: ${HINT_PATH}`,
-      ],
     ]),
+  );
+  assert.equal(
+    result.weakTypingsHint,
+    [
+      "Hint on the `no-unsafe-*` diagnostics:",
+      "- Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary module with typed wrappers.",
+      "- Inline disable (`// oxlint-disable-next-line`) is not a fix; use only when explicitly permitted by the project maintainer.",
+      `- See: ${HINT_PATH}`,
+      "",
+    ].join("\n"),
   );
 });
 
-void test("renderDiagnostics: omits the hint block when no no-unsafe-* code is present", () => {
+void test("renderDiagnostics: weakTypingsHint is null when no no-unsafe-* code is present", () => {
   const result = renderDiagnostics([makeResolved()], HINT_PATH);
-  // No "Hint on the" line in the output.
-  assert.ok(!result.formattedStdout.includes("Hint on the"));
+  assert.equal(result.weakTypingsHint, null);
+  assert.ok(!result.formattedDiagnostics.includes("Hint on the"));
 });

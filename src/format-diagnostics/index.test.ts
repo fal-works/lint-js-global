@@ -31,17 +31,46 @@ void test("happy path: single file, single diagnostic produces formatted output 
   });
 
   assert.equal(
-    result.formattedStdout,
+    result.formattedDiagnostics,
     joinSections([
       [file, "  1:1 `debugger` statement is not allowed. [eslint(no-debugger)]", "    debugger"],
     ]),
   );
+  assert.equal(result.weakTypingsHint, null);
   assert.equal(result.linterSummary, "1 unfixed lint issue in 1 file.");
   assert.equal(result.schemaMismatch, null);
   assert.equal(result.noFilesMatched, false);
 });
 
-void test("zero diagnostics yields empty formattedStdout and null linterSummary", () => {
+void test("no-unsafe-* diagnostic surfaces weakTypingsHint alongside the diagnostics", (t) => {
+  const dir = setupFixture(t, { "x.ts": "let data;\ndata.foo;\n" });
+  const file = join(dir, "x.ts");
+  const stdout = makeStdout([
+    {
+      message: "Unsafe member access .foo on an `any` value.",
+      code: "typescript-eslint(no-unsafe-member-access)",
+      severity: "error",
+      filename: file,
+      labels: [{ span: { offset: 14, length: 3, line: 2, column: 6 } }],
+    },
+  ]);
+
+  const result = formatLintOutput({
+    capturedStdout: stdout,
+    check: false,
+    unix: false,
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.match(result.formattedDiagnostics, /no-unsafe-member-access/);
+  assert.ok(!result.formattedDiagnostics.includes("Hint on the"));
+  assert.ok(result.weakTypingsHint !== null);
+  assert.match(result.weakTypingsHint, /^Hint on the `no-unsafe-\*` diagnostics:/);
+  assert.match(result.weakTypingsHint, new RegExp(`- See: ${HINT_PATH}\\n$`));
+  assert.equal(result.linterSummary, "1 unfixed lint issue in 1 file.");
+});
+
+void test("zero diagnostics yields empty payload and null aux fields", () => {
   const result = formatLintOutput({
     capturedStdout: makeStdout([]),
     check: false,
@@ -49,7 +78,8 @@ void test("zero diagnostics yields empty formattedStdout and null linterSummary"
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.formattedStdout, "");
+  assert.equal(result.formattedDiagnostics, "");
+  assert.equal(result.weakTypingsHint, null);
   assert.equal(result.linterSummary, null);
   assert.equal(result.schemaMismatch, null);
 });
@@ -65,7 +95,8 @@ void test("empty stdout in JSON mode is clean-compatible (no schemaMismatch)", (
   });
 
   assert.equal(result.schemaMismatch, null);
-  assert.equal(result.formattedStdout, "");
+  assert.equal(result.formattedDiagnostics, "");
+  assert.equal(result.weakTypingsHint, null);
   assert.equal(result.linterSummary, null);
   assert.equal(result.noFilesMatched, false);
 });
@@ -80,7 +111,8 @@ void test("broken JSON is relayed verbatim and surfaced via schemaMismatch", () 
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.formattedStdout, broken);
+  assert.equal(result.formattedDiagnostics, broken);
+  assert.equal(result.weakTypingsHint, null);
   assert.equal(result.linterSummary, null);
   assert.notEqual(result.schemaMismatch, null);
   assert.match(result.schemaMismatch?.reason ?? "", /JSON/);
@@ -98,7 +130,8 @@ void test("schema-mismatch from validator is relayed verbatim with the validator
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.formattedStdout, raw, "raw payload must be relayed verbatim");
+  assert.equal(result.formattedDiagnostics, raw, "raw payload must be relayed verbatim");
+  assert.equal(result.weakTypingsHint, null);
   assert.notEqual(result.schemaMismatch, null);
   assert.match(result.schemaMismatch?.reason ?? "", /diagnostics/);
 });
@@ -116,7 +149,8 @@ void test('"No files found to lint." prefix is treated as a clean no-files run',
 
   assert.equal(result.noFilesMatched, true);
   assert.equal(result.schemaMismatch, null);
-  assert.equal(result.formattedStdout, "");
+  assert.equal(result.formattedDiagnostics, "");
+  assert.equal(result.weakTypingsHint, null);
   assert.equal(result.linterSummary, null);
 });
 
@@ -133,7 +167,8 @@ void test('"No files found to lint." prefix sets noFilesMatched in --unix mode t
 
   assert.equal(result.noFilesMatched, true);
   assert.equal(result.schemaMismatch, null);
-  assert.equal(result.formattedStdout, raw, "unix mode keeps the raw payload as passthrough");
+  assert.equal(result.formattedDiagnostics, raw, "unix mode keeps the raw payload as passthrough");
+  assert.equal(result.weakTypingsHint, null);
   assert.equal(result.linterSummary, null);
 });
 
@@ -147,6 +182,7 @@ void test("--unix mode passes stdout through unchanged", () => {
     weakTypingsDocPath: HINT_PATH,
   });
 
-  assert.equal(result.formattedStdout, raw);
+  assert.equal(result.formattedDiagnostics, raw);
+  assert.equal(result.weakTypingsHint, null);
   assert.equal(result.linterSummary, null);
 });

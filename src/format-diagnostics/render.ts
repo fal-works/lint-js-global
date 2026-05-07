@@ -2,22 +2,22 @@ import type { ResolvedDiagnostic } from "./resolve.ts";
 
 /**
  * Pattern matching the `errorCode` of `typescript-eslint(no-unsafe-*)` diagnostics, which
- * trigger the weak-typings hint block at the end of the output.
+ * trigger the weak-typings hint block.
  */
 const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 
 /**
- * Render the formatted-stdout payload from resolved diagnostics. Diagnostics are sorted
- * stably, grouped by filename, and emitted as one section per file. A weak-typings hint
- * block is appended when any `no-unsafe-*` diagnostic is present.
+ * Render the formatted diagnostics payload from resolved diagnostics. Diagnostics are
+ * sorted stably, grouped by filename, and emitted as one section per file.
  *
- * Returns the file count alongside the text so the caller can compose the summary line
- * without re-grouping.
+ * Returns the diagnostics block alongside the file count and an optional weak-typings
+ * hint block. The hint is non-null whenever any `no-unsafe-*` diagnostic is present;
+ * it is returned separately so the caller can route it apart from the diagnostics.
  */
 export function renderDiagnostics(
   resolved: readonly ResolvedDiagnostic[],
   weakTypingsDocPath: string,
-): { formattedStdout: string; fileCount: number } {
+): { formattedDiagnostics: string; weakTypingsHint: string | null; fileCount: number } {
   const sorted = [...resolved].sort(compareDiagnostics);
   const fileGroups = groupByFilename(sorted);
 
@@ -26,12 +26,13 @@ export function renderDiagnostics(
     sections.push([filename, ...diags.map(formatDiagLine)]);
   }
 
-  if (sorted.some((d) => UNSAFE_CODE_PATTERN.test(d.errorCode))) {
-    sections.push(renderWeakTypingsHint(weakTypingsDocPath));
-  }
+  const formattedDiagnostics = `${sections.map((s) => s.join("\n")).join("\n\n")}\n`;
 
-  const formattedStdout = `${sections.map((s) => s.join("\n")).join("\n\n")}\n`;
-  return { formattedStdout, fileCount: fileGroups.size };
+  const weakTypingsHint = sorted.some((d) => UNSAFE_CODE_PATTERN.test(d.errorCode))
+    ? `${renderWeakTypingsHint(weakTypingsDocPath).join("\n")}\n`
+    : null;
+
+  return { formattedDiagnostics, weakTypingsHint, fileCount: fileGroups.size };
 }
 
 /**
@@ -83,8 +84,7 @@ export function formatDiagLine(d: ResolvedDiagnostic): string {
 }
 
 /**
- * Static hint block appended after the diagnostic sections when any `no-unsafe-*`
- * diagnostic is present.
+ * Static weak-typings hint block. Each entry is one line of the block, in render order.
  */
 export function renderWeakTypingsHint(docPath: string): string[] {
   return [

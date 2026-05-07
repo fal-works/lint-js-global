@@ -41,8 +41,8 @@ Each tool's standard ignore files (like `.gitignore`) are respected.
 ### Output
 
 stdout carries lint-result text only, so it can be piped into another tool without further filtering.
-The issue-count summary and the final tagged status line go to stderr.
-The format phase is silent on success; only formatter failures surface as stderr output.
+Auxiliary text goes to stderr: the issue-count summary, the final tagged status line, formatter failures, and (when applicable) a short hint pointing to some diagnostic rules.
+The format phase is silent on success.
 
 Default lint output groups diagnostics per file.
 Each diagnostic occupies two lines: a head line with the byte-accurate location (`L:C` or `L:C-L:C`), the diagnostic message, and the bracketed error code; followed by a continuation line carrying the exact source-code slice the rule points at.
@@ -53,10 +53,6 @@ src/index.ts
     data = JSON.parse("{}")
   2:18 Unsafe member access .foo on an `any` value. [typescript-eslint(no-unsafe-member-access)]
     foo
-
-Hint on the `no-unsafe-*` diagnostics:
-- ...
-- See: <package>/docs/guide/weak-typings.md
 ```
 
 The bracketed error code is the raw oxlint `code` field in `plugin(rule)` form (e.g. `eslint(no-debugger)`, `typescript-eslint(no-floating-promises)`, `typescript(TS2591)`).
