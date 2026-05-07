@@ -231,6 +231,7 @@ export function buildPathInjectedEnv(binDir: string): NodeJS.ProcessEnv {
       if (key !== pathKey && key.toUpperCase() === "PATH") delete env[key];
     }
   }
+  // `process.env` lookup is case-insensitive on Windows, regardless of the stored spelling.
   env[pathKey] = `${binDir}${pathSep}${process.env[pathKey] ?? ""}`;
   return env;
 }
