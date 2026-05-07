@@ -24,11 +24,10 @@
   },
   "scripts": {
     "lint": "node src/cli.ts",
-    "typecheck": "tsc --noEmit",
     "test": "node --test test/cli/*.test.ts src/*.test.ts src/format-diagnostics/*.test.ts",
     "build": "tsc -p tsconfig.build.json",
     "clean": "node scripts/clean.ts",
-    "prepublishOnly": "pnpm lint --check && pnpm typecheck && pnpm test && pnpm clean && pnpm build"
+    "prepublishOnly": "pnpm lint --check && pnpm test && pnpm clean && pnpm build"
   },
   "dependencies": {
     "oxfmt": "^0.47.0",
