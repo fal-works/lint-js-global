@@ -1,4 +1,4 @@
-import { formatLintOutput } from "./format-diagnostics.ts";
+import { formatLintOutput } from "./format-diagnostics/index.ts";
 import { LintJsError, type Logger } from "./log.ts";
 import { resolvePackageBin } from "./package-info.ts";
 import { NODE_MODULES_BIN, OXLINT_CONFIG, WEAK_TYPINGS_DOC } from "./package-paths.ts";

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 
-import { formatLintOutput } from "../../src/format-diagnostics.ts";
+import { formatLintOutput } from "../../src/format-diagnostics/index.ts";
 
 const HINT_PATH = "/opt/lint-js/docs/guide/weak-typings.md";
 
