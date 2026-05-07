@@ -1,10 +1,11 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
+import { LintJsError } from "./error.ts";
 import { type FmtPhaseOutcome, runFmtPhase } from "./fmt.ts";
 import { getSystemIgnorePatterns } from "./ignore.ts";
 import { type LintPhaseOutcome, runLintPhase } from "./lint.ts";
-import { LintJsError, type Logger } from "./log.ts";
+import type { Logger } from "./log.ts";
 
 /** Run-mode arguments. */
 export interface RunArgs {

@@ -12,7 +12,8 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { LintJsError, type Logger } from "../src/log.ts";
+import { LintJsError } from "../src/error.ts";
+import type { Logger } from "../src/log.ts";
 import { run, type RunArgs } from "../src/runner.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));

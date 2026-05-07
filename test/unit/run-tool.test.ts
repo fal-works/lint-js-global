@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 
-import { LintJsError } from "../../src/log.ts";
+import { LintJsError } from "../../src/error.ts";
 import { runToolCapturingOutput } from "../../src/run-tool.ts";
 
 /**

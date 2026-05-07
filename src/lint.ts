@@ -1,5 +1,6 @@
+import { LintJsError } from "./error.ts";
 import { formatLintOutput } from "./format-diagnostics/index.ts";
-import { LintJsError, type Logger } from "./log.ts";
+import type { Logger } from "./log.ts";
 import { resolvePackageBin } from "./package-info.ts";
 import { NODE_MODULES_BIN, OXLINT_CONFIG, WEAK_TYPINGS_DOC } from "./package-paths.ts";
 import { buildPathInjectedEnv, runToolCapturingOutput } from "./run-tool.ts";
@@ -71,12 +72,16 @@ export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): Lin
 
   const oxlintBin = resolvePackageBin("oxlint", "oxlint");
 
+  // oxlint resolves the `tsgolint` binary via `PATH`. For a globally-installed lint-js we
+  // prepend our own `node_modules/.bin` so the bundled oxlint-tsgolint shim is picked up
+  // regardless of the user project's layout.
+  const env = buildPathInjectedEnv(NODE_MODULES_BIN);
   const { result, capturedStdout, capturedStderr } = runToolCapturingOutput({
     name: "oxlint",
     bin: oxlintBin,
     args: buildOxlintArgs(OXLINT_CONFIG, ignorePatterns, targets, check, unix),
     cwd,
-    env: buildPathInjectedEnv(NODE_MODULES_BIN),
+    env,
   });
 
   logger.writeErr(capturedStderr);

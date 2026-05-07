@@ -2,7 +2,8 @@
 
 import { parseArgs } from "node:util";
 
-import { createConsoleLogger, LintJsError, type Logger } from "./log.ts";
+import { LintJsError } from "./error.ts";
+import { createConsoleLogger, type Logger } from "./log.ts";
 import { getPackageVersion } from "./package-info.ts";
 import { run, type RunArgs } from "./runner.ts";
 
