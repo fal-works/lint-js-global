@@ -14,4 +14,3 @@ export const PACKAGE_JSON = fromRoot("package.json");
 export const OXFMT_CONFIG = fromRoot("cfg", "oxfmtrc.json");
 export const OXLINT_CONFIG = fromRoot("cfg", "oxlintrc.json");
 export const WEAK_TYPINGS_DOC = fromRoot("docs", "guide", "weak-typings.md");
-export const NODE_MODULES_BIN = fromRoot("node_modules", ".bin");
