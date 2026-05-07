@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
+import { runCommandCapturingOutput } from "./run-tool.ts";
 import { createTsgolintShimDir } from "./tsgolint-shim.ts";
 
 void test("createTsgolintShimDir: produces a working tsgolint executable that delegates to the bundled entry", () => {
@@ -12,15 +12,16 @@ void test("createTsgolintShimDir: produces a working tsgolint executable that de
     const binName = process.platform === "win32" ? "tsgolint.cmd" : "tsgolint";
     assert.deepEqual(readdirSync(shim.dir), [binName]);
 
-    const result = spawnSync(join(shim.dir, binName), ["--help"], {
-      encoding: "utf8",
+    const { result, capturedStdout, capturedStderr } = runCommandCapturingOutput({
+      name: "tsgolint shim",
+      command: join(shim.dir, binName),
+      args: ["--help"],
       shell: process.platform === "win32",
     });
 
-    assert.equal(result.error, undefined, "shim launches without spawn error");
     assert.equal(result.status, 0, "tsgolint --help exits 0");
     // tsgolint prints its CLI banner to stderr; combined output must mention the binary.
-    const combined = `${result.stdout}${result.stderr}`;
+    const combined = `${capturedStdout}${capturedStderr}`;
     assert.match(combined, /tsgolint/);
   } finally {
     shim.cleanup();

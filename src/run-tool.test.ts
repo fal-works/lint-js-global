@@ -5,7 +5,11 @@ import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 
 import { LintJsError } from "./error.ts";
-import { runToolCapturingOutput } from "./run-tool.ts";
+import {
+  runCommandCapturingOutput,
+  runToolCapturingCombined,
+  runToolCapturingOutput,
+} from "./run-tool.ts";
 
 /**
  * Drop a tmp JS file `script.js` containing the given source, and clean up at teardown.
@@ -56,6 +60,44 @@ void test("runToolCapturingOutput: clean exit returns captured streams", (t) => 
   assert.equal(result.status, 0);
   assert.equal(capturedStdout, "hello-out");
   assert.equal(capturedStderr, "hello-err");
+});
+
+void test("runCommandCapturingOutput: clean exit returns captured streams", (t) => {
+  const bin = makeScript(t, "process.stdout.write('cmd-out');\nprocess.stderr.write('cmd-err');\n");
+
+  const { result, capturedStdout, capturedStderr } = runCommandCapturingOutput({
+    name: "command-echo",
+    command: process.execPath,
+    args: [bin],
+  });
+
+  assert.equal(result.status, 0);
+  assert.equal(capturedStdout, "cmd-out");
+  assert.equal(capturedStderr, "cmd-err");
+});
+
+void test("runCommandCapturingOutput: launch failure throws LintJsError", () => {
+  assert.throws(
+    () =>
+      runCommandCapturingOutput({
+        name: "missing-command",
+        command: join(tmpdir(), "lint-js-runtool-missing-command"),
+        args: [],
+      }),
+    (err) => err instanceof LintJsError && /failed to launch missing-command:/.test(err.message),
+  );
+});
+
+void test("runToolCapturingCombined: clean exit returns combined output", (t) => {
+  const bin = makeScript(
+    t,
+    "process.stdout.write('combined-out');\nprocess.stderr.write('combined-err');\n",
+  );
+
+  const { result, captured } = runToolCapturingCombined({ name: "combined", bin, args: [] });
+
+  assert.equal(result.status, 0);
+  assert.equal(captured, "combined-outcombined-err");
 });
 
 void test("runToolCapturingOutput: child sees NO_COLOR=1 and no FORCE_COLOR/CLICOLOR_FORCE", (t) => {

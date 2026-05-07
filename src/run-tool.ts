@@ -24,20 +24,47 @@ interface RunToolOptions {
   env?: NodeJS.ProcessEnv;
 }
 
+interface RunCommandOptions {
+  /** Command name for launch-failure diagnostics. */
+  name: string;
+
+  /** Executable path or command name passed directly to `spawnSync`. */
+  command: string;
+
+  /** Arguments passed to the command. */
+  args: readonly string[];
+
+  /** Working directory for the child. Defaults to the parent's cwd. */
+  cwd?: string;
+
+  /** Env for the child. Defaults to inherited. */
+  env?: NodeJS.ProcessEnv;
+
+  /** Passed through to `spawnSync` for platform-specific executable shims. */
+  shell?: boolean | string;
+}
+
 /**
- * Run a Node-based tool (executed via `process.execPath`) and capture stdout/stderr
- * for post-run inspection. Use this when the caller treats the two streams differently
+ * Run an arbitrary command and capture stdout/stderr separately for post-run inspection.
+ * Use this when the caller treats the two streams differently
  * (e.g. parses stdout, relays stderr).
  *
  * File-backed stdio (not pipes): workaround for https://github.com/openai/codex/issues/18473,
- * where captured pipe-backed output from a nested Node child can be dropped in the Codex sandbox.
+ * where pipe-backed stdio from nested children can be unreliable in the Codex sandbox.
  *
  * Side effect: the child's output is batched until exit instead of streaming.
  * Both streams are captured symmetrically so the caller can flush them in a deterministic order.
  *
  * Throws {@link LintJsError} on launch failure or signal-driven termination.
  */
-export function runToolCapturingOutput({ name, bin, args, cwd, env }: RunToolOptions): {
+export function runCommandCapturingOutput({
+  name,
+  command,
+  args,
+  cwd,
+  env,
+  shell,
+}: RunCommandOptions): {
   result: SpawnResult;
   capturedStdout: string;
   capturedStderr: string;
@@ -50,10 +77,11 @@ export function runToolCapturingOutput({ name, bin, args, cwd, env }: RunToolOpt
   try {
     stdoutFd = openSync(stdoutPath, "w");
     stderrFd = openSync(stderrPath, "w");
-    const result = spawnSync(process.execPath, [bin, ...args], {
+    const result = spawnSync(command, args, {
       stdio: ["inherit", stdoutFd, stderrFd],
       cwd,
-      env: forcePlainOutput(env ?? process.env),
+      env: env ?? process.env,
+      shell,
     });
     closeSync(stdoutFd);
     stdoutFd = -1;
@@ -73,13 +101,21 @@ export function runToolCapturingOutput({ name, bin, args, cwd, env }: RunToolOpt
 }
 
 /**
- * Like {@link runToolCapturingOutput}, but binds the child's stdout and stderr to the same fd
- * so their natural emission order is preserved in the captured text. Use this when the caller
- * routes the whole thing into one sink (and merging post-hoc would risk reordering).
+ * Like {@link runCommandCapturingOutput}, but binds the child's stdout and stderr to the
+ * same fd so their natural emission order is preserved in the captured text.
+ * Use this when the caller routes the whole thing into one sink
+ * (and merging post-hoc would risk reordering).
  *
  * Throws {@link LintJsError} on launch failure or signal-driven termination.
  */
-export function runToolCapturingCombined({ name, bin, args, cwd, env }: RunToolOptions): {
+export function runCommandCapturingCombined({
+  name,
+  command,
+  args,
+  cwd,
+  env,
+  shell,
+}: RunCommandOptions): {
   result: SpawnResult;
   captured: string;
 } {
@@ -88,10 +124,11 @@ export function runToolCapturingCombined({ name, bin, args, cwd, env }: RunToolO
   let fd = -1;
   try {
     fd = openSync(path, "w");
-    const result = spawnSync(process.execPath, [bin, ...args], {
+    const result = spawnSync(command, args, {
       stdio: ["inherit", fd, fd],
       cwd,
-      env: forcePlainOutput(env ?? process.env),
+      env: env ?? process.env,
+      shell,
     });
     closeSync(fd);
     fd = -1;
@@ -104,6 +141,41 @@ export function runToolCapturingCombined({ name, bin, args, cwd, env }: RunToolO
     if (fd !== -1) closeSync(fd);
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/**
+ * Node-tool variant of {@link runCommandCapturingOutput}: pins `process.execPath`
+ * as the executable and strips color-forcing env vars so the child emits plain output.
+ */
+export function runToolCapturingOutput({ name, bin, args, cwd, env }: RunToolOptions): {
+  result: SpawnResult;
+  capturedStdout: string;
+  capturedStderr: string;
+} {
+  return runCommandCapturingOutput({
+    name,
+    command: process.execPath,
+    args: [bin, ...args],
+    cwd,
+    env: forcePlainOutput(env ?? process.env),
+  });
+}
+
+/**
+ * Node-tool variant of {@link runCommandCapturingCombined}: pins `process.execPath`
+ * as the executable and strips color-forcing env vars so the child emits plain output.
+ */
+export function runToolCapturingCombined({ name, bin, args, cwd, env }: RunToolOptions): {
+  result: SpawnResult;
+  captured: string;
+} {
+  return runCommandCapturingCombined({
+    name,
+    command: process.execPath,
+    args: [bin, ...args],
+    cwd,
+    env: forcePlainOutput(env ?? process.env),
+  });
 }
 
 /**
