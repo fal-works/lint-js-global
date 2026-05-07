@@ -49,10 +49,9 @@ void test("snapshot: full pipeline on dirty source (diag + summary)", (t) => {
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const { events, exitCode } = runRecording(dir, {
+    mode: "full",
     check: false,
     outputMode: "stylish",
-    formatOnly: false,
-    lintOnly: false,
     targets: DEFAULT_TARGETS,
   });
   matchSnapshot("basic-default", events, exitCode);
@@ -62,10 +61,9 @@ void test("snapshot: --unix mode emits flat diagnostic lines on stdout, summary 
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const { events, exitCode } = runRecording(dir, {
+    mode: "full",
     check: false,
     outputMode: "unix",
-    formatOnly: false,
-    lintOnly: false,
     targets: DEFAULT_TARGETS,
   });
   matchSnapshot("basic-unix", events, exitCode);
@@ -77,10 +75,9 @@ void test("snapshot: --check reports both fmt and lint violations without rewrit
   const target = join(dir, "src", "index.ts");
   const before = readFileSync(target, "utf8");
   const { events, exitCode } = runRecording(dir, {
+    mode: "full",
     check: true,
     outputMode: "stylish",
-    formatOnly: false,
-    lintOnly: false,
     targets: DEFAULT_TARGETS,
   });
   assert.equal(readFileSync(target, "utf8"), before, "sources must not be rewritten in check mode");
@@ -91,10 +88,9 @@ void test("snapshot: --check on a clean project", (t) => {
   const dir = copyFixture("with-node-modules");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const { events, exitCode } = runRecording(dir, {
+    mode: "full",
     check: true,
     outputMode: "stylish",
-    formatOnly: false,
-    lintOnly: false,
     targets: DEFAULT_TARGETS,
   });
   matchSnapshot("clean-check", events, exitCode);
@@ -104,10 +100,9 @@ void test("snapshot: unsafe-any rules trigger the weak-typings hint block", (t) 
   const dir = copyFixture("unsafe-any");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const { events, exitCode } = runRecording(dir, {
+    mode: "full",
     check: false,
     outputMode: "stylish",
-    formatOnly: false,
-    lintOnly: false,
     targets: DEFAULT_TARGETS,
   });
   matchSnapshot("unsafe-any-default", events, exitCode);
@@ -121,10 +116,9 @@ void test("snapshot: --unix with fully-ignored target keeps stdout empty", (t) =
   writeFileSync(join(dir, ".prettierignore"), "ignored.ts\n");
   writeFileSync(join(dir, ".eslintignore"), "ignored.ts\n");
   const { events, exitCode } = runRecording(dir, {
+    mode: "full",
     check: false,
     outputMode: "unix",
-    formatOnly: false,
-    lintOnly: false,
     targets: ["src/ignored.ts"],
   });
   matchSnapshot("unix-no-files", events, exitCode);
@@ -135,10 +129,9 @@ void test("snapshot: fatal fmt failure halts before lint", (t) => {
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   writeFileSync(join(dir, "broken.ts"), "const x = ;\n");
   const { events, exitCode } = runRecording(dir, {
+    mode: "full",
     check: false,
     outputMode: "stylish",
-    formatOnly: false,
-    lintOnly: false,
     targets: DEFAULT_TARGETS,
   });
   matchSnapshot("halt-fmt-fatal", events, exitCode);

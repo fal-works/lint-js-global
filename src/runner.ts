@@ -8,12 +8,19 @@ import { getSystemIgnorePatterns } from "./ignore.ts";
 import { type LintPhaseOutcome, runLintPhase } from "./lint.ts";
 import type { Logger } from "./log.ts";
 
+/**
+ * Which phases run.
+ *
+ * - `"full"` runs the full pipeline (`oxfmt` → `oxlint` → `oxfmt`).
+ * - `"format-only"` and `"lint-only"` collapse to a single phase as named.
+ */
+export type RunMode = "full" | "format-only" | "lint-only";
+
 /** Run-mode arguments. */
 export interface RunArgs {
+  mode: RunMode;
   check: boolean;
   outputMode: LintOutputMode;
-  formatOnly: boolean;
-  lintOnly: boolean;
   targets: readonly string[];
 }
 
@@ -27,8 +34,8 @@ export interface RunContext {
 }
 
 interface BuildSummaryOptions {
+  mode: RunMode;
   check: boolean;
-  formatOnly: boolean;
 
   /** True when the leading fmt phase halted the run; lint and trailing fmt were skipped. */
   halted: boolean;
@@ -56,8 +63,8 @@ interface BuildSummaryOptions {
  * so the summary only conveys overall outcome and whether fixes may have been applied.
  */
 function buildSummary({
+  mode,
   check,
-  formatOnly,
   halted,
   leadingFmt,
   lint,
@@ -71,7 +78,7 @@ function buildSummary({
     (trailingFmt === null || trailingFmt.kind === "ok");
   const lintOk = lint === null || lint.kind === "ok" || lint.kind === "no-files";
   const ok = fmtOk && lintOk;
-  if (formatOnly && !check && !ok) {
+  if (mode === "format-only" && !check && !ok) {
     return "Failed. Format errors remain.";
   }
   if (ok && lint?.kind === "no-files") {
@@ -105,7 +112,7 @@ function buildSummary({
  * May throw {@link LintJsError}; the CLI boundary catches it and maps to exit 2.
  */
 export function run(args: RunArgs, ctx: RunContext): number {
-  const { check, outputMode, formatOnly, lintOnly, targets } = args;
+  const { mode, check, outputMode, targets } = args;
   const { cwd, logger } = ctx;
 
   if (!existsSync(resolve(cwd, "package.json"))) {
@@ -130,15 +137,15 @@ export function run(args: RunArgs, ctx: RunContext): number {
   let lint: LintPhaseOutcome | null = null;
   let trailingFmt: FmtPhaseOutcome | null = null;
 
-  if (!lintOnly) {
+  if (mode !== "lint-only") {
     leadingFmt = runFmtPhase({ check, targets, ignorePatterns }, phaseCtx);
   }
 
   // Halt only when there is something downstream to skip; in `--format-only` the leading
   // pass is the entire run, so a fatal exit there falls through as a regular failure.
-  const halted = leadingFmt?.kind === "fatal" && !formatOnly;
+  const halted = leadingFmt?.kind === "fatal" && mode !== "format-only";
 
-  if (!formatOnly && !halted) {
+  if (mode !== "format-only" && !halted) {
     logger.markBlankSeparator();
     lint = runLintPhase({ check, outputMode, targets, ignorePatterns }, phaseCtx);
   }
@@ -148,13 +155,13 @@ export function run(args: RunArgs, ctx: RunContext): number {
   // Skipped when lint findings remain, so reported `L:C` positions match the file the consumer opens next.
   // Skipped when lint matched no files (no drift).
   // Skipped under `--check` (lint applies no fixes).
-  if (!lintOnly && !formatOnly && !check && !halted && lint?.kind === "ok") {
+  if (mode === "full" && !check && !halted && lint?.kind === "ok") {
     logger.markBlankSeparator();
     trailingFmt = runFmtPhase({ check: false, targets, ignorePatterns }, phaseCtx);
   }
 
   logger.markBlankSeparator();
-  logger.writeErrTagged(buildSummary({ check, formatOnly, halted, leadingFmt, lint, trailingFmt }));
+  logger.writeErrTagged(buildSummary({ mode, check, halted, leadingFmt, lint, trailingFmt }));
 
   // Collapse any failing outcome to exit 1; exit 2 is reserved for LintJsError.
   const fmtFailed =

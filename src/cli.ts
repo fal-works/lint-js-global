@@ -5,7 +5,7 @@ import { parseArgs } from "node:util";
 import { LintJsError } from "./error.ts";
 import { createConsoleLogger, type Logger } from "./log.ts";
 import { getPackageVersion } from "./package-info.ts";
-import { run, type RunArgs } from "./runner.ts";
+import { run, type RunArgs, type RunMode } from "./runner.ts";
 
 const HELP_TEXT = `Usage: lint-js [--check] [--format-only | --lint-only] [--unix] [path...]
 
@@ -67,14 +67,14 @@ function parseCliArgs(argv: readonly string[]): CliArgs {
   if (formatOnly && lintOnly) {
     throw new LintJsError("`--format-only` and `--lint-only` are mutually exclusive.");
   }
+  const mode: RunMode = formatOnly ? "format-only" : lintOnly ? "lint-only" : "full";
 
   return {
     kind: "run",
     args: {
+      mode,
       check: values.check === true,
       outputMode: values.unix === true ? "unix" : "stylish",
-      formatOnly,
-      lintOnly,
       targets: positionals.length > 0 ? positionals : ["."],
     },
   };
