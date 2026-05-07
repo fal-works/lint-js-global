@@ -2,6 +2,7 @@ node_modules/
 .codex
 /dev/
 /tmp/
+/dist/
 
 # Claude Code sandbox bind-mount artifacts
 /.bashrc
