@@ -1,4 +1,4 @@
 ERR No files found to lint.
 ERR
-ERR lint-js: Completed successfully. Issues fixed where possible.
+ERR lint-js: Completed successfully. No lintable files matched.
 EXIT 0

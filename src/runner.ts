@@ -48,6 +48,8 @@ interface BuildSummaryOptions {
  * no lint phase and applies no fixes when it fails (the only failure mode is a parse error
  * in the leading pass), so the generic "fixed where possible; unfixed issues remain" wording
  * would misrepresent a fmt-only failure as a lint issue.
+ * Successful runs where lint matched no files get their own wording too, since "Issues
+ * fixed where possible." would imply work happened on a phase that found nothing to check.
  * Otherwise the verdict is binary; which phase failed is readable from tool output above,
  * so the summary only conveys overall outcome and whether fixes may have been applied.
  */
@@ -65,10 +67,13 @@ function buildSummary({
   const fmtOk =
     (leadingFmt === null || leadingFmt.kind === "ok") &&
     (trailingFmt === null || trailingFmt.kind === "ok");
-  const lintOk = lint === null || lint.kind === "ok";
+  const lintOk = lint === null || lint.kind === "ok" || lint.kind === "no-files";
   const ok = fmtOk && lintOk;
   if (formatOnly && !check && !ok) {
     return "Failed. Format errors remain.";
+  }
+  if (ok && lint?.kind === "no-files") {
+    return "Completed successfully. No lintable files matched.";
   }
   if (check) {
     return ok
@@ -136,10 +141,11 @@ export function run(args: RunArgs, ctx: RunContext): number {
     lint = runLintPhase({ check, unix, targets, ignorePatterns }, phaseCtx);
   }
 
-  // Trailing pass: default mode only, after the leading pass and lint both succeed. Its
-  // job is to normalize any drift introduced by `oxlint --fix`. Skipped when lint findings
-  // remain, so reported `L:C` positions match the file the consumer opens next; in
-  // `--check` lint applies no fixes, so the leading pass is sufficient.
+  // Trailing pass: default mode only, when lint succeeded with a non-empty file set.
+  // Normalizes drift introduced by `oxlint --fix`.
+  // Skipped when lint findings remain, so reported `L:C` positions match the file the consumer opens next.
+  // Skipped when lint matched no files (no drift).
+  // Skipped under `--check` (lint applies no fixes).
   if (!lintOnly && !formatOnly && !check && !halted && lint?.kind === "ok") {
     logger.markBlankSeparator();
     trailingFmt = runFmtPhase({ check: false, targets, ignorePatterns }, phaseCtx);
@@ -148,10 +154,10 @@ export function run(args: RunArgs, ctx: RunContext): number {
   logger.markBlankSeparator();
   logger.writeErrTagged(buildSummary({ check, formatOnly, halted, leadingFmt, lint, trailingFmt }));
 
-  // Collapse any non-`ok` outcome to exit 1; exit 2 is reserved for LintJsError.
+  // Collapse any failing outcome to exit 1; exit 2 is reserved for LintJsError.
   const fmtFailed =
     (leadingFmt !== null && leadingFmt.kind !== "ok") ||
     (trailingFmt !== null && trailingFmt.kind !== "ok");
-  const lintFailed = lint !== null && lint.kind !== "ok";
+  const lintFailed = lint?.kind === "findings";
   return fmtFailed || lintFailed ? 1 : 0;
 }

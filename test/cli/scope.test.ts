@@ -41,7 +41,7 @@ void test("fully-ignored single-file target exits cleanly", (t) => {
   assert.equal(result.status, 0, "expected exit 0 when the only target is ignored");
   assert.equal(readFileSync(ignored, "utf8"), DIRTY_SOURCE, "ignored file must not be touched");
   assert.equal(result.stdout, "", "stdout must stay empty when no diagnostic is produced");
-  assert.match(result.stderr, /^lint-js: Completed successfully\. Issues fixed where possible\.$/m);
+  assert.match(result.stderr, /^lint-js: Completed successfully\. No lintable files matched\.$/m);
 });
 
 void test("--check + fully-ignored target: fmt phase stays silent on success (ADR-0006)", (t) => {
@@ -63,7 +63,7 @@ void test("--check + fully-ignored target: fmt phase stays silent on success (AD
     "oxfmt's own zero-match line must not surface when the phase succeeded",
   );
   assert.equal(result.stdout, "", "stdout must stay empty when no fmt/lint output applies");
-  assert.match(result.stderr, /^lint-js: Completed successfully\. No issues found\.$/m);
+  assert.match(result.stderr, /^lint-js: Completed successfully\. No lintable files matched\.$/m);
 });
 
 void test("target dir with no lintable files exits cleanly", (t) => {

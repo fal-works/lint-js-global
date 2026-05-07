@@ -51,10 +51,12 @@ export interface LintPhaseContext {
 /**
  * Outcome of a single oxlint invocation.
  *
- * - `ok`: oxlint exited 0, or returned the no-files-matched signal that collapses to clean.
+ * - `ok`: oxlint exited 0 against a non-empty file set.
+ * - `no-files`: no files matched the targets (oxlint ≥1.61's no-files signal). Exit-clean, but
+ *   distinct from `ok` so callers can adjust trailing-fmt and summary behavior.
  * - `findings`: oxlint reported diagnostics that remain after `--fix` (or in `--check` mode).
  */
-export type LintPhaseOutcome = { kind: "ok" } | { kind: "findings" };
+export type LintPhaseOutcome = { kind: "ok" } | { kind: "no-files" } | { kind: "findings" };
 
 /**
  * Run the lint phase: spawn oxlint, parse its JSON stdout via {@link formatLintOutput},
@@ -102,11 +104,10 @@ export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): Lin
     });
   }
 
-  // oxlint ≥1.61 exits non-zero when no files match the targets; treat that as clean.
-  const cleanish = result.status === 0 || noFilesMatched;
   if (linterSummary !== null) {
     logger.markBlankSeparator();
     logger.writeErr(`${linterSummary}\n`);
   }
-  return cleanish ? { kind: "ok" } : { kind: "findings" };
+  if (noFilesMatched) return { kind: "no-files" };
+  return result.status === 0 ? { kind: "ok" } : { kind: "findings" };
 }
