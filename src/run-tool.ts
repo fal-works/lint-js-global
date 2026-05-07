@@ -53,7 +53,7 @@ export function runToolCapturingOutput({ name, bin, args, cwd, env }: RunToolOpt
     const result = spawnSync(process.execPath, [bin, ...args], {
       stdio: ["inherit", stdoutFd, stderrFd],
       cwd,
-      env,
+      env: forcePlainOutput(env ?? process.env),
     });
     closeSync(stdoutFd);
     stdoutFd = -1;
@@ -91,7 +91,7 @@ export function runToolCapturingCombined({ name, bin, args, cwd, env }: RunToolO
     const result = spawnSync(process.execPath, [bin, ...args], {
       stdio: ["inherit", fd, fd],
       cwd,
-      env,
+      env: forcePlainOutput(env ?? process.env),
     });
     closeSync(fd);
     fd = -1;
@@ -104,6 +104,18 @@ export function runToolCapturingCombined({ name, bin, args, cwd, env }: RunToolO
     if (fd !== -1) closeSync(fd);
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/**
+ * Strip color-forcing env vars and assert `NO_COLOR=1` so child tools always emit plain output.
+ */
+function forcePlainOutput(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const out = { ...env };
+  // `NO_COLOR` alone is insufficient because `FORCE_COLOR` takes precedence in many tools.
+  delete out.FORCE_COLOR;
+  delete out.CLICOLOR_FORCE;
+  out.NO_COLOR = "1";
+  return out;
 }
 
 /**

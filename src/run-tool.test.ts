@@ -57,3 +57,23 @@ void test("runToolCapturingOutput: clean exit returns captured streams", (t) => 
   assert.equal(capturedStdout, "hello-out");
   assert.equal(capturedStderr, "hello-err");
 });
+
+void test("runToolCapturingOutput: child sees NO_COLOR=1 and no FORCE_COLOR/CLICOLOR_FORCE", (t) => {
+  const bin = makeScript(
+    t,
+    `process.stdout.write(JSON.stringify({
+       hasForceColor: 'FORCE_COLOR' in process.env,
+       hasCliColorForce: 'CLICOLOR_FORCE' in process.env,
+       noColor: process.env.NO_COLOR ?? null,
+     }));`,
+  );
+
+  const env: NodeJS.ProcessEnv = { ...process.env, FORCE_COLOR: "3", CLICOLOR_FORCE: "1" };
+  const { capturedStdout } = runToolCapturingOutput({ name: "envcheck", bin, args: [], env });
+
+  assert.deepEqual(JSON.parse(capturedStdout), {
+    hasForceColor: false,
+    hasCliColorForce: false,
+    noColor: "1",
+  });
+});
