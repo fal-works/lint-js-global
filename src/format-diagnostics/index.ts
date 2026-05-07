@@ -7,8 +7,8 @@ import { resolveDiagnostic } from "./resolve.ts";
  * LLM-friendly formatter for oxlint's `--format=json` output.
  */
 
-/** Prefix oxlint ≥1.61 prepends to stdout when no files match the targets. */
-export const NO_FILES_PREFIX = "No files found to lint.";
+/** Matches the signal oxlint ≥1.61 prepends to stdout when no files match the targets. */
+const OXLINT_NO_FILES_RE = /^No files found to lint\./;
 
 /**
  * Result of {@link formatLintOutput}.
@@ -76,7 +76,7 @@ export function formatLintOutput({
 }: FormatLintOptions): FormatLintResult {
   // Detected before mode branching: the prefix appears in --format=unix output too,
   // so unix mode also needs the exit-normalization signal.
-  const noFilesMatched = capturedStdout.startsWith(NO_FILES_PREFIX);
+  const noFilesMatched = OXLINT_NO_FILES_RE.test(capturedStdout);
 
   if (unix) {
     return {
