@@ -128,9 +128,8 @@ function ensureNormalExit(name: string, result: SpawnResult): void {
 /**
  * Returns a copy of `process.env` with `binDir` prepended to `PATH`.
  *
- * oxlint spawns the `tsgolint` binary via PATH lookup.
- * For globally-installed lint-js, inject our own `node_modules/.bin` at the head of PATH
- * so the bundled oxlint-tsgolint shim is found regardless of the user project's layout.
+ * On Windows, deduplicates case-variant `PATH` keys so the prepended entry is not shadowed
+ * by an earlier-spelled variant.
  *
  * @param binDir - Directory to prepend to PATH.
  */
