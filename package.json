@@ -23,7 +23,7 @@
   "scripts": {
     "lint": "node src/cli.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/cli/*.test.ts test/unit/*.test.ts",
+    "test": "node --test test/cli/*.test.ts test/unit/*.test.ts test/unit/format-diagnostics/*.test.ts",
     "prepublishOnly": "pnpm lint --check && pnpm typecheck && pnpm test"
   },
   "dependencies": {
