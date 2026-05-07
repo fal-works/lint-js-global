@@ -1,14 +1,25 @@
 import { validatePayload } from "../oxlint-json-schema.ts";
 import { createSourceCache } from "../source.ts";
-import { formatSummary, renderDiagnostics } from "./render.ts";
-import { resolveDiagnostic } from "./resolve.ts";
-
-/**
- * LLM-friendly formatter for oxlint's `--format=json` output.
- */
+import {
+  countFiles,
+  formatSummary,
+  hasUnsafeDiagnostic,
+  renderStylish,
+  renderUnix,
+  renderWeakTypingsHint,
+} from "./render.ts";
+import { resolveDiagnostic, type ResolvedDiagnostic } from "./resolve.ts";
 
 /** Matches the signal oxlint ≥1.61 prepends to stdout when no files match the targets. */
 const OXLINT_NO_FILES_RE = /^No files found to lint\./;
+
+/**
+ * Per-diagnostic line layout selector.
+ *
+ * - `stylish`: per-file grouped layout.
+ * - `unix`: one self-contained `<filename>:<L>:<C>: <message> [<code>]` line per diagnostic.
+ */
+export type LintOutputMode = "stylish" | "unix";
 
 /**
  * Result of {@link formatLintOutput}.
@@ -18,8 +29,8 @@ const OXLINT_NO_FILES_RE = /^No files found to lint\./;
  */
 export interface FormatLintResult {
   /**
-   * Per-file diagnostic sections, joined into a single string with a trailing newline.
-   * Empty when there are no diagnostics to report.
+   * Per-diagnostic stdout payload, ending with a trailing newline. Empty when there are no
+   * diagnostics to report.
    */
   formattedDiagnostics: string;
 
@@ -33,8 +44,7 @@ export interface FormatLintResult {
    * Human-readable summary line stating how many issues remain.
    * In `--check` mode the "unfixed" qualifier is omitted.
    *
-   * Null when there is nothing to summarize (no diagnostics, unix passthrough,
-   * or `schemaMismatch` is non-null).
+   * Null when there is nothing to summarize (no diagnostics, or `schemaMismatch` is non-null).
    */
   linterSummary: string | null;
 
@@ -62,8 +72,8 @@ export interface FormatLintOptions {
   /** Whether the run is `--check` (no auto-fix attempted). */
   check: boolean;
 
-  /** If true, pass through unchanged (no hint, no summary). */
-  unix: boolean;
+  /** Per-diagnostic line layout. */
+  outputMode: LintOutputMode;
 
   /** Absolute path used in the weak-typings hint. */
   weakTypingsDocPath: string;
@@ -76,7 +86,7 @@ export interface FormatLintOptions {
 }
 
 /**
- * Format raw oxlint JSON stdout into the LLM-friendly payload.
+ * Format raw oxlint JSON stdout into the structured payload.
  *
  * No stdout/stderr emission.
  * May read source files to resolve span positions.
@@ -84,97 +94,77 @@ export interface FormatLintOptions {
 export function formatLintOutput({
   capturedStdout,
   check,
-  unix,
+  outputMode,
   weakTypingsDocPath,
   cwd,
 }: FormatLintOptions): FormatLintResult {
-  // Detected before mode branching: the prefix appears in --format=unix output too,
-  // so unix mode also needs the exit-normalization signal.
   const noFilesMatched = OXLINT_NO_FILES_RE.test(capturedStdout);
+  if (noFilesMatched) return clean({ noFilesMatched: true });
 
-  if (unix) {
-    return {
-      formattedDiagnostics: capturedStdout,
-      weakTypingsHint: null,
-      linterSummary: null,
-      schemaMismatch: null,
-      noFilesMatched,
-    };
-  }
-
-  // Empty stdout is treated as clean-compatible: oxlint emitted no payload at all,
-  // which is benign and should not be escalated to a contract failure.
-  if (capturedStdout === "") {
-    return {
-      formattedDiagnostics: "",
-      weakTypingsHint: null,
-      linterSummary: null,
-      schemaMismatch: null,
-      noFilesMatched: false,
-    };
-  }
-
-  // The prefix breaks JSON parsing; short-circuit to a clean result.
-  if (noFilesMatched) {
-    return {
-      formattedDiagnostics: "",
-      weakTypingsHint: null,
-      linterSummary: null,
-      schemaMismatch: null,
-      noFilesMatched: true,
-    };
-  }
+  // oxlint normally always emits a JSON payload; an empty stdout is a benign edge case
+  // (no payload at all) and should not be escalated to a contract failure.
+  if (capturedStdout === "") return clean({ noFilesMatched: false });
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(capturedStdout);
   } catch (err) {
-    // Non-empty unparseable stdout is an output-contract failure (e.g. caret-range
-    // oxlint update silently changed the format). Surface it via the same path as
-    // schema drift so the wrapper exits 2 instead of misreporting the run as clean.
+    // Unparseable stdout signals a tool failure (e.g. tsgolint resolution failure, missing config),
+    // not a lint diagnostic.
+    // Route it through schemaMismatch so the wrapper boundary surfaces it as LintJsError + exit 2.
     const message = err instanceof Error ? err.message : String(err);
-    return {
-      formattedDiagnostics: capturedStdout,
-      weakTypingsHint: null,
-      linterSummary: null,
-      schemaMismatch: { reason: `stdout is not valid JSON: ${message}` },
-      noFilesMatched: false,
-    };
+    return contractFailure(capturedStdout, `stdout is not valid JSON: ${message}`);
   }
 
   const validation = validatePayload(parsed);
-  if (!validation.ok) {
-    return {
-      formattedDiagnostics: capturedStdout,
-      weakTypingsHint: null,
-      linterSummary: null,
-      schemaMismatch: { reason: validation.reason },
-      noFilesMatched: false,
-    };
-  }
+  if (!validation.ok) return contractFailure(capturedStdout, validation.reason);
+
   const validated = validation.value;
-  if (validated.length === 0) {
-    return {
-      formattedDiagnostics: "",
-      weakTypingsHint: null,
-      linterSummary: null,
-      schemaMismatch: null,
-      noFilesMatched: false,
-    };
-  }
+  if (validated.length === 0) return clean({ noFilesMatched: false });
 
   const cache = createSourceCache(cwd ?? process.cwd());
   const resolved = validated.map((d) => resolveDiagnostic(d, cache));
-  const { formattedDiagnostics, weakTypingsHint, fileCount } = renderDiagnostics(
-    resolved,
-    weakTypingsDocPath,
-  );
-  const linterSummary = formatSummary(check, resolved.length, fileCount);
+
+  const formattedDiagnostics = renderForMode(outputMode, resolved);
+  const weakTypingsHint = hasUnsafeDiagnostic(resolved)
+    ? `${renderWeakTypingsHint(weakTypingsDocPath).join("\n")}\n`
+    : null;
+  const linterSummary = formatSummary(check, resolved.length, countFiles(resolved));
+
   return {
     formattedDiagnostics,
     weakTypingsHint,
     linterSummary,
     schemaMismatch: null,
+    noFilesMatched: false,
+  };
+}
+
+function renderForMode(mode: LintOutputMode, resolved: readonly ResolvedDiagnostic[]): string {
+  switch (mode) {
+    case "stylish":
+      return renderStylish(resolved);
+    case "unix":
+      return renderUnix(resolved);
+  }
+}
+
+function clean(opts: { noFilesMatched: boolean }): FormatLintResult {
+  return {
+    formattedDiagnostics: "",
+    weakTypingsHint: null,
+    linterSummary: null,
+    schemaMismatch: null,
+    noFilesMatched: opts.noFilesMatched,
+  };
+}
+
+function contractFailure(rawStdout: string, reason: string): FormatLintResult {
+  return {
+    formattedDiagnostics: rawStdout,
+    weakTypingsHint: null,
+    linterSummary: null,
+    schemaMismatch: { reason },
     noFilesMatched: false,
   };
 }

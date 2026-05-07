@@ -1,12 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { HINT_PATH, joinSections } from "../../test/format-diagnostics-helpers.ts";
+import { joinSections } from "../../test/format-diagnostics-helpers.ts";
 import {
   compareDiagnostics,
-  formatDiagLine,
+  countFiles,
+  formatStylishEntry,
   formatSummary,
-  renderDiagnostics,
+  formatUnixLine,
+  hasUnsafeDiagnostic,
+  renderStylish,
+  renderUnix,
   renderWeakTypingsHint,
 } from "./render.ts";
 import type { ResolvedDiagnostic } from "./resolve.ts";
@@ -16,51 +20,107 @@ function makeResolved(overrides: Partial<ResolvedDiagnostic> = {}): ResolvedDiag
     filename: "/x.ts",
     errorCode: "eslint(no-debugger)",
     message: "msg",
-    sortLine: 1,
-    sortCol: 1,
-    location: "1:1",
+    startLine: 1,
+    startCol: 1,
+    endLine: 1,
+    endCol: 8,
     slice: "debugger",
+    sliceTruncated: false,
     ...overrides,
   };
 }
 
-void test("formatDiagLine: emits the head line and indented slice line", () => {
-  const result = formatDiagLine(makeResolved({ message: "say something" }));
+void test("formatStylishEntry: emits the head line and indented slice line", () => {
+  const result = formatStylishEntry(makeResolved({ message: "say something" }));
   assert.equal(result, "  1:1 say something [eslint(no-debugger)]\n    debugger");
 });
 
-void test("formatDiagLine: collapses newlines in the message to single spaces", () => {
-  const result = formatDiagLine(makeResolved({ message: "first line\nsecond line\r\nthird line" }));
+void test("formatStylishEntry: collapses newlines in the message to single spaces", () => {
+  const result = formatStylishEntry(
+    makeResolved({ message: "first line\nsecond line\r\nthird line" }),
+  );
   assert.equal(
     result,
     "  1:1 first line second line third line [eslint(no-debugger)]\n    debugger",
   );
 });
 
-void test("formatDiagLine: passes tsgolint typescript(TS\\d+) code through as-is", () => {
+void test("formatStylishEntry: switches to L:C-L:C when slice is truncated", () => {
+  // Truncation hides part of the original span, so the head line discloses the full range.
+  const result = formatStylishEntry(
+    makeResolved({
+      sliceTruncated: true,
+      endLine: 3,
+      endCol: 1,
+      slice: "function foo() { ...",
+    }),
+  );
+  assert.equal(result, "  1:1-3:1 msg [eslint(no-debugger)]\n    function foo() { ...");
+});
+
+void test("formatStylishEntry: passes tsgolint typescript(TS\\d+) code through as-is", () => {
   // tsgolint emits TypeScript compile errors with `code: typescript(TS<NNNN>)`. The whole `code`
   // is rendered raw inside the brackets (no inner-paren extraction).
-  const result = formatDiagLine(
+  const result = formatStylishEntry(
     makeResolved({
       message: "Cannot find name 'node:fs'.",
       errorCode: "typescript(TS2591)",
-      location: "1:9",
+      startCol: 9,
+      endCol: 16,
       slice: "node:fs",
     }),
   );
   assert.equal(result, "  1:9 Cannot find name 'node:fs'. [typescript(TS2591)]\n    node:fs");
 });
 
+void test("formatUnixLine: emits filename:line:col plus message and bracketed code", () => {
+  const result = formatUnixLine(
+    makeResolved({
+      filename: "/path/to/file.ts",
+      startLine: 5,
+      startCol: 1,
+      message: "Promises must be awaited.",
+      errorCode: "typescript-eslint(no-floating-promises)",
+    }),
+  );
+  assert.equal(
+    result,
+    "/path/to/file.ts:5:1: Promises must be awaited. [typescript-eslint(no-floating-promises)]",
+  );
+});
+
+void test("formatUnixLine: collapses newlines in the message to single spaces", () => {
+  const result = formatUnixLine(
+    makeResolved({
+      filename: "/x.ts",
+      message: "first\nsecond\r\nthird",
+    }),
+  );
+  assert.equal(result, "/x.ts:1:1: first second third [eslint(no-debugger)]");
+});
+
+void test("formatUnixLine: keeps L:C even when the slice is truncated (no range form)", () => {
+  // Unix mode never widens to L:C-L:C, regardless of truncation state.
+  const result = formatUnixLine(
+    makeResolved({
+      sliceTruncated: true,
+      endLine: 3,
+      endCol: 1,
+    }),
+  );
+  assert.equal(result, "/x.ts:1:1: msg [eslint(no-debugger)]");
+});
+
 void test("compareDiagnostics: same file sorts by (line, column, errorCode)", () => {
-  const a = makeResolved({ sortLine: 1, sortCol: 7, errorCode: "eslint(no-unused-vars)" });
-  const b = makeResolved({ sortLine: 2, sortCol: 7, errorCode: "eslint(no-unused-vars)" });
-  const c = makeResolved({ sortLine: 3, sortCol: 1, errorCode: "eslint(no-debugger)" });
+  const a = makeResolved({ startLine: 1, startCol: 7, errorCode: "eslint(no-unused-vars)" });
+  const b = makeResolved({ startLine: 2, startCol: 7, errorCode: "eslint(no-unused-vars)" });
+  const c = makeResolved({ startLine: 3, startCol: 1, errorCode: "eslint(no-debugger)" });
 
   // Feed in non-sorted order.
   const sorted = [c, b, a].sort(compareDiagnostics);
 
   assert.deepEqual(
-    sorted.map((d) => `${d.sortLine}:${d.sortCol}`),
+    sorted.map((d) => `${d.startLine}:${d.startCol}`),
     ["1:7", "2:7", "3:1"],
   );
 });
@@ -83,6 +143,28 @@ void test("renderWeakTypingsHint: 4-line block ending with the doc path", () => 
   assert.equal(lines[3], "- See: /path/to/weak-typings.md");
 });
 
+void test("hasUnsafeDiagnostic: true when any errorCode matches typescript-eslint(no-unsafe-*)", () => {
+  assert.equal(hasUnsafeDiagnostic([makeResolved()]), false);
+  assert.equal(
+    hasUnsafeDiagnostic([
+      makeResolved(),
+      makeResolved({ errorCode: "typescript-eslint(no-unsafe-assignment)" }),
+    ]),
+    true,
+  );
+});
+
+void test("countFiles: counts distinct filenames", () => {
+  assert.equal(
+    countFiles([
+      makeResolved({ filename: "/a.ts" }),
+      makeResolved({ filename: "/a.ts", startLine: 2 }),
+      makeResolved({ filename: "/b.ts" }),
+    ]),
+    2,
+  );
+});
+
 void test("formatSummary: non-check plural form has 'unfixed' qualifier and plural words", () => {
   assert.equal(formatSummary(false, 3, 2), "3 unfixed lint issues in 2 files.");
 });
@@ -99,31 +181,28 @@ void test("formatSummary: check mode drops the 'unfixed' qualifier (singular)", 
   assert.equal(formatSummary(true, 1, 1), "1 lint issue in 1 file.");
 });
 
-void test("renderDiagnostics: groups by filename, sorts, returns fileCount", () => {
+void test("renderStylish: groups by filename and sorts within each group", () => {
   // Feed in non-sorted, multi-file order.
   const a1 = makeResolved({ filename: "/a.ts", message: "a" });
   const a2 = makeResolved({
     filename: "/a.ts",
     message: "b",
-    sortLine: 2,
-    sortCol: 1,
-    location: "2:1",
+    startLine: 2,
+    startCol: 1,
     slice: "x",
   });
   const b1 = makeResolved({
     filename: "/b.ts",
     message: "c",
-    sortLine: 3,
-    sortCol: 5,
-    location: "3:5",
+    startLine: 3,
+    startCol: 5,
     slice: "y",
   });
 
-  const result = renderDiagnostics([b1, a2, a1], HINT_PATH);
+  const result = renderStylish([b1, a2, a1]);
 
-  assert.equal(result.fileCount, 2);
   assert.equal(
-    result.formattedDiagnostics,
+    result,
     joinSections([
       [
         "/a.ts",
@@ -135,43 +214,40 @@ void test("renderDiagnostics: groups by filename, sorts, returns fileCount", () 
       ["/b.ts", "  3:5 c [eslint(no-debugger)]", "    y"],
     ]),
   );
-  assert.equal(result.weakTypingsHint, null);
 });
 
-void test("renderDiagnostics: surfaces weak-typings hint as a separate field on no-unsafe-*", () => {
-  const file = "/x.ts";
-  const d = makeResolved({
-    filename: file,
-    message: "Unsafe assignment",
-    errorCode: "typescript-eslint(no-unsafe-assignment)",
-    location: "1:7",
-    sortCol: 7,
-    slice: "x = foo",
+void test("renderStylish: empty input produces empty output", () => {
+  assert.equal(renderStylish([]), "");
+});
+
+void test("renderUnix: emits one line per diagnostic in sorted order", () => {
+  const a1 = makeResolved({ filename: "/a.ts", message: "a" });
+  const a2 = makeResolved({
+    filename: "/a.ts",
+    message: "b",
+    startLine: 2,
+    startCol: 1,
+  });
+  const b1 = makeResolved({
+    filename: "/b.ts",
+    message: "c",
+    startLine: 3,
+    startCol: 5,
   });
 
-  const result = renderDiagnostics([d], HINT_PATH);
+  const result = renderUnix([b1, a2, a1]);
 
-  assert.equal(result.fileCount, 1);
   assert.equal(
-    result.formattedDiagnostics,
-    joinSections([
-      [file, "  1:7 Unsafe assignment [typescript-eslint(no-unsafe-assignment)]", "    x = foo"],
-    ]),
-  );
-  assert.equal(
-    result.weakTypingsHint,
+    result,
     [
-      "Hint on the `no-unsafe-*` diagnostics:",
-      "- Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary module with typed wrappers.",
-      "- Inline disable (`// oxlint-disable-next-line`) is not a fix; use only when explicitly permitted by the project maintainer.",
-      `- See: ${HINT_PATH}`,
+      "/a.ts:1:1: a [eslint(no-debugger)]",
+      "/a.ts:2:1: b [eslint(no-debugger)]",
+      "/b.ts:3:5: c [eslint(no-debugger)]",
       "",
     ].join("\n"),
   );
 });
 
-void test("renderDiagnostics: weakTypingsHint is null when no no-unsafe-* code is present", () => {
-  const result = renderDiagnostics([makeResolved()], HINT_PATH);
-  assert.equal(result.weakTypingsHint, null);
-  assert.ok(!result.formattedDiagnostics.includes("Hint on the"));
+void test("renderUnix: empty input produces empty output", () => {
+  assert.equal(renderUnix([]), "");
 });

@@ -22,7 +22,7 @@ function makeValidated(overrides: Partial<ValidatedDiagnostic> = {}): ValidatedD
   };
 }
 
-void test("resolveDiagnostic: happy path uses source slice + L:C", (t) => {
+void test("resolveDiagnostic: happy path exposes start/end position and an untruncated slice", (t) => {
   const dir = setupFixture(t, { "x.ts": "debugger;\n" });
   const file = join(dir, "x.ts");
   const cache = createSourceCache(dir);
@@ -32,10 +32,12 @@ void test("resolveDiagnostic: happy path uses source slice + L:C", (t) => {
   assert.equal(result.filename, file);
   assert.equal(result.errorCode, "eslint(no-debugger)");
   assert.equal(result.message, "msg");
-  assert.equal(result.location, "1:1");
+  assert.equal(result.startLine, 1);
+  assert.equal(result.startCol, 1);
+  assert.equal(result.endLine, 1);
+  assert.equal(result.endCol, 8);
   assert.equal(result.slice, "debugger");
-  assert.equal(result.sortLine, 1);
-  assert.equal(result.sortCol, 1);
+  assert.equal(result.sliceTruncated, false);
 });
 
 void test("resolveDiagnostic: null code is replaced with the parse-error placeholder", (t) => {
@@ -56,6 +58,27 @@ void test("resolveDiagnostic: null code is replaced with the parse-error placeho
   assert.equal(result.slice, ";");
 });
 
+void test("resolveDiagnostic: multi-line span sets sliceTruncated and reports the end position", (t) => {
+  const dir = setupFixture(t, { "x.ts": "function foo() {\n  return 1;\n}\n" });
+  const file = join(dir, "x.ts");
+  const cache = createSourceCache(dir);
+
+  const result = resolveDiagnostic(
+    makeValidated({
+      filename: file,
+      span: { offset: 0, length: 30, line: 1, column: 1 },
+    }),
+    cache,
+  );
+
+  assert.equal(result.startLine, 1);
+  assert.equal(result.startCol, 1);
+  assert.equal(result.endLine, 3);
+  assert.equal(result.endCol, 1);
+  assert.equal(result.sliceTruncated, true);
+  assert.equal(result.slice, "function foo() { ...");
+});
+
 void test("resolveDiagnostic: unreadable source falls back to validator-reported L:C and placeholder slice", () => {
   const cache = createSourceCache("/");
   const result = resolveDiagnostic(
@@ -66,10 +89,12 @@ void test("resolveDiagnostic: unreadable source falls back to validator-reported
     cache,
   );
 
-  assert.equal(result.location, "3:5");
+  assert.equal(result.startLine, 3);
+  assert.equal(result.startCol, 5);
+  assert.equal(result.endLine, 3);
+  assert.equal(result.endCol, 5);
   assert.equal(result.slice, UNREADABLE_SLICE);
-  assert.equal(result.sortLine, 3);
-  assert.equal(result.sortCol, 5);
+  assert.equal(result.sliceTruncated, false);
 });
 
 void test("resolveDiagnostic: out-of-bounds span falls back the same way", (t) => {
@@ -85,8 +110,10 @@ void test("resolveDiagnostic: out-of-bounds span falls back the same way", (t) =
     cache,
   );
 
-  assert.equal(result.location, "1:1");
+  assert.equal(result.startLine, 1);
+  assert.equal(result.startCol, 1);
   assert.equal(result.slice, UNREADABLE_SLICE);
+  assert.equal(result.sliceTruncated, false);
 });
 
 void test("formatCodeSlice: short single-line text passes through unchanged", () => {

@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 import { LintJsError } from "./error.ts";
 import { type FmtPhaseOutcome, runFmtPhase } from "./fmt.ts";
+import type { LintOutputMode } from "./format-diagnostics/index.ts";
 import { getSystemIgnorePatterns } from "./ignore.ts";
 import { type LintPhaseOutcome, runLintPhase } from "./lint.ts";
 import type { Logger } from "./log.ts";
@@ -10,7 +11,7 @@ import type { Logger } from "./log.ts";
 /** Run-mode arguments. */
 export interface RunArgs {
   check: boolean;
-  unix: boolean;
+  outputMode: LintOutputMode;
   formatOnly: boolean;
   lintOnly: boolean;
   targets: readonly string[];
@@ -90,7 +91,7 @@ function buildSummary({
  * Execute the format and lint phases against `args.targets` under `ctx.cwd`,
  * writing user-facing output through `ctx.logger`. Returns the process exit code.
  *
- * Default mode runs `oxfmt` → `oxlint` → `oxfmt` (ADR-0005).
+ * The full pipeline (no run-mode flag) runs `oxfmt` → `oxlint` → `oxfmt` (ADR-0005).
  * A fatal failure in the leading fmt pass halts the run, skipping lint and the trailing pass.
  * The trailing pass is also skipped when lint findings remain, so reported `L:C` positions
  * match the file the consumer opens next.
@@ -104,7 +105,7 @@ function buildSummary({
  * May throw {@link LintJsError}; the CLI boundary catches it and maps to exit 2.
  */
 export function run(args: RunArgs, ctx: RunContext): number {
-  const { check, unix, formatOnly, lintOnly, targets } = args;
+  const { check, outputMode, formatOnly, lintOnly, targets } = args;
   const { cwd, logger } = ctx;
 
   if (!existsSync(resolve(cwd, "package.json"))) {
@@ -139,11 +140,11 @@ export function run(args: RunArgs, ctx: RunContext): number {
 
   if (!formatOnly && !halted) {
     logger.markBlankSeparator();
-    lint = runLintPhase({ check, unix, targets, ignorePatterns }, phaseCtx);
+    lint = runLintPhase({ check, outputMode, targets, ignorePatterns }, phaseCtx);
   }
 
-  // Trailing pass: default mode only, when lint succeeded with a non-empty file set.
-  // Normalizes drift introduced by `oxlint --fix`.
+  // Trailing pass normalizes drift introduced by `oxlint --fix`. Runs only on the full
+  // pipeline (no run-mode flag) when lint succeeded with a non-empty file set.
   // Skipped when lint findings remain, so reported `L:C` positions match the file the consumer opens next.
   // Skipped when lint matched no files (no drift).
   // Skipped under `--check` (lint applies no fixes).

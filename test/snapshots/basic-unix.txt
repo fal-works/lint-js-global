@@ -1,6 +1,6 @@
-OUT src/index.ts:5:1: Promises must be awaited, add void operator to ignore. [Error/typescript-eslint(no-floating-promises)]
-OUT
-OUT 1 problem
+OUT src/index.ts:5:1: Promises must be awaited, add void operator to ignore. [typescript-eslint(no-floating-promises)]
+ERR
+ERR 1 unfixed lint issue in 1 file.
 ERR
 ERR lint-js: Failed. Issues fixed where possible; unfixed issues remain.
 EXIT 1

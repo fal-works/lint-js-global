@@ -26,7 +26,7 @@ Target paths themselves may point anywhere.
 - `--check` verifies formatting and lint without rewriting files.
 - `--format-only` runs only the format phase; the lint phase is skipped entirely.
 - `--lint-only` is the symmetric counterpart (runs only the lint phase).
-- `--unix` emits oxlint's `--format=unix` output on stdout instead of the default LLM-friendly layout.
+- `--unix` emits unix-format diagnostic lines on stdout (one per diagnostic) instead of the default per-file grouped layout.
 
 `--format-only` and `--lint-only` are mutually exclusive.
 
@@ -58,8 +58,7 @@ src/index.ts
 The bracketed error code is the raw oxlint `code` field in `plugin(rule)` form (e.g. `eslint(no-debugger)`, `typescript-eslint(no-floating-promises)`, `typescript(TS2591)`).
 For oxc parser errors, which carry no rule code, the placeholder `parse-error` appears in the brackets instead.
 
-Under `--unix`, stdout carries oxlint's `--format=unix` lines (one per diagnostic).
-The wrapper does not inject the issue-count summary or the weak-typings hint, and reroutes oxlint's `No files found to lint.` line to stderr so stdout stays clean.
+Under `--unix`, each diagnostic is emitted as a single self-contained line of the form `<filename>:<line>:<column>: <message> [<code>]`, suitable for VS Code terminal link detection.
 
 ## Type-aware linting
 

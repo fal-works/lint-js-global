@@ -7,32 +7,28 @@ import type { ResolvedDiagnostic } from "./resolve.ts";
 const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 
 /**
- * Render the formatted diagnostics payload from resolved diagnostics. Diagnostics are
- * sorted stably, grouped by filename, and emitted as one section per file.
- *
- * Returns the diagnostics block alongside the file count and an optional weak-typings
- * hint block. The hint is non-null whenever any `no-unsafe-*` diagnostic is present;
- * it is returned separately so the caller can route it apart from the diagnostics.
+ * Render the stylish layout: per-file sections, two lines per diagnostic.
+ * Returns an empty string for an empty input.
  */
-export function renderDiagnostics(
-  resolved: readonly ResolvedDiagnostic[],
-  weakTypingsDocPath: string,
-): { formattedDiagnostics: string; weakTypingsHint: string | null; fileCount: number } {
+export function renderStylish(resolved: readonly ResolvedDiagnostic[]): string {
+  if (resolved.length === 0) return "";
   const sorted = [...resolved].sort(compareDiagnostics);
   const fileGroups = groupByFilename(sorted);
-
-  const sections: string[][] = [];
+  const sections: string[] = [];
   for (const [filename, diags] of fileGroups) {
-    sections.push([filename, ...diags.map(formatDiagLine)]);
+    const lines = [filename, ...diags.map(formatStylishEntry)];
+    sections.push(lines.join("\n"));
   }
+  return `${sections.join("\n\n")}\n`;
+}
 
-  const formattedDiagnostics = `${sections.map((s) => s.join("\n")).join("\n\n")}\n`;
-
-  const weakTypingsHint = sorted.some((d) => UNSAFE_CODE_PATTERN.test(d.errorCode))
-    ? `${renderWeakTypingsHint(weakTypingsDocPath).join("\n")}\n`
-    : null;
-
-  return { formattedDiagnostics, weakTypingsHint, fileCount: fileGroups.size };
+/**
+ * Render the unix layout: one line per diagnostic. Returns an empty string for an empty input.
+ */
+export function renderUnix(resolved: readonly ResolvedDiagnostic[]): string {
+  if (resolved.length === 0) return "";
+  const sorted = [...resolved].sort(compareDiagnostics);
+  return `${sorted.map(formatUnixLine).join("\n")}\n`;
 }
 
 /**
@@ -47,12 +43,36 @@ export function formatSummary(check: boolean, issueCount: number, fileCount: num
 }
 
 /**
+ * Static weak-typings hint block. Each entry is one line of the block, in render order.
+ */
+export function renderWeakTypingsHint(docPath: string): string[] {
+  return [
+    "Hint on the `no-unsafe-*` diagnostics:",
+    "- Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary module with typed wrappers.",
+    "- Inline disable (`// oxlint-disable-next-line`) is not a fix; use only when explicitly permitted by the project maintainer.",
+    `- See: ${docPath}`,
+  ];
+}
+
+/** True when any diagnostic in the set carries a `typescript-eslint(no-unsafe-*)` code. */
+export function hasUnsafeDiagnostic(resolved: readonly ResolvedDiagnostic[]): boolean {
+  return resolved.some((d) => UNSAFE_CODE_PATTERN.test(d.errorCode));
+}
+
+/** Number of distinct filenames the resolved set spans. */
+export function countFiles(resolved: readonly ResolvedDiagnostic[]): number {
+  const set = new Set<string>();
+  for (const d of resolved) set.add(d.filename);
+  return set.size;
+}
+
+/**
  * Stable ordering: filename (lexicographic) → start line → start column → error code.
  */
 export function compareDiagnostics(a: ResolvedDiagnostic, b: ResolvedDiagnostic): number {
   if (a.filename !== b.filename) return a.filename < b.filename ? -1 : 1;
-  if (a.sortLine !== b.sortLine) return a.sortLine - b.sortLine;
-  if (a.sortCol !== b.sortCol) return a.sortCol - b.sortCol;
+  if (a.startLine !== b.startLine) return a.startLine - b.startLine;
+  if (a.startCol !== b.startCol) return a.startCol - b.startCol;
   if (a.errorCode !== b.errorCode) return a.errorCode < b.errorCode ? -1 : 1;
   return 0;
 }
@@ -73,24 +93,29 @@ export function groupByFilename(
 }
 
 /**
- * Render a single diagnostic as the head line (`<location> <message> [<error-code>]`)
- * followed by a source-slice continuation line. Newlines inside `message` collapse to
- * a single space so the head line stays on one line.
+ * Render one diagnostic as the stylish layout's two-line entry: an indented head line carrying
+ * location, message and bracketed code, followed by an indented source-slice continuation.
+ *
+ * The location collapses to `L:C` when the source slice fully shows the span;
+ * when the slice is truncated, the range form `L:C-L:C` discloses the hidden portion.
+ * Newlines inside `message` collapse to single spaces so the head line stays on one line.
  */
-export function formatDiagLine(d: ResolvedDiagnostic): string {
-  const message = d.message.replace(/\r?\n/g, " ");
-  const headLine = `  ${d.location} ${message} [${d.errorCode}]`;
-  return `${headLine}\n    ${d.slice}`;
+export function formatStylishEntry(d: ResolvedDiagnostic): string {
+  const location = d.sliceTruncated
+    ? `${d.startLine}:${d.startCol}-${d.endLine}:${d.endCol}`
+    : `${d.startLine}:${d.startCol}`;
+  const message = collapseNewlines(d.message);
+  return `  ${location} ${message} [${d.errorCode}]\n    ${d.slice}`;
 }
 
 /**
- * Static weak-typings hint block. Each entry is one line of the block, in render order.
+ * Render one diagnostic as a single `<filename>:<L>:<C>: <message> [<code>]` line.
  */
-export function renderWeakTypingsHint(docPath: string): string[] {
-  return [
-    "Hint on the `no-unsafe-*` diagnostics:",
-    "- Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary module with typed wrappers.",
-    "- Inline disable (`// oxlint-disable-next-line`) is not a fix; use only when explicitly permitted by the project maintainer.",
-    `- See: ${docPath}`,
-  ];
+export function formatUnixLine(d: ResolvedDiagnostic): string {
+  const message = collapseNewlines(d.message);
+  return `${d.filename}:${d.startLine}:${d.startCol}: ${message} [${d.errorCode}]`;
+}
+
+function collapseNewlines(text: string): string {
+  return text.replace(/\r?\n/g, " ");
 }

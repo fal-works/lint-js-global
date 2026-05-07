@@ -81,8 +81,8 @@ void test("target dir with no lintable files exits cleanly", (t) => {
 });
 
 void test("--unix + fully-ignored target exits cleanly", (t) => {
-  // oxlint ≥1.61 emits the "No files found to lint." signal in --format=unix too,
-  // so the wrapper's exit normalization must run before the unix passthrough.
+  // The no-files signal must route through the same exit-normalization path under --unix
+  // as under stylish mode; stdout stays empty either way.
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -94,7 +94,6 @@ void test("--unix + fully-ignored target exits cleanly", (t) => {
 
   assert.equal(result.status, 0, "expected exit 0 when the only target is ignored");
   assert.equal(readFileSync(ignored, "utf8"), DIRTY_SOURCE, "ignored file must not be touched");
-  // Even under --unix, the no-files signal must not pollute stdout: it routes to stderr.
   assert.equal(result.stdout, "", "stdout must stay clean under --unix when no files match");
   assert.match(
     result.stderr,

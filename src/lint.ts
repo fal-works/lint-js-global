@@ -1,5 +1,5 @@
 import { LintJsError } from "./error.ts";
-import { formatLintOutput } from "./format-diagnostics/index.ts";
+import { formatLintOutput, type LintOutputMode } from "./format-diagnostics/index.ts";
 import type { Logger } from "./log.ts";
 import { resolvePackageBin } from "./package-info.ts";
 import { OXLINT_CONFIG, WEAK_TYPINGS_DOC } from "./package-paths.ts";
@@ -7,29 +7,25 @@ import { buildPathInjectedEnv, runToolCapturingOutput } from "./run-tool.ts";
 import { createTsgolintShimDir } from "./tsgolint-shim.ts";
 
 /**
- * Build CLI args for oxlint.
- *
- * Default mode uses `--format=json` for downstream parsing by the LLM-friendly formatter.
- * `unix` mode delegates to oxlint's own `--format=unix` for VS Code terminal link detection.
+ * Build CLI args for oxlint. Always invokes `--format=json`;
+ * the per-diagnostic stdout layout is selected downstream in {@link formatLintOutput}.
  *
  * @param config - Path to the oxlint config file.
  * @param ignorePatterns - Gitignore-style patterns.
  * @param targets - Positional paths to process.
  * @param check - Report only; do not apply auto-fix.
- * @param unix - Emit `--format=unix` instead of `--format=json`.
  */
 export function buildOxlintArgs(
   config: string,
   ignorePatterns: readonly string[],
   targets: readonly string[],
   check: boolean,
-  unix: boolean,
 ): string[] {
   const ignoreFlags = ignorePatterns.flatMap((pattern) => ["--ignore-pattern", pattern]);
   return [
     "-c",
     config,
-    unix ? "--format=unix" : "--format=json",
+    "--format=json",
     ...(check ? [] : ["--fix"]),
     "--type-aware",
     "--type-check",
@@ -40,7 +36,7 @@ export function buildOxlintArgs(
 
 export interface LintPhaseOptions {
   check: boolean;
-  unix: boolean;
+  outputMode: LintOutputMode;
   targets: readonly string[];
   ignorePatterns: readonly string[];
 }
@@ -61,14 +57,17 @@ export interface LintPhaseContext {
 export type LintPhaseOutcome = { kind: "ok" } | { kind: "no-files" } | { kind: "findings" };
 
 /**
- * Run the lint phase: spawn oxlint, parse its JSON stdout via {@link formatLintOutput},
- * and emit diagnostics plus linter summary through `ctx.logger`.
+ * Run the lint phase: spawn oxlint, validate the payload through {@link formatLintOutput},
+ * and emit diagnostics plus auxiliary text through `ctx.logger`.
+ *
+ * Diagnostics route to stdout in the layout selected by `outputMode`;
+ * the weak-typings hint (when applicable) and the issue-count summary always route to stderr.
  *
  * @throws {LintJsError} on launch failure, signal-driven termination,
  *   or oxlint output-contract mismatch.
  */
 export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): LintPhaseOutcome {
-  const { check, unix, targets, ignorePatterns } = opts;
+  const { check, outputMode, targets, ignorePatterns } = opts;
   const { cwd, logger } = ctx;
 
   const oxlintBin = resolvePackageBin("oxlint", "oxlint");
@@ -84,7 +83,7 @@ export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): Lin
     ({ result, capturedStdout, capturedStderr } = runToolCapturingOutput({
       name: "oxlint",
       bin: oxlintBin,
-      args: buildOxlintArgs(OXLINT_CONFIG, ignorePatterns, targets, check, unix),
+      args: buildOxlintArgs(OXLINT_CONFIG, ignorePatterns, targets, check),
       cwd,
       env,
     }));
@@ -98,7 +97,7 @@ export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): Lin
     formatLintOutput({
       capturedStdout,
       check,
-      unix,
+      outputMode,
       weakTypingsDocPath: WEAK_TYPINGS_DOC,
       cwd,
     });

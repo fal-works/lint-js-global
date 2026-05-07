@@ -14,8 +14,11 @@ export const UNREADABLE_SLICE = "<unreadable>";
 export const SLICE_MAX_LEN = 40;
 
 /**
- * Render-ready unit produced from a {@link ValidatedDiagnostic} + source resolution. All fields
- * except `sortLine`/`sortCol` are formatted strings ready to be embedded in the output.
+ * Render-ready unit produced from a {@link ValidatedDiagnostic} + source resolution.
+ *
+ * `slice` is the source text the rule points at, truncated to one line of at most
+ * {@link SLICE_MAX_LEN} code points; `sliceTruncated` is true whenever truncation hides any
+ * portion of the original span.
  */
 export interface ResolvedDiagnostic {
   filename: string;
@@ -30,10 +33,12 @@ export interface ResolvedDiagnostic {
   errorCode: string;
 
   message: string;
-  sortLine: number;
-  sortCol: number;
-  location: string;
+  startLine: number;
+  startCol: number;
+  endLine: number;
+  endCol: number;
   slice: string;
+  sliceTruncated: boolean;
 }
 
 /**
@@ -48,17 +53,16 @@ export function resolveDiagnostic(
   const resolved = resolveSpan(cache, diag.filename, diag.span.offset, diag.span.length);
   if (resolved !== null) {
     const slice = formatCodeSlice(resolved.text);
-    const location = slice.truncated
-      ? `${resolved.startLine}:${resolved.startCol}-${resolved.endLine}:${resolved.endCol}`
-      : `${resolved.startLine}:${resolved.startCol}`;
     return {
       filename: diag.filename,
       errorCode,
       message: diag.message,
-      sortLine: resolved.startLine,
-      sortCol: resolved.startCol,
-      location,
+      startLine: resolved.startLine,
+      startCol: resolved.startCol,
+      endLine: resolved.endLine,
+      endCol: resolved.endCol,
       slice: slice.text,
+      sliceTruncated: slice.truncated,
     };
   }
 
@@ -66,10 +70,12 @@ export function resolveDiagnostic(
     filename: diag.filename,
     errorCode,
     message: diag.message,
-    sortLine: diag.span.line,
-    sortCol: diag.span.column,
-    location: `${diag.span.line}:${diag.span.column}`,
+    startLine: diag.span.line,
+    startCol: diag.span.column,
+    endLine: diag.span.line,
+    endCol: diag.span.column,
     slice: UNREADABLE_SLICE,
+    sliceTruncated: false,
   };
 }
 

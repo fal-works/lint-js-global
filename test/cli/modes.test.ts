@@ -47,29 +47,40 @@ void test("basic: reformats sources and reports floating promise", (t) => {
   assert.doesNotMatch(result.stdout, /^lint-js:/m, "tagged status must not leak to stdout");
 });
 
-void test("--unix: oxlint unix output passes through, no issue-count summary or hint", (t) => {
+void test("--unix: stdout carries flat diagnostic lines; auxiliary text routes to stderr", (t) => {
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
   const result = runCli(dir, ["--unix"]);
 
   assert.equal(result.status, 1, "expected exit 1 from unfixed lint error");
-  // Classic `--format=unix` tag appears verbatim on stdout.
+  // Single line of the form `<filename>:<L>:<C>: <message> [<code>]`.
   assert.match(
     result.stdout,
-    /typescript-eslint\(no-floating-promises\)/,
-    "expected unix-format rule tag to appear verbatim on stdout",
+    /^src\/index\.ts:\d+:\d+: .* \[typescript-eslint\(no-floating-promises\)\]$/m,
+    "expected flat unix-style diagnostic line on stdout",
   );
-  // None of the default formatter's framing survives.
+  // stdout stays pipe-friendly: no summary, no hint, no severity tag.
   assert.doesNotMatch(
     result.stdout,
-    /^\d+ unfixed lint issues?/m,
-    "issue-count summary must be suppressed under --unix",
+    /\bunfixed lint issues?\b/,
+    "issue-count summary must not appear on stdout under --unix",
   );
   assert.doesNotMatch(
     result.stdout,
     /weak-typings\.md/,
-    "hint block must be suppressed under --unix",
+    "weak-typings hint must not appear on stdout under --unix",
+  );
+  assert.doesNotMatch(
+    result.stdout,
+    /\[Error\//,
+    "severity prefix must not appear in the bracketed code",
+  );
+  // stderr carries the same auxiliary text as stylish mode.
+  assert.match(
+    result.stderr,
+    /^1 unfixed lint issue in 1 file\.$/m,
+    "expected issue-count summary on stderr under --unix",
   );
   assert.match(result.stderr, /^lint-js: Failed\./m);
 });
@@ -236,7 +247,7 @@ void test("--lint-only: runs lint phase, skips fmt phase entirely", (t) => {
   );
 });
 
-void test("default mode: trailing fmt normalizes drift left by oxlint --fix (ADR-0005)", (t) => {
+void test("full pipeline: trailing fmt normalizes drift left by oxlint --fix (ADR-0005)", (t) => {
   const dir = copyFixture("lint-fix-drift");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -247,7 +258,7 @@ void test("default mode: trailing fmt normalizes drift left by oxlint --fix (ADR
   assert.ok(after.includes(`import type { ExampleType } from "./types.ts";`));
 });
 
-void test("default mode: trailing fmt is skipped when lint findings remain so L:C matches final file (ADR-0005)", (t) => {
+void test("full pipeline: trailing fmt is skipped when lint findings remain so L:C matches final file (ADR-0005)", (t) => {
   const dir = copyFixture("lint-fix-position-stability");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 

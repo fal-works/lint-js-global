@@ -16,9 +16,7 @@ Options:
   --check         Verify only; do not rewrite files.
   --format-only   Run only the format phase (skip lint).
   --lint-only     Run only the lint phase (skip format).
-  --unix          Emit oxlint's \`--format=unix\` output unchanged (for VS Code
-                  terminal link detection). Skips the LLM-friendly layout and
-                  the per-run issue-count summary.
+  --unix          Emit unix-format diagnostic lines on stdout (one per diagnostic).
   -h, --help      Show this help.
   -v, --version   Show version.
 
@@ -74,7 +72,7 @@ function parseCliArgs(argv: readonly string[]): CliArgs {
     kind: "run",
     args: {
       check: values.check === true,
-      unix: values.unix === true,
+      outputMode: values.unix === true ? "unix" : "stylish",
       formatOnly,
       lintOnly,
       targets: positionals.length > 0 ? positionals : ["."],
