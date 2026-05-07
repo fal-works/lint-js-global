@@ -30,5 +30,5 @@ The trailing pass also skips when lint findings remain. This keeps lint `L:C` lo
 ### Consequences
 
 - Good, because lint `L:C` locations always reference the file the consumer opens next.
-- Good, because exit 0 strictly means lint-clean and format-clean.
+- Good, because in default mode exit 0 strictly means lint-clean and format-clean.
 - Bad, because format runs twice when default mode succeeds. The runtime cost is negligible; the log-noise cost is addressed in ADR-0006.
