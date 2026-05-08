@@ -1,4 +1,4 @@
-import { LintJsError } from "../error.ts";
+import { reportLintJsError } from "../error.ts";
 import type { Logger } from "../log.ts";
 import { getPackageVersion } from "../package/info.ts";
 import { run } from "../pipeline/runner.ts";
@@ -6,8 +6,8 @@ import { HELP_TEXT, parseCliArgs } from "./args.ts";
 
 /**
  * CLI top-level flow. Parses `argv`, dispatches to {@link run} (or short-circuits on
- * `--help`/`--version`), and routes {@link LintJsError} through the boundary to a tagged stderr
- * block + exit 2.
+ * `--help`/`--version`), and routes `LintJsError` through {@link reportLintJsError}
+ * to a tagged stderr block + the reserved exit code.
  *
  * Exit codes:
  * - 0: success (any auto-fixable issues were fixed and nothing remains)
@@ -33,10 +33,8 @@ export async function runCli(
     }
     return await run(cliArgs.args, { cwd, logger });
   } catch (err: unknown) {
-    if (err instanceof LintJsError) {
-      logger.writeErrTagged(err.message, ...err.details);
-      return 2;
-    }
+    const code = reportLintJsError(err, logger);
+    if (code !== null) return code;
     throw err;
   }
 }

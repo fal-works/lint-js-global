@@ -1,5 +1,5 @@
-import { LintJsError } from "../src/error.ts";
-import type { Logger } from "../src/log.ts";
+import { reportLintJsError } from "../src/error.ts";
+import { createLogger, type Logger } from "../src/log.ts";
 import { run, type RunArgs } from "../src/pipeline/runner.ts";
 
 export interface RecordedEvent {
@@ -15,49 +15,24 @@ interface Recorder {
 }
 
 /**
- * `Logger` that records each emitted line into an in-memory array, preserving the
- * cross-stream call order.
+ * `Logger` that records each emitted line into an in-memory array,
+ * preserving the cross-stream call order.
  *
- * `writeOut` / `writeErr` arguments are split on `"\n"` and pushed line-by-line.
- * A trailing `"\n"` (closing the last line) is stripped before splitting;
- * an empty call (no `"\n"` at all) records nothing.
- * Empty arguments are no-ops.
+ * Built on the production `createLogger`, so blank-separator handling and the
+ * `lint-js:` tagged-block layout stay aligned with the console logger.
+ *
+ * Each sink write is split on `"\n"` and pushed line-by-line.
+ * A trailing `"\n"` (closing the last line) is stripped before splitting.
  */
 function createRecordingLogger(): Recorder {
   const events: RecordedEvent[] = [];
-  let hasWritten = false;
-  let pendingBlank = false;
-
-  const flushPending = (): void => {
-    if (pendingBlank && hasWritten) events.push({ stream: "err", line: "" });
-    pendingBlank = false;
-  };
-
-  const pushLines = (stream: "out" | "err", msg: string): void => {
-    if (msg === "") return;
-    flushPending();
-    hasWritten = true;
-    const parts = msg.split("\n");
-    if (msg.endsWith("\n")) parts.pop();
-    for (const line of parts) events.push({ stream, line });
-  };
-  const logger: Logger = {
-    writeOut(msg) {
-      pushLines("out", msg);
+  const logger = createLogger({
+    write(stream, msg) {
+      const parts = msg.split("\n");
+      if (msg.endsWith("\n")) parts.pop();
+      for (const line of parts) events.push({ stream, line });
     },
-    writeErr(msg) {
-      pushLines("err", msg);
-    },
-    writeErrTagged(headline, ...details) {
-      flushPending();
-      hasWritten = true;
-      events.push({ stream: "err", line: `lint-js: ${headline}` });
-      for (const detail of details) events.push({ stream: "err", line: `  ${detail}` });
-    },
-    markBlankSeparator() {
-      pendingBlank = true;
-    },
-  };
+  });
   return { logger, events };
 }
 
@@ -87,11 +62,9 @@ export function streamText(events: readonly RecordedEvent[], stream: "out" | "er
 }
 
 /**
- * Run {@link run} in-process with a recording logger.
- *
- * Mirrors the CLI's `LintJsError` boundary: on `LintJsError`, the headline + details
- * are emitted via `writeErrTagged` and the exit code is pinned to 2. Anything else
- * propagates as a genuine bug.
+ * Run {@link run} in-process with a recording logger, applying the same
+ * `LintJsError` boundary that the CLI uses (via {@link reportLintJsError}).
+ * Anything else propagates as a genuine bug.
  */
 export async function runRecording(
   cwd: string,
@@ -102,10 +75,8 @@ export async function runRecording(
     const exitCode = await run(args, { cwd, logger: recorder.logger });
     return { events: recorder.events, exitCode };
   } catch (err: unknown) {
-    if (err instanceof LintJsError) {
-      recorder.logger.writeErrTagged(err.message, ...err.details);
-      return { events: recorder.events, exitCode: 2 };
-    }
+    const code = reportLintJsError(err, recorder.logger);
+    if (code !== null) return { events: recorder.events, exitCode: code };
     throw err;
   }
 }

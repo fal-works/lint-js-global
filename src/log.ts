@@ -44,38 +44,68 @@ export interface Logger {
 }
 
 /**
- * Default {@link Logger} backed by `process.stdout` / `process.stderr`.
+ * Underlying byte-level sink that backs a {@link Logger} built by {@link createLogger}.
+ *
+ * The state machine in {@link createLogger} translates every {@link Logger} method
+ * into one or more `(stream, msg)` calls here; concrete sinks decide how each write
+ * is materialized.
+ *
+ * `msg` is always non-empty and may contain embedded `"\n"` characters.
  */
-export function createConsoleLogger(): Logger {
+export interface LoggerSink {
+  write(stream: "out" | "err", msg: string): void;
+}
+
+/**
+ * Build a {@link Logger} that delegates byte-level writes to `sink` and centralizes
+ * the blank-separator state machine plus the `lint-js:` tagged-block layout.
+ *
+ * Concrete loggers differ only in their sink, so user-facing logging behavior stays
+ * identical across them.
+ */
+export function createLogger(sink: LoggerSink): Logger {
   let hasWritten = false;
   let pendingBlank = false;
 
   const flushPending = (): void => {
-    if (pendingBlank && hasWritten) process.stderr.write("\n");
+    if (pendingBlank && hasWritten) sink.write("err", "\n");
     pendingBlank = false;
+  };
+
+  const write = (stream: "out" | "err", msg: string): void => {
+    if (msg.length === 0) return;
+    flushPending();
+    hasWritten = true;
+    sink.write(stream, msg);
   };
 
   return {
     writeOut(msg) {
-      if (msg.length === 0) return;
-      flushPending();
-      hasWritten = true;
-      process.stdout.write(msg);
+      write("out", msg);
     },
     writeErr(msg) {
-      if (msg.length === 0) return;
-      flushPending();
-      hasWritten = true;
-      process.stderr.write(msg);
+      write("err", msg);
     },
     writeErrTagged(headline, ...details) {
       flushPending();
       hasWritten = true;
-      process.stderr.write(`${LOG_PREFIX} ${headline}\n`);
-      for (const line of details) process.stderr.write(`  ${line}\n`);
+      sink.write("err", `${LOG_PREFIX} ${headline}\n`);
+      for (const line of details) sink.write("err", `  ${line}\n`);
     },
     markBlankSeparator() {
       pendingBlank = true;
     },
   };
+}
+
+/**
+ * Default {@link Logger} backed by `process.stdout` / `process.stderr`.
+ */
+export function createConsoleLogger(): Logger {
+  return createLogger({
+    write(stream, msg) {
+      const target = stream === "out" ? process.stdout : process.stderr;
+      target.write(msg);
+    },
+  });
 }

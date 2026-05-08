@@ -29,6 +29,9 @@ void test("halted run returns the dedicated halt summary regardless of other sta
     summary({ halted: true, leadingFmt: FMT_FATAL, lint: null, trailingFmt: null }),
     "Halted. Resolve format errors above and re-run.",
   );
+  // Defensive pin: runner does not currently emit `halted: true` with mode `lint-only`
+  // (halt needs a fatal leading fmt, which lint-only skips). Locked so summary stays
+  // coherent if that invariant changes.
   assert.equal(
     summary({ halted: true, mode: "lint-only", leadingFmt: null, lint: null, trailingFmt: null }),
     "Halted. Resolve format errors above and re-run.",

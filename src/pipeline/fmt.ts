@@ -46,7 +46,10 @@ export interface FmtPhaseContext {
  *
  * - `ok`: oxfmt exited 0.
  * - `findings`: `--check` reported files needing formatting (oxfmt exit 1).
- * - `fatal`: parse errors or other tool failures (oxfmt exit ≥ 2, or any non-zero in write mode).
+ * - `fatal`: oxfmt rejected the input.
+ *   Covers parse error (exit ≥ 2 in either mode) and write failure (any non-zero in write mode),
+ *   both user-source attributable.
+ * - Tool-side failures (launch, signal-driven termination) escalate to `LintJsError` and never reach this outcome.
  */
 export type FmtPhaseOutcome = { kind: "ok" } | { kind: "findings" } | { kind: "fatal" };
 
@@ -79,8 +82,8 @@ export async function runFmtPhase(
   if (status === 0) return { kind: "ok" };
 
   logger.writeErr(captured);
-  // oxfmt's exit-code contract: 0 = clean, 1 = `--check` found formatting drift,
-  // anything else = parse error or tool failure. Write mode never legitimately exits 1.
+  // oxfmt exit codes: 0 = clean, 1 = `--check` drift, anything else fatal.
+  // Write mode never legitimately exits 1.
   if (check && status === 1) return { kind: "findings" };
   return { kind: "fatal" };
 }
