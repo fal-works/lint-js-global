@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
+
+import { spawnCapturing } from "../helpers.ts";
 
 const repoRoot = join(import.meta.dirname, "..", "..");
 const fixtureRoot = join(repoRoot, "test", "fixtures");
@@ -33,12 +34,14 @@ function preparePublishLayout(): PublishLayout {
     rmSync(extractDir, { recursive: true, force: true });
   };
   try {
-    const packResult = spawnSync("pnpm", ["pack", "--pack-destination", packDir], {
+    const pack = spawnCapturing({
+      name: "pnpm pack",
+      command: "pnpm",
+      args: ["pack", "--pack-destination", packDir],
       cwd: repoRoot,
-      encoding: "utf8",
     });
-    if (packResult.status !== 0) {
-      throw new Error(`pnpm pack failed: exit ${packResult.status}\nstderr:\n${packResult.stderr}`);
+    if (pack.status !== 0) {
+      throw new Error(`pnpm pack failed: exit ${pack.status}\nstderr:\n${pack.stderr}`);
     }
     const tarballs = readdirSync(packDir).filter((name) => name.endsWith(".tgz"));
     const [tarballName, ...rest] = tarballs;
@@ -48,11 +51,13 @@ function preparePublishLayout(): PublishLayout {
       );
     }
     const tarballPath = join(packDir, tarballName);
-    const tarResult = spawnSync("tar", ["-xf", tarballPath, "-C", extractDir], {
-      encoding: "utf8",
+    const tar = spawnCapturing({
+      name: "tar",
+      command: "tar",
+      args: ["-xf", tarballPath, "-C", extractDir],
     });
-    if (tarResult.status !== 0) {
-      throw new Error(`tar extract failed: exit ${tarResult.status}\nstderr:\n${tarResult.stderr}`);
+    if (tar.status !== 0) {
+      throw new Error(`tar extract failed: exit ${tar.status}\nstderr:\n${tar.stderr}`);
     }
     const packageRoot = join(extractDir, "package");
     symlinkSync(join(repoRoot, "node_modules"), join(packageRoot, "node_modules"));
@@ -78,7 +83,11 @@ void describe("smoke against the published layout", () => {
   });
 
   void it("--help: prints usage and exits 0", () => {
-    const result = spawnSync(process.execPath, [layout.distCli, "--help"], { encoding: "utf8" });
+    const result = spawnCapturing({
+      name: "lint-js --help",
+      command: process.execPath,
+      args: [layout.distCli, "--help"],
+    });
     assert.equal(result.status, 0, `expected exit 0\nstderr:\n${result.stderr}`);
     assert.match(result.stdout, /Usage: lint-js/, "expected usage on stdout");
   });
@@ -91,9 +100,11 @@ void describe("smoke against the published layout", () => {
     t.after(() => rmSync(dir, { recursive: true, force: true }));
     cpSync(join(fixtureRoot, "basic"), dir, { recursive: true });
 
-    const result = spawnSync(process.execPath, [layout.distCli, "--check"], {
+    const result = spawnCapturing({
+      name: "lint-js --check",
+      command: process.execPath,
+      args: [layout.distCli, "--check"],
       cwd: dir,
-      encoding: "utf8",
     });
     assert.equal(
       result.status,

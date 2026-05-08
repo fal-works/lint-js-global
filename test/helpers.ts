@@ -1,19 +1,12 @@
-import { spawnSync, type SpawnSyncReturns } from "node:child_process";
-import {
-  closeSync,
-  cpSync,
-  mkdtempSync,
-  openSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import type { SpawnSyncReturns } from "node:child_process";
+import { cpSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { LintJsError } from "../src/error.ts";
 import type { Logger } from "../src/log.ts";
+import { runCommandCapturingOutput } from "../src/run-tool.ts";
 import { run, type RunArgs } from "../src/runner.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -49,36 +42,45 @@ export interface CliRunResult extends SpawnSyncReturns<Buffer | string> {
   stderr: string;
 }
 
-export function runCli(cwd: string, args: readonly string[] = []): CliRunResult {
-  const captureDir = makeTempDir("stdio");
-  const stdoutPath = join(captureDir, "stdout.txt");
-  const stderrPath = join(captureDir, "stderr.txt");
-  let stdoutFd = -1;
-  let stderrFd = -1;
+export interface SpawnCapturingParams {
+  /** Identifier used in launch-failure and signal diagnostics. */
+  name: string;
 
-  try {
-    // Work around openai/codex#18473: in the Codex sandbox, nested Node child output captured
-    // through pipe-backed stdout/stderr can disappear. File-backed stdio stays reliable.
-    stdoutFd = openSync(stdoutPath, "w");
-    stderrFd = openSync(stderrPath, "w");
-    const result = spawnSync(process.execPath, [cliPath, ...args], {
-      cwd,
-      stdio: ["ignore", stdoutFd, stderrFd],
-    });
-    closeSync(stdoutFd);
-    closeSync(stderrFd);
-    stdoutFd = -1;
-    stderrFd = -1;
-    return {
-      ...result,
-      stdout: readFileSync(stdoutPath, "utf8"),
-      stderr: readFileSync(stderrPath, "utf8"),
-    };
-  } finally {
-    if (stdoutFd !== -1) closeSync(stdoutFd);
-    if (stderrFd !== -1) closeSync(stderrFd);
-    rmSync(captureDir, { recursive: true, force: true });
-  }
+  /** Executable path or command name passed directly to `spawnSync`. */
+  command: string;
+
+  /** Arguments passed to the command. */
+  args: readonly string[];
+
+  /** Working directory for the child. Defaults to the parent's cwd. */
+  cwd?: string;
+}
+
+/**
+ * Spawn a command with file-backed stdio and reshape the result to {@link CliRunResult}.
+ *
+ * Wraps {@link runCommandCapturingOutput} so tests can capture stdout/stderr separately via the
+ * canonical Codex-sandbox-safe path (workaround for https://github.com/openai/codex/issues/18473).
+ *
+ * Throws {@link LintJsError} on launch failure or signal-driven termination.
+ */
+export function spawnCapturing({ name, command, args, cwd }: SpawnCapturingParams): CliRunResult {
+  const { result, capturedStdout, capturedStderr } = runCommandCapturingOutput({
+    name,
+    command,
+    args,
+    cwd,
+  });
+  return { ...result, stdout: capturedStdout, stderr: capturedStderr };
+}
+
+export function runCli(cwd: string, args: readonly string[] = []): CliRunResult {
+  return spawnCapturing({
+    name: "lint-js",
+    command: process.execPath,
+    args: [cliPath, ...args],
+    cwd,
+  });
 }
 
 export interface RecordedEvent {
