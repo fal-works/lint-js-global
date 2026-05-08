@@ -7,6 +7,7 @@ import type { LintOutputMode } from "./format-diagnostics/index.ts";
 import { getSystemIgnorePatterns } from "./ignore.ts";
 import { type LintPhaseOutcome, runLintPhase } from "./lint.ts";
 import type { Logger } from "./log.ts";
+import { buildSummary } from "./summary.ts";
 
 /**
  * Which phases run.
@@ -30,67 +31,6 @@ export interface RunContext {
   cwd: string;
 
   logger: Logger;
-}
-
-interface BuildSummaryOptions {
-  mode: RunMode;
-  check: boolean;
-
-  /** True when the leading fmt phase halted the run; lint and trailing fmt were skipped. */
-  halted: boolean;
-
-  /** `null` if the phase was skipped (`--lint-only`). */
-  leadingFmt: FmtPhaseOutcome | null;
-
-  /** `null` if the phase was skipped (`--format-only`, or halted before it ran). */
-  lint: LintPhaseOutcome | null;
-
-  /** `null` if the phase was skipped (`--check`, `--format-only`, `--lint-only`, or halted). */
-  trailingFmt: FmtPhaseOutcome | null;
-}
-
-/**
- * Pick the one-line summary emitted after the run finishes.
- *
- * Halted runs and non-check `--format-only` failures get dedicated summaries; the latter has
- * no lint phase and applies no fixes when it fails (the only failure mode is a parse error
- * in the leading pass), so the generic "fixed where possible; unfixed issues remain" wording
- * would misrepresent a fmt-only failure as a lint issue.
- * Successful runs where lint matched no files get their own wording too, since "Issues
- * fixed where possible." would imply work happened on a phase that found nothing to check.
- * Otherwise the verdict is binary; which phase failed is readable from tool output above,
- * so the summary only conveys overall outcome and whether fixes may have been applied.
- */
-function buildSummary({
-  mode,
-  check,
-  halted,
-  leadingFmt,
-  lint,
-  trailingFmt,
-}: BuildSummaryOptions): string {
-  if (halted) {
-    return "Halted. Resolve format errors above and re-run.";
-  }
-  const fmtOk =
-    (leadingFmt === null || leadingFmt.kind === "ok") &&
-    (trailingFmt === null || trailingFmt.kind === "ok");
-  const lintOk = lint === null || lint.kind === "ok" || lint.kind === "no-files";
-  const ok = fmtOk && lintOk;
-  if (mode === "format-only" && !check && !ok) {
-    return "Failed. Format errors remain.";
-  }
-  if (ok && lint?.kind === "no-files") {
-    return "Completed successfully. No lintable files matched.";
-  }
-  if (check) {
-    return ok
-      ? "Completed successfully. No issues found."
-      : "Failed. Issues found; fixes required.";
-  }
-  return ok
-    ? "Completed successfully. Issues fixed where possible."
-    : "Failed. Issues fixed where possible; unfixed issues remain.";
 }
 
 /**

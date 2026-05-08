@@ -4,11 +4,12 @@ import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { copyFixture, renderSnapshot, runRecording, type RecordedEvent } from "../test/helpers.ts";
+import { copyFixture, DIRTY_SOURCE, writeIgnoreFiles } from "../fixture-helpers.ts";
+import { type RecordedEvent, renderSnapshot, runRecording } from "../recording-helpers.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const snapshotDir = join(here, "..", "test", "snapshots");
-const packageRoot = resolve(here, "..");
+const snapshotDir = join(here, "..", "snapshots");
+const packageRoot = resolve(here, "..", "..");
 const UPDATE = process.env.UPDATE_SNAPSHOTS === "1";
 
 /**
@@ -112,9 +113,8 @@ void test("snapshot: --unix with fully-ignored target keeps stdout empty", (t) =
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const ignored = join(dir, "src", "ignored.ts");
-  writeFileSync(ignored, "const x  =  1;debugger\n");
-  writeFileSync(join(dir, ".prettierignore"), "ignored.ts\n");
-  writeFileSync(join(dir, ".eslintignore"), "ignored.ts\n");
+  writeFileSync(ignored, DIRTY_SOURCE);
+  writeIgnoreFiles(dir, "ignored.ts");
   const { events, exitCode } = runRecording(dir, {
     mode: "full",
     check: false,

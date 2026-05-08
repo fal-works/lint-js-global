@@ -1,87 +1,6 @@
-import type { SpawnSyncReturns } from "node:child_process";
-import { cpSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-
 import { LintJsError } from "../src/error.ts";
 import type { Logger } from "../src/log.ts";
-import { runCommandCapturingOutput } from "../src/run-tool.ts";
 import { run, type RunArgs } from "../src/runner.ts";
-
-const here = dirname(fileURLToPath(import.meta.url));
-const cliPath = join(here, "..", "src", "cli.ts");
-const fixtureRoot = join(here, "fixtures");
-
-/** Fixture source with both fmt (double spaces) and lint (no-debugger) violations. */
-export const DIRTY_SOURCE = "const x  =  1;debugger\n";
-
-export function makeTempDir(label: string): string {
-  return mkdtempSync(join(tmpdir(), `lint-js-test-${label}-`));
-}
-
-/**
- * Copy a fixture under `test/fixtures/` to a fresh temp directory.
- *
- * @returns Path to the copied directory.
- */
-export function copyFixture(fixtureName: string): string {
-  const dest = makeTempDir(fixtureName);
-  cpSync(join(fixtureRoot, fixtureName), dest, { recursive: true });
-  return dest;
-}
-
-/** Write a matching pattern into both `.prettierignore` and `.eslintignore` at `dir`. */
-export function writeIgnoreFiles(dir: string, pattern: string): void {
-  writeFileSync(join(dir, ".prettierignore"), `${pattern}\n`);
-  writeFileSync(join(dir, ".eslintignore"), `${pattern}\n`);
-}
-
-export interface CliRunResult extends SpawnSyncReturns<Buffer | string> {
-  stdout: string;
-  stderr: string;
-}
-
-export interface SpawnCapturingParams {
-  /** Identifier used in launch-failure and signal diagnostics. */
-  name: string;
-
-  /** Executable path or command name passed directly to `spawnSync`. */
-  command: string;
-
-  /** Arguments passed to the command. */
-  args: readonly string[];
-
-  /** Working directory for the child. Defaults to the parent's cwd. */
-  cwd?: string;
-}
-
-/**
- * Spawn a command with file-backed stdio and reshape the result to {@link CliRunResult}.
- *
- * Wraps {@link runCommandCapturingOutput} so tests can capture stdout/stderr separately via the
- * canonical Codex-sandbox-safe path (workaround for https://github.com/openai/codex/issues/18473).
- *
- * Throws {@link LintJsError} on launch failure or signal-driven termination.
- */
-export function spawnCapturing({ name, command, args, cwd }: SpawnCapturingParams): CliRunResult {
-  const { result, capturedStdout, capturedStderr } = runCommandCapturingOutput({
-    name,
-    command,
-    args,
-    cwd,
-  });
-  return { ...result, stdout: capturedStdout, stderr: capturedStderr };
-}
-
-export function runLintJsCli(cwd: string, args: readonly string[] = []): CliRunResult {
-  return spawnCapturing({
-    name: "lint-js",
-    command: process.execPath,
-    args: [cliPath, ...args],
-    cwd,
-  });
-}
 
 export interface RecordedEvent {
   stream: "out" | "err";
@@ -154,6 +73,17 @@ export function renderSnapshot(events: readonly RecordedEvent[], exitCode: numbe
   });
   rendered.push(`EXIT ${exitCode}`);
   return `${rendered.join("\n")}\n`;
+}
+
+/**
+ * Pluck the events from a single stream into a single newline-joined string for matching
+ * stream-specific patterns without committing the whole structure to a snapshot.
+ */
+export function streamText(events: readonly RecordedEvent[], stream: "out" | "err"): string {
+  return events
+    .filter((e) => e.stream === stream)
+    .map((e) => e.line)
+    .join("\n");
 }
 
 /**

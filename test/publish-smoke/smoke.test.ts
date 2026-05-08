@@ -5,14 +5,14 @@ import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
 
-import { spawnCapturing } from "../helpers.ts";
+import { spawnCapturing } from "../cli-helpers.ts";
 
 const repoRoot = join(import.meta.dirname, "..", "..");
 const fixtureRoot = join(repoRoot, "test", "fixtures");
 
 interface PublishLayout {
   packageRoot: string;
-  distCli: string;
+  distBin: string;
   dispose: () => void;
 }
 
@@ -63,7 +63,7 @@ function preparePublishLayout(): PublishLayout {
     symlinkSync(join(repoRoot, "node_modules"), join(packageRoot, "node_modules"));
     return {
       packageRoot,
-      distCli: join(packageRoot, "dist", "cli.js"),
+      distBin: join(packageRoot, "dist", "bin.js"),
       dispose,
     };
   } catch (err) {
@@ -86,7 +86,7 @@ void describe("smoke against the published layout", () => {
     const result = spawnCapturing({
       name: "lint-js --help",
       command: process.execPath,
-      args: [layout.distCli, "--help"],
+      args: [layout.distBin, "--help"],
     });
     assert.equal(result.status, 0, `expected exit 0\nstderr:\n${result.stderr}`);
     assert.match(result.stdout, /Usage: lint-js/, "expected usage on stdout");
@@ -103,7 +103,7 @@ void describe("smoke against the published layout", () => {
     const result = spawnCapturing({
       name: "lint-js --check",
       command: process.execPath,
-      args: [layout.distCli, "--check"],
+      args: [layout.distBin, "--check"],
       cwd: dir,
     });
     assert.equal(
