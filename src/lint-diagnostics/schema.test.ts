@@ -21,9 +21,50 @@ void test("valid payload with one diagnostic resolves to ValidatedDiagnostic[]",
       filename: "/x.ts",
       code: "eslint(no-debugger)",
       message: "ok",
-      span: { offset: 0, length: 8, line: 1, column: 1 },
+      labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
     },
   ]);
+});
+
+void test("multi-label entry returns all labels in input order", () => {
+  const result = validatePayload({
+    diagnostics: [
+      {
+        filename: "/x.ts",
+        code: "eslint(no-dupe-keys)",
+        message: "duplicate key",
+        labels: [
+          { span: { offset: 0, length: 3, line: 1, column: 1 } },
+          { span: { offset: 10, length: 3, line: 2, column: 1 } },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.ok ? result.value[0]?.labels : null, [
+    { span: { offset: 0, length: 3, line: 1, column: 1 } },
+    { span: { offset: 10, length: 3, line: 2, column: 1 } },
+  ]);
+});
+
+void test("integrity check is applied per label, reporting the failing index", () => {
+  const result = validatePayload({
+    diagnostics: [
+      {
+        filename: "/x.ts",
+        code: "eslint(no-dupe-keys)",
+        message: "duplicate key",
+        labels: [
+          { span: { offset: 0, length: 3, line: 1, column: 1 } },
+          { span: { offset: -1, length: 3, line: 2, column: 1 } },
+        ],
+      },
+    ],
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.ok ? "" : result.reason, /labels\[1\]\.span\.offset/);
 });
 
 void test("empty diagnostics array resolves to []", () => {

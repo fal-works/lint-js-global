@@ -12,7 +12,7 @@ function makeValidated(overrides: Partial<ValidatedDiagnostic> = {}): ValidatedD
     filename: "/x.ts",
     code: "eslint(no-debugger)",
     message: "msg",
-    span: { offset: 0, length: 8, line: 1, column: 1 },
+    labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
     ...overrides,
   };
 }
@@ -45,7 +45,7 @@ void test("resolveDiagnostic: null code is replaced with the parse-error placeho
     makeValidated({
       filename: file,
       code: null,
-      span: { offset: 10, length: 1, line: 1, column: 11 },
+      labels: [{ span: { offset: 10, length: 1, line: 1, column: 11 } }],
     }),
     cache,
   );
@@ -63,7 +63,7 @@ void test("resolveDiagnostic: multi-line span sets sliceTruncated and reports th
   const result = resolveDiagnostic(
     makeValidated({
       filename: file,
-      span: { offset: 0, length: 30, line: 1, column: 1 },
+      labels: [{ span: { offset: 0, length: 30, line: 1, column: 1 } }],
     }),
     cache,
   );
@@ -82,7 +82,7 @@ void test("resolveDiagnostic: unreadable source returns null", () => {
   const result = resolveDiagnostic(
     makeValidated({
       filename: "/nonexistent/path/to/file.ts",
-      span: { offset: 0, length: 8, line: 3, column: 5 },
+      labels: [{ span: { offset: 0, length: 8, line: 3, column: 5 } }],
     }),
     cache,
   );
@@ -98,7 +98,7 @@ void test("resolveDiagnostic: out-of-bounds span returns null", (t) => {
   const result = resolveDiagnostic(
     makeValidated({
       filename: file,
-      span: { offset: 0, length: 9999, line: 1, column: 1 },
+      labels: [{ span: { offset: 0, length: 9999, line: 1, column: 1 } }],
     }),
     cache,
   );

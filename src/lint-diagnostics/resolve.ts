@@ -53,12 +53,17 @@ export interface ResolvedDiagnostic {
  * Resolve a validated diagnostic against the source cache.
  *
  * Returns `null` when the source is unreadable or the span is out-of-bounds.
+ *
+ * Uses `labels[0]` for the displayed span.
+ * oxlint's `labels[]` carries no primary/secondary distinction, and
+ * multi-label rules (e.g. `no-dupe-keys`) typically duplicate the same slice across entries.
  */
 export function resolveDiagnostic(
   diag: ValidatedDiagnostic,
   cache: SourceCache,
 ): ResolvedDiagnostic | null {
-  const resolved = resolveSpan(cache, diag.filename, diag.span.offset, diag.span.length);
+  const span = diag.labels[0].span;
+  const resolved = resolveSpan(cache, diag.filename, span.offset, span.length);
   if (resolved === null) return null;
   const slice = formatCodeSlice(resolved.text);
   return {

@@ -8,6 +8,27 @@
 /** Discriminated-union result type for fallible validators. */
 export type Result<T, E> = { ok: true; value: T } | { ok: false; reason: E };
 
+/** Native oxlint span units. */
+export interface ValidatedSpan {
+  /** Byte offset from the start of the file. */
+  offset: number;
+
+  /** Span length in bytes. */
+  length: number;
+
+  /** 1-origin line number. */
+  line: number;
+
+  /** 1-origin column, byte-based. */
+  column: number;
+}
+
+/** Per-label structural unit. */
+export interface ValidatedLabel {
+  /** Source span the rule points at. */
+  span: ValidatedSpan;
+}
+
 /**
  * Per-diagnostic shape after schema validation. Only fields downstream consumers use are kept.
  */
@@ -19,13 +40,8 @@ export interface ValidatedDiagnostic {
 
   message: string;
 
-  /**
-   * Native oxlint span units.
-   *
-   * `offset` and `length` are byte counts.
-   * `line` and `column` are 1-origin, with `column` byte-based.
-   */
-  span: { offset: number; length: number; line: number; column: number };
+  /** Non-empty array of labels emitted by oxlint. */
+  labels: [ValidatedLabel, ...ValidatedLabel[]];
 }
 
 /**
@@ -61,32 +77,42 @@ function validateDiagnostic(diag: unknown): Result<ValidatedDiagnostic, string> 
   if (!isUnknownArray(diag.labels) || diag.labels.length === 0) {
     return { ok: false, reason: "`labels` is missing or empty" };
   }
-  // Reduce multi-label entries to `labels[0]`.
-  // Typical extras are duplicate pointers to the identical slice at different locations.
-  const first = diag.labels[0];
-  if (!isObject(first)) return { ok: false, reason: "`labels[0]` is not an object" };
-  const span = first.span;
+  const firstResult = validateLabel(diag.labels[0], 0);
+  if (!firstResult.ok) return firstResult;
+  const labels: [ValidatedLabel, ...ValidatedLabel[]] = [firstResult.value];
+  for (let i = 1; i < diag.labels.length; i++) {
+    const result = validateLabel(diag.labels[i], i);
+    if (!result.ok) return result;
+    labels.push(result.value);
+  }
+  return {
+    ok: true,
+    value: { filename: diag.filename, code, message, labels },
+  };
+}
+
+function validateLabel(label: unknown, index: number): Result<ValidatedLabel, string> {
+  const at = `labels[${index}]`;
+  if (!isObject(label)) return { ok: false, reason: `\`${at}\` is not an object` };
+  const span = label.span;
   if (!isObject(span)) {
-    return { ok: false, reason: "`labels[0].span` is missing or not an object" };
+    return { ok: false, reason: `\`${at}.span\` is missing or not an object` };
   }
   if (!isNonNegativeInteger(span.offset)) {
-    return { ok: false, reason: "`labels[0].span.offset` is not a non-negative integer" };
+    return { ok: false, reason: `\`${at}.span.offset\` is not a non-negative integer` };
   }
   if (!isNonNegativeInteger(span.length)) {
-    return { ok: false, reason: "`labels[0].span.length` is not a non-negative integer" };
+    return { ok: false, reason: `\`${at}.span.length\` is not a non-negative integer` };
   }
   if (!isPositiveInteger(span.line)) {
-    return { ok: false, reason: "`labels[0].span.line` is not a positive integer" };
+    return { ok: false, reason: `\`${at}.span.line\` is not a positive integer` };
   }
   if (!isPositiveInteger(span.column)) {
-    return { ok: false, reason: "`labels[0].span.column` is not a positive integer" };
+    return { ok: false, reason: `\`${at}.span.column\` is not a positive integer` };
   }
   return {
     ok: true,
     value: {
-      filename: diag.filename,
-      code,
-      message,
       span: {
         offset: span.offset,
         length: span.length,

@@ -163,6 +163,6 @@ function contractFailure(rawStdout: string, reason: string): FormatLintResult {
 }
 
 function formatResolveFailure(diag: ValidatedDiagnostic): string {
-  const { offset, length } = diag.span;
+  const { offset, length } = diag.labels[0].span;
   return `failed to resolve span: filename=${diag.filename}, offset=${offset}, length=${length}`;
 }
