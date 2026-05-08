@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseCliArgs } from "./cli-args.ts";
-import { LintJsError } from "./error.ts";
+import { LintJsError } from "../error.ts";
+import { parseCliArgs } from "./args.ts";
 
 void test("--help / -h short-circuit before any other validation", () => {
   assert.deepEqual(parseCliArgs(["--help"]), { kind: "help" });

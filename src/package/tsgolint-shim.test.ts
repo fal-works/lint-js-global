@@ -3,7 +3,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import { runCommandCapturingOutput } from "./run-tool.ts";
+import { runCommandCapturingOutput } from "../system/subprocess.ts";
 import { createTsgolintShimDir } from "./tsgolint-shim.ts";
 
 void test("createTsgolintShimDir: produces a working tsgolint executable that delegates to the bundled entry", () => {

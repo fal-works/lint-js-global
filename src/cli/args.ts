@@ -1,7 +1,7 @@
 import { parseArgs } from "node:util";
 
-import { LintJsError } from "./error.ts";
-import type { RunArgs, RunMode } from "./runner.ts";
+import { LintJsError } from "../error.ts";
+import type { RunArgs, RunMode } from "../pipeline/runner.ts";
 
 export const HELP_TEXT = `Usage: lint-js [--check] [--format-only | --lint-only] [--unix] [path...]
 

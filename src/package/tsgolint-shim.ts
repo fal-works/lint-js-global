@@ -2,7 +2,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { resolvePackageBin } from "./package-info.ts";
+import { resolvePackageBin } from "./info.ts";
 
 /**
  * A temporary directory containing a `tsgolint` executable shim that delegates to the

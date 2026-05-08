@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { joinSections } from "../../test/format-diagnostics-helpers.ts";
+import { joinSections } from "../../test/lint-diagnostics-helpers.ts";
 import {
   compareDiagnostics,
   countFiles,

@@ -3,7 +3,7 @@ import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { LintJsError } from "./error.ts";
+import { LintJsError } from "../error.ts";
 
 type SpawnResult = SpawnSyncReturns<Buffer | string>;
 

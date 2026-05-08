@@ -113,14 +113,14 @@ void describe("smoke against the published layout", () => {
     );
   });
 
-  void it("shipped-paths: every path exported by package-paths.ts exists", async () => {
+  void it("shipped-paths: every path exported by package/paths.ts exists", async () => {
     // Some entries (e.g. doc paths embedded in diagnostic hints) appear as strings in CLI output
     // without being read at startup, so their absence would slip past the CLI-running stages above.
-    const url = pathToFileURL(join(layout.packageRoot, "dist", "package-paths.js")).href;
+    const url = pathToFileURL(join(layout.packageRoot, "dist", "package", "paths.js")).href;
     const mod: unknown = await import(url);
     assert.ok(
       typeof mod === "object" && mod !== null,
-      "expected module namespace object from package-paths.js",
+      "expected module namespace object from package/paths.js",
     );
     const missing: string[] = [];
     for (const [name, value] of Object.entries(mod as Record<string, unknown>)) {

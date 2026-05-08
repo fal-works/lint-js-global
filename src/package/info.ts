@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { LintJsError } from "./error.ts";
-import { PACKAGE_JSON } from "./package-paths.ts";
+import { LintJsError } from "../error.ts";
+import { PACKAGE_JSON } from "./paths.ts";
 
 /**
  * Type predicate narrowing an arbitrary value to a string-keyed record.

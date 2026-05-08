@@ -2,8 +2,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import test from "node:test";
 
-import { setupFixture } from "../../test/format-diagnostics-helpers.ts";
-import type { ValidatedDiagnostic } from "../oxlint-json-schema.ts";
+import { setupFixture } from "../../test/lint-diagnostics-helpers.ts";
 import { createSourceCache } from "../source.ts";
 import {
   formatCodeSlice,
@@ -11,6 +10,7 @@ import {
   resolveDiagnostic,
   UNREADABLE_SLICE,
 } from "./resolve.ts";
+import type { ValidatedDiagnostic } from "./schema.ts";
 
 function makeValidated(overrides: Partial<ValidatedDiagnostic> = {}): ValidatedDiagnostic {
   return {

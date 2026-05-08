@@ -1,7 +1,7 @@
-import type { Logger } from "./log.ts";
-import { resolvePackageBin } from "./package-info.ts";
-import { OXFMT_CONFIG } from "./package-paths.ts";
-import { runToolCapturingCombined } from "./run-tool.ts";
+import type { Logger } from "../log.ts";
+import { resolvePackageBin } from "../package/info.ts";
+import { OXFMT_CONFIG } from "../package/paths.ts";
+import { runToolCapturingCombined } from "../system/subprocess.ts";
 
 /**
  * Build CLI args for oxfmt.

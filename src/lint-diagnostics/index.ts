@@ -1,4 +1,3 @@
-import { validatePayload } from "../oxlint-json-schema.ts";
 import { createSourceCache } from "../source.ts";
 import {
   countFiles,
@@ -9,6 +8,7 @@ import {
   renderWeakTypingsHint,
 } from "./render.ts";
 import { resolveDiagnostic, type ResolvedDiagnostic } from "./resolve.ts";
+import { validatePayload } from "./schema.ts";
 
 /** Matches the signal oxlint ≥1.61 prepends to stdout when no files match the targets. */
 const OXLINT_NO_FILES_RE = /^No files found to lint\./;

@@ -1,8 +1,8 @@
-import { HELP_TEXT, parseCliArgs } from "./cli-args.ts";
-import { LintJsError } from "./error.ts";
-import type { Logger } from "./log.ts";
-import { getPackageVersion } from "./package-info.ts";
-import { run } from "./runner.ts";
+import { LintJsError } from "../error.ts";
+import type { Logger } from "../log.ts";
+import { getPackageVersion } from "../package/info.ts";
+import { run } from "../pipeline/runner.ts";
+import { HELP_TEXT, parseCliArgs } from "./args.ts";
 
 /**
  * CLI top-level flow. Parses `argv`, dispatches to {@link run} (or short-circuits on

@@ -2,7 +2,7 @@ import type { SpawnSyncReturns } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { runCommandCapturingOutput } from "../src/run-tool.ts";
+import { runCommandCapturingOutput } from "../src/system/subprocess.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const binPath = join(here, "..", "src", "bin.ts");

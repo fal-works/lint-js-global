@@ -1,10 +1,10 @@
-import { LintJsError } from "./error.ts";
-import { formatLintOutput, type LintOutputMode } from "./format-diagnostics/index.ts";
-import type { Logger } from "./log.ts";
-import { resolvePackageBin } from "./package-info.ts";
-import { OXLINT_CONFIG, WEAK_TYPINGS_DOC } from "./package-paths.ts";
-import { buildPathInjectedEnv, runToolCapturingOutput } from "./run-tool.ts";
-import { createTsgolintShimDir } from "./tsgolint-shim.ts";
+import { LintJsError } from "../error.ts";
+import { formatLintOutput, type LintOutputMode } from "../lint-diagnostics/index.ts";
+import type { Logger } from "../log.ts";
+import { resolvePackageBin } from "../package/info.ts";
+import { OXLINT_CONFIG, WEAK_TYPINGS_DOC } from "../package/paths.ts";
+import { createTsgolintShimDir } from "../package/tsgolint-shim.ts";
+import { buildPathInjectedEnv, runToolCapturingOutput } from "../system/subprocess.ts";
 
 /**
  * Build CLI args for oxlint. Always invokes `--format=json`;

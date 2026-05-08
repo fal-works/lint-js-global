@@ -1,12 +1,12 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { LintJsError } from "./error.ts";
+import { LintJsError } from "../error.ts";
+import type { LintOutputMode } from "../lint-diagnostics/index.ts";
+import type { Logger } from "../log.ts";
+import { getSystemIgnorePatterns } from "../system/ignore.ts";
 import { type FmtPhaseOutcome, runFmtPhase } from "./fmt.ts";
-import type { LintOutputMode } from "./format-diagnostics/index.ts";
-import { getSystemIgnorePatterns } from "./ignore.ts";
 import { type LintPhaseOutcome, runLintPhase } from "./lint.ts";
-import type { Logger } from "./log.ts";
 import { buildSummary } from "./summary.ts";
 
 /**
@@ -45,7 +45,7 @@ export interface RunContext {
  * `--check` runs only the leading fmt pass before lint.
  * `--format-only` and `--lint-only` collapse to a single phase as named.
  *
- * Exit codes follow the wrapper-wide convention (see `src/cli.ts`):
+ * Exit codes follow the wrapper-wide convention (see `src/cli/index.ts`):
  * 0 success, 1 fmt/lint findings remain or run halted, 2 reserved for {@link LintJsError}.
  *
  * May throw {@link LintJsError}; the CLI boundary catches it and maps to exit 2.

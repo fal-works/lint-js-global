@@ -7,7 +7,7 @@ import {
   joinSections,
   makeStdout,
   setupFixture,
-} from "../../test/format-diagnostics-helpers.ts";
+} from "../../test/lint-diagnostics-helpers.ts";
 import { formatLintOutput } from "./index.ts";
 
 void test("stylish mode: single file, single diagnostic produces grouped output and summary", (t) => {
@@ -215,7 +215,7 @@ void test("broken JSON surfaces as contract-failure under unix mode (tool-failur
 
 void test("schema-mismatch from validator surfaces as contract-failure with the validator's reason", () => {
   // Smoke test that the validator's failure reason flows through to contract-failure.reason.
-  // Detail-level cases live in oxlint-json-schema.test.ts.
+  // Detail-level cases live in schema.test.ts.
   const raw = JSON.stringify({ fatal: "internal error", number_of_files: 0 });
 
   const result = formatLintOutput({

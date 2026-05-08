@@ -1,6 +1,6 @@
 import { LintJsError } from "../src/error.ts";
 import type { Logger } from "../src/log.ts";
-import { run, type RunArgs } from "../src/runner.ts";
+import { run, type RunArgs } from "../src/pipeline/runner.ts";
 
 export interface RecordedEvent {
   stream: "out" | "err";

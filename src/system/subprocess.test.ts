@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test, { type TestContext } from "node:test";
 
-import { LintJsError } from "./error.ts";
+import { LintJsError } from "../error.ts";
 import {
   runCommandCapturingOutput,
   runToolCapturingCombined,
   runToolCapturingOutput,
-} from "./run-tool.ts";
+} from "./subprocess.ts";
 
 /**
  * Drop a tmp JS file `script.js` containing the given source, and clean up at teardown.

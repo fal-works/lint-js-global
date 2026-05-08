@@ -1,5 +1,5 @@
-import type { ValidatedDiagnostic } from "../oxlint-json-schema.ts";
 import { type SourceCache, resolveSpan } from "../source.ts";
+import type { ValidatedDiagnostic } from "./schema.ts";
 
 /**
  * Synthetic placeholder used in the `[...]` bracket when a diagnostic has no `code` (oxc parser
