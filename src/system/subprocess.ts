@@ -1,11 +1,25 @@
-import { spawnSync, type SpawnSyncReturns } from "node:child_process";
-import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from "node:fs";
+import { spawn, type SpawnOptions } from "node:child_process";
+import { type FileHandle, mkdtemp, open, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { LintJsError } from "../error.ts";
 
-type SpawnResult = SpawnSyncReturns<Buffer | string>;
+/**
+ * Subset of a child-process exit record used by callers.
+ *
+ * Launch failures and signal-driven termination are routed through {@link LintJsError},
+ * so a returned {@link SpawnResult} always represents a normal exit.
+ */
+export interface SpawnResult {
+  status: number | null;
+  signal: NodeJS.Signals | null;
+}
+
+/** Internal exit record carrying the launch error so {@link ensureNormalExit} can branch on it. */
+interface RawSpawnResult extends SpawnResult {
+  error: Error | null;
+}
 
 interface RunToolOptions {
   /** Tool name for launch-failure diagnostics. */
@@ -28,7 +42,7 @@ interface RunCommandOptions {
   /** Command name for launch-failure diagnostics. */
   name: string;
 
-  /** Executable path or command name passed directly to `spawnSync`. */
+  /** Executable path or command name passed directly to `spawn`. */
   command: string;
 
   /** Arguments passed to the command. */
@@ -40,7 +54,7 @@ interface RunCommandOptions {
   /** Env for the child. Defaults to inherited. */
   env?: NodeJS.ProcessEnv;
 
-  /** Passed through to `spawnSync` for platform-specific executable shims. */
+  /** Passed through to `spawn` for platform-specific executable shims. */
   shell?: boolean | string;
 }
 
@@ -57,46 +71,46 @@ interface RunCommandOptions {
  *
  * Throws {@link LintJsError} on launch failure or signal-driven termination.
  */
-export function runCommandCapturingOutput({
+export async function runCommandCapturingOutput({
   name,
   command,
   args,
   cwd,
   env,
   shell,
-}: RunCommandOptions): {
+}: RunCommandOptions): Promise<{
   result: SpawnResult;
   capturedStdout: string;
   capturedStderr: string;
-} {
-  const dir = mkdtempSync(join(tmpdir(), "lint-js-"));
+}> {
+  const dir = await mkdtemp(join(tmpdir(), "lint-js-"));
   const stdoutPath = join(dir, "stdout");
   const stderrPath = join(dir, "stderr");
-  let stdoutFd = -1;
-  let stderrFd = -1;
+  let stdoutFh: FileHandle | null = null;
+  let stderrFh: FileHandle | null = null;
   try {
-    stdoutFd = openSync(stdoutPath, "w");
-    stderrFd = openSync(stderrPath, "w");
-    const result = spawnSync(command, args, {
-      stdio: ["ignore", stdoutFd, stderrFd],
+    stdoutFh = await open(stdoutPath, "w");
+    stderrFh = await open(stderrPath, "w");
+    const raw = await spawnAndWait(command, args, {
+      stdio: ["ignore", stdoutFh.fd, stderrFh.fd],
       cwd,
       env: env ?? process.env,
       shell,
     });
-    closeSync(stdoutFd);
-    stdoutFd = -1;
-    closeSync(stderrFd);
-    stderrFd = -1;
-    ensureNormalExit(name, result);
+    await stdoutFh.close();
+    stdoutFh = null;
+    await stderrFh.close();
+    stderrFh = null;
+    ensureNormalExit(name, raw);
     return {
-      result,
-      capturedStdout: readFileSync(stdoutPath, "utf8"),
-      capturedStderr: readFileSync(stderrPath, "utf8"),
+      result: { status: raw.status, signal: raw.signal },
+      capturedStdout: await readFile(stdoutPath, "utf8"),
+      capturedStderr: await readFile(stderrPath, "utf8"),
     };
   } finally {
-    if (stdoutFd !== -1) closeSync(stdoutFd);
-    if (stderrFd !== -1) closeSync(stderrFd);
-    rmSync(dir, { recursive: true, force: true });
+    if (stdoutFh !== null) await stdoutFh.close();
+    if (stderrFh !== null) await stderrFh.close();
+    await rm(dir, { recursive: true, force: true });
   }
 }
 
@@ -108,38 +122,38 @@ export function runCommandCapturingOutput({
  *
  * Throws {@link LintJsError} on launch failure or signal-driven termination.
  */
-export function runCommandCapturingCombined({
+export async function runCommandCapturingCombined({
   name,
   command,
   args,
   cwd,
   env,
   shell,
-}: RunCommandOptions): {
+}: RunCommandOptions): Promise<{
   result: SpawnResult;
   captured: string;
-} {
-  const dir = mkdtempSync(join(tmpdir(), "lint-js-"));
+}> {
+  const dir = await mkdtemp(join(tmpdir(), "lint-js-"));
   const path = join(dir, "combined");
-  let fd = -1;
+  let fh: FileHandle | null = null;
   try {
-    fd = openSync(path, "w");
-    const result = spawnSync(command, args, {
-      stdio: ["ignore", fd, fd],
+    fh = await open(path, "w");
+    const raw = await spawnAndWait(command, args, {
+      stdio: ["ignore", fh.fd, fh.fd],
       cwd,
       env: env ?? process.env,
       shell,
     });
-    closeSync(fd);
-    fd = -1;
-    ensureNormalExit(name, result);
+    await fh.close();
+    fh = null;
+    ensureNormalExit(name, raw);
     return {
-      result,
-      captured: readFileSync(path, "utf8"),
+      result: { status: raw.status, signal: raw.signal },
+      captured: await readFile(path, "utf8"),
     };
   } finally {
-    if (fd !== -1) closeSync(fd);
-    rmSync(dir, { recursive: true, force: true });
+    if (fh !== null) await fh.close();
+    await rm(dir, { recursive: true, force: true });
   }
 }
 
@@ -147,11 +161,11 @@ export function runCommandCapturingCombined({
  * Node-tool variant of {@link runCommandCapturingOutput}: pins `process.execPath`
  * as the executable and strips color-forcing env vars so the child emits plain output.
  */
-export function runToolCapturingOutput({ name, bin, args, cwd, env }: RunToolOptions): {
+export function runToolCapturingOutput({ name, bin, args, cwd, env }: RunToolOptions): Promise<{
   result: SpawnResult;
   capturedStdout: string;
   capturedStderr: string;
-} {
+}> {
   return runCommandCapturingOutput({
     name,
     command: process.execPath,
@@ -165,16 +179,44 @@ export function runToolCapturingOutput({ name, bin, args, cwd, env }: RunToolOpt
  * Node-tool variant of {@link runCommandCapturingCombined}: pins `process.execPath`
  * as the executable and strips color-forcing env vars so the child emits plain output.
  */
-export function runToolCapturingCombined({ name, bin, args, cwd, env }: RunToolOptions): {
+export function runToolCapturingCombined({ name, bin, args, cwd, env }: RunToolOptions): Promise<{
   result: SpawnResult;
   captured: string;
-} {
+}> {
   return runCommandCapturingCombined({
     name,
     command: process.execPath,
     args: [bin, ...args],
     cwd,
     env: forcePlainOutput(env ?? process.env),
+  });
+}
+
+/**
+ * Spawn the child and resolve once it exits or fails to launch.
+ *
+ * Folds the asynchronous `'error'` and `'exit'` events into a single resolved value so the
+ * caller can branch through {@link ensureNormalExit} instead of unwrapping a rejected Promise.
+ */
+function spawnAndWait(
+  command: string,
+  args: readonly string[],
+  options: SpawnOptions,
+): Promise<RawSpawnResult> {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, options);
+    let settled = false;
+    const settle = (value: RawSpawnResult): void => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    child.once("error", (error) => {
+      settle({ status: null, signal: null, error });
+    });
+    child.once("exit", (status, signal) => {
+      settle({ status, signal, error: null });
+    });
   });
 }
 
@@ -198,7 +240,7 @@ function forcePlainOutput(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
  * Without this guard, a signal-killed child surfaces as `status: null` with `error: null`,
  * which is indistinguishable from a clean exit when the caller only inspects status.
  */
-function ensureNormalExit(name: string, result: SpawnResult): void {
+function ensureNormalExit(name: string, result: RawSpawnResult): void {
   if (result.error) {
     throw new LintJsError(`failed to launch ${name}: ${result.error.message}`, {
       cause: result.error,

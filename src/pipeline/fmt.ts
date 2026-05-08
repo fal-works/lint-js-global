@@ -58,14 +58,17 @@ export type FmtPhaseOutcome = { kind: "ok" } | { kind: "findings" } | { kind: "f
  * @throws {LintJsError} on launch failure or signal-driven termination
  *   (propagated from `runToolCapturingCombined`).
  */
-export function runFmtPhase(opts: FmtPhaseOptions, ctx: FmtPhaseContext): FmtPhaseOutcome {
+export async function runFmtPhase(
+  opts: FmtPhaseOptions,
+  ctx: FmtPhaseContext,
+): Promise<FmtPhaseOutcome> {
   const { check, targets, ignorePatterns } = opts;
   const { cwd, logger } = ctx;
 
   const oxfmtBin = resolvePackageBin("oxfmt", "oxfmt");
   // Combined capture: oxfmt's output is auxiliary text routed to stderr as a single block,
   // so capturing the streams together preserves the child's natural emission order.
-  const { result, captured } = runToolCapturingCombined({
+  const { result, captured } = await runToolCapturingCombined({
     name: "oxfmt",
     bin: oxfmtBin,
     args: buildOxfmtArgs(OXFMT_CONFIG, ignorePatterns, targets, check),

@@ -6,13 +6,13 @@ import test from "node:test";
 import { runCommandCapturingOutput } from "../system/subprocess.ts";
 import { createTsgolintShimDir } from "./tsgolint-shim.ts";
 
-void test("createTsgolintShimDir: produces a working tsgolint executable that delegates to the bundled entry", () => {
+void test("createTsgolintShimDir: produces a working tsgolint executable that delegates to the bundled entry", async () => {
   const shim = createTsgolintShimDir();
   try {
     const binName = process.platform === "win32" ? "tsgolint.cmd" : "tsgolint";
     assert.deepEqual(readdirSync(shim.dir), [binName]);
 
-    const { result, capturedStdout, capturedStderr } = runCommandCapturingOutput({
+    const { result, capturedStdout, capturedStderr } = await runCommandCapturingOutput({
       name: "tsgolint shim",
       command: join(shim.dir, binName),
       args: ["--help"],

@@ -16,7 +16,11 @@ import { HELP_TEXT, parseCliArgs } from "./args.ts";
  *
  * Anything else is re-thrown so genuine bugs surface with their full stack trace.
  */
-export function runCli(argv: readonly string[], cwd: string, logger: Logger): number {
+export async function runCli(
+  argv: readonly string[],
+  cwd: string,
+  logger: Logger,
+): Promise<number> {
   try {
     const cliArgs = parseCliArgs(argv);
     if (cliArgs.kind === "help") {
@@ -27,7 +31,7 @@ export function runCli(argv: readonly string[], cwd: string, logger: Logger): nu
       logger.writeOut(`lint-js ${getPackageVersion()}\n`);
       return 0;
     }
-    return run(cliArgs.args, { cwd, logger });
+    return await run(cliArgs.args, { cwd, logger });
   } catch (err: unknown) {
     if (err instanceof LintJsError) {
       logger.writeErrTagged(err.message, ...err.details);

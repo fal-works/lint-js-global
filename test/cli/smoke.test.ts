@@ -6,7 +6,7 @@ import test from "node:test";
 import { runLintJsCli } from "../cli-helpers.ts";
 import { copyFixture, DIRTY_SOURCE } from "../fixture-helpers.ts";
 
-void test("end-to-end smoke: full pipeline reaches the tools and reports through the configured streams", (t) => {
+void test("end-to-end smoke: full pipeline reaches the tools and reports through the configured streams", async (t) => {
   // Confirms the CLI binary wires `process.argv`, `process.cwd()`, `process.exitCode`,
   // `createConsoleLogger`, and the `LintJsError` boundary together. The basic fixture
   // is intentionally dirty, so a successful end-to-end run reports findings and exits 1.
@@ -14,7 +14,7 @@ void test("end-to-end smoke: full pipeline reaches the tools and reports through
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
-  const result = runLintJsCli(dir);
+  const result = await runLintJsCli(dir);
 
   assert.equal(result.status, 1, "expected exit 1 from unfixed lint findings");
   assert.match(result.stdout, /no-floating-promises/, "lint diagnostic on stdout");
@@ -26,7 +26,7 @@ void test("end-to-end smoke: full pipeline reaches the tools and reports through
   assert.doesNotMatch(result.stdout, /^lint-js:/m, "tagged status must not leak to stdout");
 });
 
-void test("end-to-end smoke: non-default flags reach run() unchanged", (t) => {
+void test("end-to-end smoke: non-default flags reach run() unchanged", async (t) => {
   // Each parsed CliArgs field has an observable that differs from the default run, so a
   // regression where cli.ts drops or hardcodes any of them surfaces as one of the asserts
   // below failing. Per-field branch coverage of the parser and runner lives upstream.
@@ -38,7 +38,7 @@ void test("end-to-end smoke: non-default flags reach run() unchanged", (t) => {
   const target = join(dir, "src", "index.ts");
   const before = readFileSync(target, "utf8");
 
-  const result = runLintJsCli(dir, ["--check", "--unix", "src"]);
+  const result = await runLintJsCli(dir, ["--check", "--unix", "src"]);
 
   assert.equal(result.status, 1, "expected exit 1 from fmt or lint findings");
   // --check forwarded: even files inside the positional target are not rewritten.

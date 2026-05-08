@@ -8,7 +8,7 @@ import { runRecording, streamText } from "../recording-helpers.ts";
 
 const DEFAULT_TARGETS = ["."];
 
-void test("positional path narrows scope but still honors ignore files", (t) => {
+void test("positional path narrows scope but still honors ignore files", async (t) => {
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -19,7 +19,7 @@ void test("positional path narrows scope but still honors ignore files", (t) => 
   writeFileSync(ignored, DIRTY_SOURCE);
   writeIgnoreFiles(dir, "ignored.ts");
 
-  const { events, exitCode } = runRecording(dir, {
+  const { events, exitCode } = await runRecording(dir, {
     mode: "full",
     check: false,
     outputMode: "stylish",
@@ -32,7 +32,7 @@ void test("positional path narrows scope but still honors ignore files", (t) => 
   assert.doesNotMatch(streamText(events, "out"), /no-debugger/);
 });
 
-void test("fully-ignored single-file target exits cleanly with the no-files summary", (t) => {
+void test("fully-ignored single-file target exits cleanly with the no-files summary", async (t) => {
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -40,7 +40,7 @@ void test("fully-ignored single-file target exits cleanly with the no-files summ
   writeFileSync(ignored, DIRTY_SOURCE);
   writeIgnoreFiles(dir, "ignored.ts");
 
-  const { events, exitCode } = runRecording(dir, {
+  const { events, exitCode } = await runRecording(dir, {
     mode: "full",
     check: false,
     outputMode: "stylish",
@@ -56,7 +56,7 @@ void test("fully-ignored single-file target exits cleanly with the no-files summ
   );
 });
 
-void test("--check + fully-ignored target: fmt phase stays silent on success (ADR-0006)", (t) => {
+void test("--check + fully-ignored target: fmt phase stays silent on success (ADR-0006)", async (t) => {
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -64,7 +64,7 @@ void test("--check + fully-ignored target: fmt phase stays silent on success (AD
   writeFileSync(ignored, DIRTY_SOURCE);
   writeIgnoreFiles(dir, "ignored.ts");
 
-  const { events, exitCode } = runRecording(dir, {
+  const { events, exitCode } = await runRecording(dir, {
     mode: "full",
     check: true,
     outputMode: "stylish",
@@ -80,14 +80,14 @@ void test("--check + fully-ignored target: fmt phase stays silent on success (AD
   assert.match(err, /^lint-js: Completed successfully\. No lintable files matched\.$/m);
 });
 
-void test("target dir with no lintable files exits cleanly", (t) => {
+void test("target dir with no lintable files exits cleanly", async (t) => {
   // oxlint ≥1.61's no-files signal also fires when a target simply contains no lintable files,
   // not only when ignore patterns filter every match out.
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(join(dir, "empty-dir"));
 
-  const { events, exitCode } = runRecording(dir, {
+  const { events, exitCode } = await runRecording(dir, {
     mode: "full",
     check: false,
     outputMode: "stylish",
@@ -98,7 +98,7 @@ void test("target dir with no lintable files exits cleanly", (t) => {
   assert.equal(streamText(events, "out"), "");
 });
 
-void test("node_modules is ignored", (t) => {
+void test("node_modules is ignored", async (t) => {
   const dir = copyFixture("with-node-modules");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -108,7 +108,7 @@ void test("node_modules is ignored", (t) => {
   const brokenContent = "const x=1;const y  =2\n";
   writeFileSync(brokenFile, brokenContent);
 
-  const { exitCode } = runRecording(dir, {
+  const { exitCode } = await runRecording(dir, {
     mode: "full",
     check: false,
     outputMode: "stylish",
@@ -119,12 +119,12 @@ void test("node_modules is ignored", (t) => {
   assert.equal(readFileSync(brokenFile, "utf8"), brokenContent);
 });
 
-void test("missing package.json: LintJsError routes through the boundary as exit 2", (t) => {
+void test("missing package.json: LintJsError routes through the boundary as exit 2", async (t) => {
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   rmSync(join(dir, "package.json"));
 
-  const { events, exitCode } = runRecording(dir, {
+  const { events, exitCode } = await runRecording(dir, {
     mode: "full",
     check: false,
     outputMode: "stylish",
@@ -135,11 +135,11 @@ void test("missing package.json: LintJsError routes through the boundary as exit
   assert.match(streamText(events, "err"), /no package\.json/);
 });
 
-void test("nonexistent target: LintJsError routes through the boundary as exit 2", (t) => {
+void test("nonexistent target: LintJsError routes through the boundary as exit 2", async (t) => {
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
-  const { events, exitCode } = runRecording(dir, {
+  const { events, exitCode } = await runRecording(dir, {
     mode: "full",
     check: false,
     outputMode: "stylish",

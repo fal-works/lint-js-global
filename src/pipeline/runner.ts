@@ -50,7 +50,7 @@ export interface RunContext {
  *
  * May throw {@link LintJsError}; the CLI boundary catches it and maps to exit 2.
  */
-export function run(args: RunArgs, ctx: RunContext): number {
+export async function run(args: RunArgs, ctx: RunContext): Promise<number> {
   const { mode, check, outputMode, targets } = args;
   const { cwd, logger } = ctx;
 
@@ -77,7 +77,7 @@ export function run(args: RunArgs, ctx: RunContext): number {
   let trailingFmt: FmtPhaseOutcome | null = null;
 
   if (mode !== "lint-only") {
-    leadingFmt = runFmtPhase({ check, targets, ignorePatterns }, phaseCtx);
+    leadingFmt = await runFmtPhase({ check, targets, ignorePatterns }, phaseCtx);
   }
 
   // Halt only when there is something downstream to skip; in `--format-only` the leading
@@ -86,7 +86,7 @@ export function run(args: RunArgs, ctx: RunContext): number {
 
   if (mode !== "format-only" && !halted) {
     logger.markBlankSeparator();
-    lint = runLintPhase({ check, outputMode, targets, ignorePatterns }, phaseCtx);
+    lint = await runLintPhase({ check, outputMode, targets, ignorePatterns }, phaseCtx);
   }
 
   // Trailing pass normalizes drift introduced by `oxlint --fix`. Runs only on the full
@@ -96,7 +96,7 @@ export function run(args: RunArgs, ctx: RunContext): number {
   // Skipped under `--check` (lint applies no fixes).
   if (mode === "full" && !check && !halted && lint?.kind === "ok") {
     logger.markBlankSeparator();
-    trailingFmt = runFmtPhase({ check: false, targets, ignorePatterns }, phaseCtx);
+    trailingFmt = await runFmtPhase({ check: false, targets, ignorePatterns }, phaseCtx);
   }
 
   logger.markBlankSeparator();

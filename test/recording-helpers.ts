@@ -93,13 +93,13 @@ export function streamText(events: readonly RecordedEvent[], stream: "out" | "er
  * are emitted via `writeErrTagged` and the exit code is pinned to 2. Anything else
  * propagates as a genuine bug.
  */
-export function runRecording(
+export async function runRecording(
   cwd: string,
   args: RunArgs,
-): { events: readonly RecordedEvent[]; exitCode: number } {
+): Promise<{ events: readonly RecordedEvent[]; exitCode: number }> {
   const recorder = createRecordingLogger();
   try {
-    const exitCode = run(args, { cwd, logger: recorder.logger });
+    const exitCode = await run(args, { cwd, logger: recorder.logger });
     return { events: recorder.events, exitCode };
   } catch (err: unknown) {
     if (err instanceof LintJsError) {

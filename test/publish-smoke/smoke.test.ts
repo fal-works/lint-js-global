@@ -26,7 +26,7 @@ interface PublishLayout {
  * The repo's `node_modules` is symlinked into the extracted package so runtime
  * dependency resolution succeeds without a fresh install.
  */
-function preparePublishLayout(): PublishLayout {
+async function preparePublishLayout(): Promise<PublishLayout> {
   const packDir = mkdtempSync(join(tmpdir(), "lint-js-smoke-pack-"));
   const extractDir = mkdtempSync(join(tmpdir(), "lint-js-smoke-extracted-"));
   const dispose = () => {
@@ -34,7 +34,7 @@ function preparePublishLayout(): PublishLayout {
     rmSync(extractDir, { recursive: true, force: true });
   };
   try {
-    const pack = spawnCapturing({
+    const pack = await spawnCapturing({
       name: "pnpm pack",
       command: "pnpm",
       args: ["pack", "--pack-destination", packDir],
@@ -51,7 +51,7 @@ function preparePublishLayout(): PublishLayout {
       );
     }
     const tarballPath = join(packDir, tarballName);
-    const tar = spawnCapturing({
+    const tar = await spawnCapturing({
       name: "tar",
       command: "tar",
       args: ["-xf", tarballPath, "-C", extractDir],
@@ -75,15 +75,15 @@ function preparePublishLayout(): PublishLayout {
 void describe("smoke against the published layout", () => {
   let layout: PublishLayout;
 
-  before(() => {
-    layout = preparePublishLayout();
+  before(async () => {
+    layout = await preparePublishLayout();
   });
   after(() => {
     layout?.dispose();
   });
 
-  void it("--help: prints usage and exits 0", () => {
-    const result = spawnCapturing({
+  void it("--help: prints usage and exits 0", async () => {
+    const result = await spawnCapturing({
       name: "lint-js --help",
       command: process.execPath,
       args: [layout.distBin, "--help"],
@@ -92,7 +92,7 @@ void describe("smoke against the published layout", () => {
     assert.match(result.stdout, /Usage: lint-js/, "expected usage on stdout");
   });
 
-  void it("--check on basic fixture: reaches underlying tools (exit 1 = findings)", (t) => {
+  void it("--check on basic fixture: reaches underlying tools (exit 1 = findings)", async (t) => {
     // `basic` is intentionally dirty, so a successful end-to-end run reports findings and exits 1.
     // Exit 1 therefore proves the full pipeline reached the underlying tools.
     // Exit 2 would mean a `LintJsError` aborted the run before findings were produced.
@@ -100,7 +100,7 @@ void describe("smoke against the published layout", () => {
     t.after(() => rmSync(dir, { recursive: true, force: true }));
     cpSync(join(fixtureRoot, "basic"), dir, { recursive: true });
 
-    const result = spawnCapturing({
+    const result = await spawnCapturing({
       name: "lint-js --check",
       command: process.execPath,
       args: [layout.distBin, "--check"],

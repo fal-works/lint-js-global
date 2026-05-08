@@ -66,7 +66,10 @@ export type LintPhaseOutcome = { kind: "ok" } | { kind: "no-files" } | { kind: "
  * @throws {LintJsError} on launch failure, signal-driven termination,
  *   or oxlint output-contract mismatch.
  */
-export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): LintPhaseOutcome {
+export async function runLintPhase(
+  opts: LintPhaseOptions,
+  ctx: LintPhaseContext,
+): Promise<LintPhaseOutcome> {
   const { check, outputMode, targets, ignorePatterns } = opts;
   const { cwd, logger } = ctx;
 
@@ -80,7 +83,7 @@ export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): Lin
   let capturedStderr;
   try {
     const env = buildPathInjectedEnv(shim.dir);
-    ({ result, capturedStdout, capturedStderr } = runToolCapturingOutput({
+    ({ result, capturedStdout, capturedStderr } = await runToolCapturingOutput({
       name: "oxlint",
       bin: oxlintBin,
       args: buildOxlintArgs(OXLINT_CONFIG, ignorePatterns, targets, check),

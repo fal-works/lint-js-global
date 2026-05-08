@@ -8,12 +8,12 @@ import { runRecording, streamText } from "../recording-helpers.ts";
 
 const DEFAULT_TARGETS = ["."];
 
-void test("--check halt: fatal fmt under --check still halts before lint", (t) => {
+void test("--check halt: fatal fmt under --check still halts before lint", async (t) => {
   const dir = copyFixture("with-node-modules");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   writeFileSync(join(dir, "broken.ts"), "const x = ;\n");
 
-  const { events, exitCode } = runRecording(dir, {
+  const { events, exitCode } = await runRecording(dir, {
     mode: "full",
     check: true,
     outputMode: "stylish",
@@ -29,14 +29,14 @@ void test("--check halt: fatal fmt under --check still halts before lint", (t) =
   );
 });
 
-void test("--format-only: fatal fmt failure surfaces the fmt-specific failure summary", (t) => {
+void test("--format-only: fatal fmt failure surfaces the fmt-specific failure summary", async (t) => {
   // Halt suppresses duplicate parse-error output across phases; with no downstream phase,
   // it has nothing to suppress and falls through to a regular failure with fmt-specific wording.
   const dir = copyFixture("with-node-modules");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   writeFileSync(join(dir, "broken.ts"), "const x = ;\n");
 
-  const { events, exitCode } = runRecording(dir, {
+  const { events, exitCode } = await runRecording(dir, {
     mode: "format-only",
     check: false,
     outputMode: "stylish",
@@ -50,13 +50,13 @@ void test("--format-only: fatal fmt failure surfaces the fmt-specific failure su
   assert.match(err, /^lint-js: Failed\. Format errors remain\.$/m);
 });
 
-void test("--format-only: rewrites sources and skips lint phase entirely", (t) => {
+void test("--format-only: rewrites sources and skips lint phase entirely", async (t) => {
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const target = join(dir, "src", "index.ts");
   const before = readFileSync(target, "utf8");
 
-  const { events, exitCode } = runRecording(dir, {
+  const { events, exitCode } = await runRecording(dir, {
     mode: "format-only",
     check: false,
     outputMode: "stylish",
@@ -72,7 +72,7 @@ void test("--format-only: rewrites sources and skips lint phase entirely", (t) =
   );
 });
 
-void test("--lint-only: skips fmt phase, leaves source bytes untouched", (t) => {
+void test("--lint-only: skips fmt phase, leaves source bytes untouched", async (t) => {
   // Asserting bytes-equal is meaningful because the basic fixture has fmt violations
   // that the leading fmt pass would otherwise rewrite.
   const dir = copyFixture("basic");
@@ -80,7 +80,7 @@ void test("--lint-only: skips fmt phase, leaves source bytes untouched", (t) => 
   const target = join(dir, "src", "index.ts");
   const before = readFileSync(target, "utf8");
 
-  const { events, exitCode } = runRecording(dir, {
+  const { events, exitCode } = await runRecording(dir, {
     mode: "lint-only",
     check: false,
     outputMode: "stylish",

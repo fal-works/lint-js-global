@@ -8,11 +8,11 @@ import { runRecording, streamText } from "../recording-helpers.ts";
 
 const DEFAULT_TARGETS = ["."];
 
-void test("full pipeline: trailing fmt normalizes drift left by oxlint --fix (ADR-0005)", (t) => {
+void test("full pipeline: trailing fmt normalizes drift left by oxlint --fix (ADR-0005)", async (t) => {
   const dir = copyFixture("lint-fix-drift");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
-  const { exitCode } = runRecording(dir, {
+  const { exitCode } = await runRecording(dir, {
     mode: "full",
     check: false,
     outputMode: "stylish",
@@ -24,11 +24,11 @@ void test("full pipeline: trailing fmt normalizes drift left by oxlint --fix (AD
   assert.ok(after.includes(`import type { ExampleType } from "./types.ts";`));
 });
 
-void test("full pipeline: trailing fmt skipped when lint findings remain so L:C matches final file (ADR-0005)", (t) => {
+void test("full pipeline: trailing fmt skipped when lint findings remain so L:C matches final file (ADR-0005)", async (t) => {
   const dir = copyFixture("lint-fix-position-stability");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
-  const { events, exitCode } = runRecording(dir, {
+  const { events, exitCode } = await runRecording(dir, {
     mode: "full",
     check: false,
     outputMode: "stylish",
@@ -49,11 +49,11 @@ void test("full pipeline: trailing fmt skipped when lint findings remain so L:C 
   );
 });
 
-void test("--lint-only: drift left by oxlint --fix is preserved (no trailing fmt)", (t) => {
+void test("--lint-only: drift left by oxlint --fix is preserved (no trailing fmt)", async (t) => {
   const dir = copyFixture("lint-fix-drift");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
-  const { exitCode } = runRecording(dir, {
+  const { exitCode } = await runRecording(dir, {
     mode: "lint-only",
     check: false,
     outputMode: "stylish",

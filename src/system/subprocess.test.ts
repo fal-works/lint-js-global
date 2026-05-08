@@ -24,11 +24,11 @@ function makeScript(t: TestContext, source: string): string {
   return path;
 }
 
-void test("runToolCapturingOutput: signal-driven termination throws LintJsError", (t) => {
+void test("runToolCapturingOutput: signal-driven termination throws LintJsError", async (t) => {
   // Self-kill via SIGTERM. Linux only; project test target is WSL2.
   const bin = makeScript(t, "process.kill(process.pid, 'SIGTERM');\n");
 
-  assert.throws(
+  await assert.rejects(
     () => runToolCapturingOutput({ name: "self-killer", bin, args: [] }),
     (err) =>
       err instanceof LintJsError &&
@@ -36,22 +36,22 @@ void test("runToolCapturingOutput: signal-driven termination throws LintJsError"
   );
 });
 
-void test("runToolCapturingOutput: non-zero exit propagates via result.status (no throw)", (t) => {
+void test("runToolCapturingOutput: non-zero exit propagates via result.status (no throw)", async (t) => {
   const bin = makeScript(t, "process.exit(7);\n");
 
-  const { result } = runToolCapturingOutput({ name: "exit7", bin, args: [] });
+  const { result } = await runToolCapturingOutput({ name: "exit7", bin, args: [] });
 
   assert.equal(result.status, 7, "non-zero status passes through to the caller");
   assert.equal(result.signal, null);
 });
 
-void test("runToolCapturingOutput: clean exit returns captured streams", (t) => {
+void test("runToolCapturingOutput: clean exit returns captured streams", async (t) => {
   const bin = makeScript(
     t,
     "process.stdout.write('hello-out');\nprocess.stderr.write('hello-err');\n",
   );
 
-  const { result, capturedStdout, capturedStderr } = runToolCapturingOutput({
+  const { result, capturedStdout, capturedStderr } = await runToolCapturingOutput({
     name: "echo",
     bin,
     args: [],
@@ -62,10 +62,10 @@ void test("runToolCapturingOutput: clean exit returns captured streams", (t) => 
   assert.equal(capturedStderr, "hello-err");
 });
 
-void test("runCommandCapturingOutput: clean exit returns captured streams", (t) => {
+void test("runCommandCapturingOutput: clean exit returns captured streams", async (t) => {
   const bin = makeScript(t, "process.stdout.write('cmd-out');\nprocess.stderr.write('cmd-err');\n");
 
-  const { result, capturedStdout, capturedStderr } = runCommandCapturingOutput({
+  const { result, capturedStdout, capturedStderr } = await runCommandCapturingOutput({
     name: "command-echo",
     command: process.execPath,
     args: [bin],
@@ -76,8 +76,8 @@ void test("runCommandCapturingOutput: clean exit returns captured streams", (t) 
   assert.equal(capturedStderr, "cmd-err");
 });
 
-void test("runCommandCapturingOutput: launch failure throws LintJsError", () => {
-  assert.throws(
+void test("runCommandCapturingOutput: launch failure throws LintJsError", async () => {
+  await assert.rejects(
     () =>
       runCommandCapturingOutput({
         name: "missing-command",
@@ -88,19 +88,19 @@ void test("runCommandCapturingOutput: launch failure throws LintJsError", () => 
   );
 });
 
-void test("runToolCapturingCombined: clean exit returns combined output", (t) => {
+void test("runToolCapturingCombined: clean exit returns combined output", async (t) => {
   const bin = makeScript(
     t,
     "process.stdout.write('combined-out');\nprocess.stderr.write('combined-err');\n",
   );
 
-  const { result, captured } = runToolCapturingCombined({ name: "combined", bin, args: [] });
+  const { result, captured } = await runToolCapturingCombined({ name: "combined", bin, args: [] });
 
   assert.equal(result.status, 0);
   assert.equal(captured, "combined-outcombined-err");
 });
 
-void test("runToolCapturingOutput: child sees NO_COLOR=1 and no FORCE_COLOR/CLICOLOR_FORCE", (t) => {
+void test("runToolCapturingOutput: child sees NO_COLOR=1 and no FORCE_COLOR/CLICOLOR_FORCE", async (t) => {
   const bin = makeScript(
     t,
     `process.stdout.write(JSON.stringify({
@@ -111,7 +111,12 @@ void test("runToolCapturingOutput: child sees NO_COLOR=1 and no FORCE_COLOR/CLIC
   );
 
   const env: NodeJS.ProcessEnv = { ...process.env, FORCE_COLOR: "3", CLICOLOR_FORCE: "1" };
-  const { capturedStdout } = runToolCapturingOutput({ name: "envcheck", bin, args: [], env });
+  const { capturedStdout } = await runToolCapturingOutput({
+    name: "envcheck",
+    bin,
+    args: [],
+    env,
+  });
 
   assert.deepEqual(JSON.parse(capturedStdout), {
     hasForceColor: false,

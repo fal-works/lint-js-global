@@ -1,4 +1,3 @@
-import type { SpawnSyncReturns } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -7,7 +6,9 @@ import { runCommandCapturingOutput } from "../src/system/subprocess.ts";
 const here = dirname(fileURLToPath(import.meta.url));
 const binPath = join(here, "..", "src", "bin.ts");
 
-export interface CliRunResult extends SpawnSyncReturns<Buffer | string> {
+export interface CliRunResult {
+  status: number | null;
+  signal: NodeJS.Signals | null;
   stdout: string;
   stderr: string;
 }
@@ -16,7 +17,7 @@ export interface SpawnCapturingParams {
   /** Identifier used in launch-failure and signal diagnostics. */
   name: string;
 
-  /** Executable path or command name passed directly to `spawnSync`. */
+  /** Executable path or command name passed directly to `spawn`. */
   command: string;
 
   /** Arguments passed to the command. */
@@ -34,17 +35,27 @@ export interface SpawnCapturingParams {
  *
  * Throws {@link LintJsError} on launch failure or signal-driven termination.
  */
-export function spawnCapturing({ name, command, args, cwd }: SpawnCapturingParams): CliRunResult {
-  const { result, capturedStdout, capturedStderr } = runCommandCapturingOutput({
+export async function spawnCapturing({
+  name,
+  command,
+  args,
+  cwd,
+}: SpawnCapturingParams): Promise<CliRunResult> {
+  const { result, capturedStdout, capturedStderr } = await runCommandCapturingOutput({
     name,
     command,
     args,
     cwd,
   });
-  return { ...result, stdout: capturedStdout, stderr: capturedStderr };
+  return {
+    status: result.status,
+    signal: result.signal,
+    stdout: capturedStdout,
+    stderr: capturedStderr,
+  };
 }
 
-export function runLintJsCli(cwd: string, args: readonly string[] = []): CliRunResult {
+export function runLintJsCli(cwd: string, args: readonly string[] = []): Promise<CliRunResult> {
   return spawnCapturing({
     name: "lint-js",
     command: process.execPath,
