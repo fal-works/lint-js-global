@@ -93,18 +93,6 @@ export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): Lin
 
   logger.writeErr(capturedStderr);
 
-  // Empty stdout with non-zero status means oxlint failed before producing any output.
-  // Routing through the diagnostics branch would surface it as a misleading
-  // "unfixed issues remain" summary, so escalate to LintJsError instead.
-  if (capturedStdout === "" && result.status !== 0) {
-    throw new LintJsError("oxlint exited with no output.", {
-      details: [
-        `exit status: ${result.status ?? "(none)"}`,
-        "stderr above (if any) is the only signal from the tool.",
-      ],
-    });
-  }
-
   const formatted = formatLintOutput({
     capturedStdout,
     check,
@@ -132,6 +120,17 @@ export function runLintPhase(opts: LintPhaseOptions, ctx: LintPhaseContext): Lin
 
     case "diagnostics": {
       const { formattedDiagnostics, weakTypingsHint, linterSummary } = formatted;
+      // Non-zero exit with no validated diagnostics (empty stdout, or `{"diagnostics":[]}`)
+      // means oxlint signaled failure without producing findings.
+      // Surface it as a tool failure so the run does not display the misleading "unfixed issues remain" summary.
+      if (linterSummary === null && result.status !== 0) {
+        throw new LintJsError("oxlint exited non-zero without producing diagnostics.", {
+          details: [
+            `exit status: ${result.status ?? "(none)"}`,
+            "stderr above (if any) is the only signal from the tool.",
+          ],
+        });
+      }
       logger.writeOut(formattedDiagnostics);
       if (weakTypingsHint !== null) {
         logger.markBlankSeparator();
