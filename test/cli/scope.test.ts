@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import { DIRTY_SOURCE, copyFixture, runCli, writeIgnoreFiles } from "../helpers.ts";
+import { DIRTY_SOURCE, copyFixture, runLintJsCli, writeIgnoreFiles } from "../helpers.ts";
 
 void test("positional path narrows scope but still honors ignore files", (t) => {
   const dir = copyFixture("basic");
@@ -16,7 +16,7 @@ void test("positional path narrows scope but still honors ignore files", (t) => 
   writeFileSync(ignored, DIRTY_SOURCE);
   writeIgnoreFiles(dir, "ignored.ts");
 
-  const result = runCli(dir, ["src"]);
+  const result = runLintJsCli(dir, ["src"]);
 
   assert.equal(result.status, 1, "expected exit 1 from unfixed lint error in src/index.ts");
   assert.equal(readFileSync(outside, "utf8"), DIRTY_SOURCE, "outside target must not be touched");
@@ -36,7 +36,7 @@ void test("fully-ignored single-file target exits cleanly", (t) => {
   writeFileSync(ignored, DIRTY_SOURCE);
   writeIgnoreFiles(dir, "ignored.ts");
 
-  const result = runCli(dir, ["src/ignored.ts"]);
+  const result = runLintJsCli(dir, ["src/ignored.ts"]);
 
   assert.equal(result.status, 0, "expected exit 0 when the only target is ignored");
   assert.equal(readFileSync(ignored, "utf8"), DIRTY_SOURCE, "ignored file must not be touched");
@@ -52,7 +52,7 @@ void test("--check + fully-ignored target: fmt phase stays silent on success (AD
   writeFileSync(ignored, DIRTY_SOURCE);
   writeIgnoreFiles(dir, "ignored.ts");
 
-  const result = runCli(dir, ["--check", "src/ignored.ts"]);
+  const result = runLintJsCli(dir, ["--check", "src/ignored.ts"]);
 
   assert.equal(result.status, 0, "expected exit 0 when the only target is ignored");
   // Per ADR-0006 the fmt phase is silent on success, including the zero-match case
@@ -74,7 +74,7 @@ void test("target dir with no lintable files exits cleanly", (t) => {
 
   mkdirSync(join(dir, "empty-dir"));
 
-  const result = runCli(dir, ["empty-dir"]);
+  const result = runLintJsCli(dir, ["empty-dir"]);
 
   assert.equal(result.status, 0, "expected exit 0 when the target has no lintable files");
   assert.equal(result.stdout, "", "stdout must stay empty when no diagnostic is produced");
@@ -90,7 +90,7 @@ void test("--unix + fully-ignored target exits cleanly", (t) => {
   writeFileSync(ignored, DIRTY_SOURCE);
   writeIgnoreFiles(dir, "ignored.ts");
 
-  const result = runCli(dir, ["--unix", "src/ignored.ts"]);
+  const result = runLintJsCli(dir, ["--unix", "src/ignored.ts"]);
 
   assert.equal(result.status, 0, "expected exit 0 when the only target is ignored");
   assert.equal(readFileSync(ignored, "utf8"), DIRTY_SOURCE, "ignored file must not be touched");
@@ -112,7 +112,7 @@ void test("node_modules is ignored", (t) => {
   const brokenContent = "const x=1;const y  =2\n";
   writeFileSync(brokenFile, brokenContent);
 
-  const result = runCli(dir);
+  const result = runLintJsCli(dir);
 
   assert.equal(result.status, 0, "clean project src should pass");
   assert.equal(

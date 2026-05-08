@@ -3,7 +3,7 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
-import { copyFixture, makeTempDir, runCli } from "../helpers.ts";
+import { copyFixture, makeTempDir, runLintJsCli } from "../helpers.ts";
 
 void test("basic: reformats sources and reports floating promise", (t) => {
   const dir = copyFixture("basic");
@@ -12,7 +12,7 @@ void test("basic: reformats sources and reports floating promise", (t) => {
   const target = join(dir, "src", "index.ts");
   const before = readFileSync(target, "utf8");
 
-  const result = runCli(dir);
+  const result = runLintJsCli(dir);
 
   assert.equal(result.status, 1, "expected exit 1 from unfixed lint error");
   const after = readFileSync(target, "utf8");
@@ -51,7 +51,7 @@ void test("--unix: stdout carries flat diagnostic lines; auxiliary text routes t
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
-  const result = runCli(dir, ["--unix"]);
+  const result = runLintJsCli(dir, ["--unix"]);
 
   assert.equal(result.status, 1, "expected exit 1 from unfixed lint error");
   // Single line of the form `<filename>:<L>:<C>: <message> [<code>]`.
@@ -92,7 +92,7 @@ void test("fatal oxfmt failure halts the run before lint", (t) => {
   // Parse error in the leading fmt pass is the sole halt trigger (ADR-0005).
   writeFileSync(join(dir, "broken.ts"), "const x = ;\n");
 
-  const result = runCli(dir);
+  const result = runLintJsCli(dir);
 
   // oxfmt itself returns 2 on parse errors, but lint-js reserves 2 for LintJsError;
   // any non-zero child status must collapse to 1.
@@ -112,7 +112,7 @@ void test("--check: fatal oxfmt failure halts the run before lint", (t) => {
 
   writeFileSync(join(dir, "broken.ts"), "const x = ;\n");
 
-  const result = runCli(dir, ["--check"]);
+  const result = runLintJsCli(dir, ["--check"]);
 
   assert.equal(result.status, 1, "halt collapses to exit 1 under --check too");
   assert.match(result.stderr, /Unexpected token/, "leading fmt's parse error must surface");
@@ -133,7 +133,7 @@ void test("--format-only: fatal oxfmt failure surfaces a fmt-specific failure su
 
   writeFileSync(join(dir, "broken.ts"), "const x = ;\n");
 
-  const result = runCli(dir, ["--format-only"]);
+  const result = runLintJsCli(dir, ["--format-only"]);
 
   assert.equal(result.status, 1, "fmt-only fmt failure still exits 1");
   assert.match(result.stderr, /Unexpected token/);
@@ -153,7 +153,7 @@ void test("--check: does not modify files and reports both fmt and lint violatio
   const target = join(dir, "src", "index.ts");
   const before = readFileSync(target, "utf8");
 
-  const result = runCli(dir, ["--check"]);
+  const result = runLintJsCli(dir, ["--check"]);
 
   assert.equal(result.status, 1, "expected exit 1 from fmt or lint violations");
   assert.equal(readFileSync(target, "utf8"), before, "sources must not be rewritten in check mode");
@@ -176,7 +176,7 @@ void test("--check: clean project exits 0", (t) => {
   const dir = copyFixture("with-node-modules");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
-  const result = runCli(dir, ["--check"]);
+  const result = runLintJsCli(dir, ["--check"]);
 
   assert.equal(result.status, 0, "expected exit 0 on clean project under --check");
   assert.doesNotMatch(
@@ -199,7 +199,7 @@ void test("--format-only: runs fmt phase, skips lint phase entirely", (t) => {
   const target = join(dir, "src", "index.ts");
   const before = readFileSync(target, "utf8");
 
-  const result = runCli(dir, ["--format-only"]);
+  const result = runLintJsCli(dir, ["--format-only"]);
 
   assert.equal(
     result.status,
@@ -229,7 +229,7 @@ void test("--lint-only: runs lint phase, skips fmt phase entirely", (t) => {
   const target = join(dir, "src", "index.ts");
   const before = readFileSync(target, "utf8");
 
-  const result = runCli(dir, ["--lint-only"]);
+  const result = runLintJsCli(dir, ["--lint-only"]);
 
   assert.equal(result.status, 1, "expected exit 1 from unfixed lint error");
   assert.match(result.stdout, /no-floating-promises/, "expected lint diagnostic on stdout");
@@ -251,7 +251,7 @@ void test("full pipeline: trailing fmt normalizes drift left by oxlint --fix (AD
   const dir = copyFixture("lint-fix-drift");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
-  const result = runCli(dir);
+  const result = runLintJsCli(dir);
 
   assert.equal(result.status, 0);
   const after = readFileSync(join(dir, "src", "index.ts"), "utf8");
@@ -262,7 +262,7 @@ void test("full pipeline: trailing fmt is skipped when lint findings remain so L
   const dir = copyFixture("lint-fix-position-stability");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
-  const result = runCli(dir);
+  const result = runLintJsCli(dir);
 
   assert.equal(result.status, 1, "expected exit 1 from unfixed lint error");
   // Locate the diagnostic head line "  L:C ..." emitted by the JSON formatter.
@@ -281,7 +281,7 @@ void test("--lint-only: drift left by oxlint --fix is preserved (no trailing fmt
   const dir = copyFixture("lint-fix-drift");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
-  const result = runCli(dir, ["--lint-only"]);
+  const result = runLintJsCli(dir, ["--lint-only"]);
 
   assert.equal(result.status, 0);
   const after = readFileSync(join(dir, "src", "index.ts"), "utf8");
@@ -294,7 +294,7 @@ void test("--format-only and --lint-only are mutually exclusive", (t) => {
   const dir = makeTempDir("mutually-exclusive");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
-  const result = runCli(dir, ["--format-only", "--lint-only"]);
+  const result = runLintJsCli(dir, ["--format-only", "--lint-only"]);
 
   assert.equal(result.status, 2, "LintJsError path uses exit 2");
   assert.match(result.stderr, /mutually exclusive/);

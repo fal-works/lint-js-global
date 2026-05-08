@@ -74,7 +74,7 @@ export function spawnCapturing({ name, command, args, cwd }: SpawnCapturingParam
   return { ...result, stdout: capturedStdout, stderr: capturedStderr };
 }
 
-export function runCli(cwd: string, args: readonly string[] = []): CliRunResult {
+export function runLintJsCli(cwd: string, args: readonly string[] = []): CliRunResult {
   return spawnCapturing({
     name: "lint-js",
     command: process.execPath,

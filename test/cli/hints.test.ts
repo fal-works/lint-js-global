@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { existsSync, rmSync } from "node:fs";
 import test from "node:test";
 
-import { copyFixture, runCli } from "../helpers.ts";
+import { copyFixture, runLintJsCli } from "../helpers.ts";
 
 void test("unsafe-any: weak-typings hint goes to stderr, leaving stdout pure diagnostics", (t) => {
   const dir = copyFixture("unsafe-any");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
-  const result = runCli(dir, ["--check"]);
+  const result = runLintJsCli(dir, ["--check"]);
 
   assert.equal(result.status, 1, "expected exit 1 from no-unsafe-* errors (fmt/lint findings)");
 
