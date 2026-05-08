@@ -213,6 +213,34 @@ void test("broken JSON surfaces as contract-failure under unix mode (tool-failur
   assert.match(result.reason, /JSON/);
 });
 
+void test("span-resolution failure surfaces as contract-failure with filename/offset/length in reason", () => {
+  const filename = "/nonexistent/path/to/file.ts";
+  const stdout = makeStdout([
+    {
+      message: "msg",
+      code: "eslint(no-debugger)",
+      severity: "error",
+      filename,
+      labels: [{ span: { offset: 7, length: 3, line: 1, column: 1 } }],
+    },
+  ]);
+
+  const result = formatLintOutput({
+    capturedStdout: stdout,
+    check: false,
+    outputMode: "stylish",
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(result.kind, "contract-failure");
+  if (result.kind !== "contract-failure") return;
+  assert.equal(result.rawStdout, stdout);
+  assert.match(result.reason, /failed to resolve span/);
+  assert.ok(result.reason.includes(`filename=${filename}`));
+  assert.ok(result.reason.includes("offset=7"));
+  assert.ok(result.reason.includes("length=3"));
+});
+
 void test("schema-mismatch from validator surfaces as contract-failure with the validator's reason", () => {
   // Smoke test that the validator's failure reason flows through to contract-failure.reason.
   // Detail-level cases live in schema.test.ts.

@@ -4,12 +4,7 @@ import test from "node:test";
 
 import { setupFixture } from "../../test/lint-diagnostics-helpers.ts";
 import { createSourceCache } from "../source.ts";
-import {
-  formatCodeSlice,
-  PARSE_ERROR_CODE,
-  resolveDiagnostic,
-  UNREADABLE_SLICE,
-} from "./resolve.ts";
+import { formatCodeSlice, PARSE_ERROR_CODE, resolveDiagnostic } from "./resolve.ts";
 import type { ValidatedDiagnostic } from "./schema.ts";
 
 function makeValidated(overrides: Partial<ValidatedDiagnostic> = {}): ValidatedDiagnostic {
@@ -29,6 +24,7 @@ void test("resolveDiagnostic: happy path exposes start/end position and an untru
 
   const result = resolveDiagnostic(makeValidated({ filename: file }), cache);
 
+  assert.ok(result !== null);
   assert.equal(result.filename, file);
   assert.equal(result.errorCode, "eslint(no-debugger)");
   assert.equal(result.message, "msg");
@@ -54,6 +50,7 @@ void test("resolveDiagnostic: null code is replaced with the parse-error placeho
     cache,
   );
 
+  assert.ok(result !== null);
   assert.equal(result.errorCode, PARSE_ERROR_CODE);
   assert.equal(result.slice, ";");
 });
@@ -71,6 +68,7 @@ void test("resolveDiagnostic: multi-line span sets sliceTruncated and reports th
     cache,
   );
 
+  assert.ok(result !== null);
   assert.equal(result.startLine, 1);
   assert.equal(result.startCol, 1);
   assert.equal(result.endLine, 3);
@@ -79,7 +77,7 @@ void test("resolveDiagnostic: multi-line span sets sliceTruncated and reports th
   assert.equal(result.slice, "function foo() { ...");
 });
 
-void test("resolveDiagnostic: unreadable source falls back to validator-reported L:C and placeholder slice", () => {
+void test("resolveDiagnostic: unreadable source returns null", () => {
   const cache = createSourceCache("/");
   const result = resolveDiagnostic(
     makeValidated({
@@ -89,15 +87,10 @@ void test("resolveDiagnostic: unreadable source falls back to validator-reported
     cache,
   );
 
-  assert.equal(result.startLine, 3);
-  assert.equal(result.startCol, 5);
-  assert.equal(result.endLine, 3);
-  assert.equal(result.endCol, 5);
-  assert.equal(result.slice, UNREADABLE_SLICE);
-  assert.equal(result.sliceTruncated, false);
+  assert.equal(result, null);
 });
 
-void test("resolveDiagnostic: out-of-bounds span falls back the same way", (t) => {
+void test("resolveDiagnostic: out-of-bounds span returns null", (t) => {
   const dir = setupFixture(t, { "x.ts": "debugger;\n" });
   const file = join(dir, "x.ts");
   const cache = createSourceCache(dir);
@@ -110,10 +103,7 @@ void test("resolveDiagnostic: out-of-bounds span falls back the same way", (t) =
     cache,
   );
 
-  assert.equal(result.startLine, 1);
-  assert.equal(result.startCol, 1);
-  assert.equal(result.slice, UNREADABLE_SLICE);
-  assert.equal(result.sliceTruncated, false);
+  assert.equal(result, null);
 });
 
 void test("formatCodeSlice: short single-line text passes through unchanged", () => {

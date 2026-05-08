@@ -69,8 +69,6 @@ function validateDiagnostic(diag: unknown): Result<ValidatedDiagnostic, string> 
   if (!isObject(span)) {
     return { ok: false, reason: "`labels[0].span` is missing or not an object" };
   }
-  // Without integer-domain checks, malformed spans slip past validation and
-  // surface as `<unreadable>` at the runtime path, masking contract drift.
   if (!isNonNegativeInteger(span.offset)) {
     return { ok: false, reason: "`labels[0].span.offset` is not a non-negative integer" };
   }

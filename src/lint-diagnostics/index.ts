@@ -8,7 +8,7 @@ import {
   renderWeakTypingsHint,
 } from "./render.ts";
 import { resolveDiagnostic, type ResolvedDiagnostic } from "./resolve.ts";
-import { validatePayload } from "./schema.ts";
+import { validatePayload, type ValidatedDiagnostic } from "./schema.ts";
 
 /** Matches the signal oxlint ≥1.61 prepends to stdout when no files match the targets. */
 const OXLINT_NO_FILES_RE = /^No files found to lint\./;
@@ -119,7 +119,12 @@ export function formatLintOutput({
   if (validated.length === 0) return emptyDiagnostics();
 
   const cache = createSourceCache(cwd ?? process.cwd());
-  const resolved = validated.map((d) => resolveDiagnostic(d, cache));
+  const resolved: ResolvedDiagnostic[] = [];
+  for (const diag of validated) {
+    const entry = resolveDiagnostic(diag, cache);
+    if (entry === null) return contractFailure(capturedStdout, formatResolveFailure(diag));
+    resolved.push(entry);
+  }
 
   const formattedDiagnostics = renderForMode(outputMode, resolved);
   const weakTypingsHint = hasUnsafeDiagnostic(resolved)
@@ -155,4 +160,9 @@ function emptyDiagnostics(): FormatDiagnosticsResult {
 
 function contractFailure(rawStdout: string, reason: string): FormatLintResult {
   return { kind: "contract-failure", rawStdout, reason };
+}
+
+function formatResolveFailure(diag: ValidatedDiagnostic): string {
+  const { offset, length } = diag.span;
+  return `failed to resolve span: filename=${diag.filename}, offset=${offset}, length=${length}`;
 }

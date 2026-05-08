@@ -7,9 +7,6 @@ import type { ValidatedDiagnostic } from "./schema.ts";
  */
 export const PARSE_ERROR_CODE = "parse-error";
 
-/** Slice text used as a placeholder when the source is unreadable or the span is out-of-bounds. */
-export const UNREADABLE_SLICE = "<unreadable>";
-
 /** Code-point cap for the rendered slice's first line before truncation kicks in. */
 export const SLICE_MAX_LEN = 40;
 
@@ -33,19 +30,13 @@ export interface ResolvedDiagnostic {
   /** 1-origin line number of the span start. */
   startLine: number;
 
-  /**
-   * 1-origin column of the span start, in UTF-16 code units.
-   * In byte units when `slice` is {@link UNREADABLE_SLICE}.
-   */
+  /** 1-origin column of the span start, in UTF-16 code units. */
   startCol: number;
 
   /** 1-origin line number of the span end (inclusive). */
   endLine: number;
 
-  /**
-   * 1-origin column of the span end (inclusive), in UTF-16 code units.
-   * In byte units when `slice` is {@link UNREADABLE_SLICE}.
-   */
+  /** 1-origin column of the span end (inclusive), in UTF-16 code units. */
   endCol: number;
 
   /**
@@ -59,40 +50,27 @@ export interface ResolvedDiagnostic {
 }
 
 /**
- * Resolve a validated diagnostic against the source cache. Falls back to the validator's
- * span L:C and {@link UNREADABLE_SLICE} when the source is unreadable or the span is out-of-bounds.
+ * Resolve a validated diagnostic against the source cache.
+ *
+ * Returns `null` when the source is unreadable or the span is out-of-bounds.
  */
 export function resolveDiagnostic(
   diag: ValidatedDiagnostic,
   cache: SourceCache,
-): ResolvedDiagnostic {
-  const errorCode = diag.code ?? PARSE_ERROR_CODE;
+): ResolvedDiagnostic | null {
   const resolved = resolveSpan(cache, diag.filename, diag.span.offset, diag.span.length);
-  if (resolved !== null) {
-    const slice = formatCodeSlice(resolved.text);
-    return {
-      filename: diag.filename,
-      errorCode,
-      message: diag.message,
-      startLine: resolved.startLine,
-      startCol: resolved.startCol,
-      endLine: resolved.endLine,
-      endCol: resolved.endCol,
-      slice: slice.text,
-      sliceTruncated: slice.truncated,
-    };
-  }
-
+  if (resolved === null) return null;
+  const slice = formatCodeSlice(resolved.text);
   return {
     filename: diag.filename,
-    errorCode,
+    errorCode: diag.code ?? PARSE_ERROR_CODE,
     message: diag.message,
-    startLine: diag.span.line,
-    startCol: diag.span.column,
-    endLine: diag.span.line,
-    endCol: diag.span.column,
-    slice: UNREADABLE_SLICE,
-    sliceTruncated: false,
+    startLine: resolved.startLine,
+    startCol: resolved.startCol,
+    endLine: resolved.endLine,
+    endCol: resolved.endCol,
+    slice: slice.text,
+    sliceTruncated: slice.truncated,
   };
 }
 
