@@ -78,7 +78,7 @@ export function runCommandCapturingOutput({
     stdoutFd = openSync(stdoutPath, "w");
     stderrFd = openSync(stderrPath, "w");
     const result = spawnSync(command, args, {
-      stdio: ["inherit", stdoutFd, stderrFd],
+      stdio: ["ignore", stdoutFd, stderrFd],
       cwd,
       env: env ?? process.env,
       shell,
@@ -125,7 +125,7 @@ export function runCommandCapturingCombined({
   try {
     fd = openSync(path, "w");
     const result = spawnSync(command, args, {
-      stdio: ["inherit", fd, fd],
+      stdio: ["ignore", fd, fd],
       cwd,
       env: env ?? process.env,
       shell,
