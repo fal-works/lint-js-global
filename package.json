@@ -27,7 +27,8 @@
     "test": "node --test test/cli/*.test.ts src/*.test.ts src/format-diagnostics/*.test.ts",
     "build": "tsc -p tsconfig.build.json",
     "clean": "node scripts/clean.ts",
-    "prepublishOnly": "pnpm lint --check && pnpm test && pnpm clean && pnpm build"
+    "smoke:dist": "node scripts/dist-smoke.ts",
+    "prepublishOnly": "pnpm lint --check && pnpm test && pnpm clean && pnpm build && pnpm smoke:dist"
   },
   "dependencies": {
     "oxfmt": "^0.47.0",
