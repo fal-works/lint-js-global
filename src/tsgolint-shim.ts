@@ -7,12 +7,16 @@ import { resolvePackageBin } from "./package-info.ts";
 /**
  * A temporary directory containing a `tsgolint` executable shim that delegates to the
  * bundled `oxlint-tsgolint` entry point.
- *
- * Caller prepends {@link dir} to the child's `PATH` so that `oxlint`'s native side picks
- * up our shim, and invokes {@link cleanup} on teardown to remove the directory.
  */
 export interface TsgolintShimHandle {
+  /**
+   * Path of the shim directory.
+   *
+   * Caller prepends this to the child's `PATH` so that `oxlint`'s native side picks up the shim.
+   */
   dir: string;
+
+  /** Removes the shim directory. Caller invokes on teardown. */
   cleanup: () => void;
 }
 

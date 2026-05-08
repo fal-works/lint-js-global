@@ -15,10 +15,6 @@ export const SLICE_MAX_LEN = 40;
 
 /**
  * Render-ready unit produced from a {@link ValidatedDiagnostic} + source resolution.
- *
- * `slice` is the source text the rule points at, truncated to one line of at most
- * {@link SLICE_MAX_LEN} code points; `sliceTruncated` is true whenever truncation hides any
- * portion of the original span.
  */
 export interface ResolvedDiagnostic {
   filename: string;
@@ -52,7 +48,13 @@ export interface ResolvedDiagnostic {
    */
   endCol: number;
 
+  /**
+   * Source text the rule points at,
+   * truncated to one line of at most {@link SLICE_MAX_LEN} code points.
+   */
   slice: string;
+
+  /** True whenever truncation hides any portion of the original span. */
   sliceTruncated: boolean;
 }
 

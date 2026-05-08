@@ -5,27 +5,39 @@ const LOG_PREFIX = "lint-js:";
  *
  * stdout carries text intended for downstream consumption.
  * stderr carries everything else.
- *
- * `writeOut` / `writeErr` accept the message verbatim; callers append `"\n"` to close a line
- * so blocks already terminated with `\n` pass through unchanged.
- *
- * Empty writes are no-ops.
- * `markBlankSeparator()` queues one stderr blank line before the next non-empty write,
- * but never creates a leading blank at the top of output.
  */
 export interface Logger {
+  /**
+   * Write the message verbatim to stdout.
+   *
+   * Callers append `"\n"` to close a line,
+   * so blocks already terminated with `\n` pass through unchanged.
+   *
+   * Empty writes are no-ops.
+   */
   writeOut(msg: string): void;
+
+  /**
+   * Write the message verbatim to stderr.
+   *
+   * Callers append `"\n"` to close a line,
+   * so blocks already terminated with `\n` pass through unchanged.
+   *
+   * Empty writes are no-ops.
+   */
   writeErr(msg: string): void;
 
   /**
-   * Tagged stderr block: a `lint-js: <headline>` line followed by 2-space-indented
-   * detail lines. Used for the end-of-run outcome and {@link LintJsError} notifications.
+   * Tagged stderr block: a `lint-js: <headline>` line followed by 2-space-indented detail lines.
+   *
+   * Used for the end-of-run outcome and {@link LintJsError} notifications.
    */
   writeErrTagged(headline: string, ...details: readonly string[]): void;
 
   /**
    * Queue a blank-line separator on stderr before the next non-empty write.
    *
+   * Never creates a leading blank at the top of output.
    * Multiple consecutive calls collapse to one separator.
    */
   markBlankSeparator(): void;

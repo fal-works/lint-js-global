@@ -24,12 +24,11 @@ export interface RunArgs {
   targets: readonly string[];
 }
 
-/**
- * Ambient context for {@link run}.
- * `cwd` is the working directory used for filesystem checks and child-process spawning.
- */
+/** Ambient context for {@link run}. */
 export interface RunContext {
+  /** Working directory used for filesystem checks and child-process spawning. */
   cwd: string;
+
   logger: Logger;
 }
 
