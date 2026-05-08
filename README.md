@@ -44,8 +44,10 @@ stdout carries lint-result text only, so it can be piped into another tool witho
 Auxiliary text goes to stderr: the issue-count summary, the final tagged status line, formatter failures, and (when applicable) a short hint pointing to some diagnostic rules.
 The format phase is silent on success.
 
+All reported columns are 1-origin UTF-16 code units.
+
 Default lint output groups diagnostics per file.
-Each diagnostic occupies two lines: a head line with the byte-accurate location (`L:C` or `L:C-L:C`), the diagnostic message, and the bracketed error code; followed by a continuation line carrying the exact source-code slice the rule points at.
+Each diagnostic occupies two lines: a head line with the location (`L:C` or `L:C-L:C`), the diagnostic message, and the bracketed error code; followed by a continuation line carrying the exact source-code slice the rule points at.
 
 ```
 src/index.ts

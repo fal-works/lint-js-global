@@ -40,8 +40,12 @@ export function createSourceCache(cwd: string): SourceCache {
 /**
  * Resolve a byte-range span against the cached source, returning position info + UTF-8 text.
  *
- * End position is inclusive (points to the last byte of the span, 1-origin). Zero-length spans
- * collapse end → start. Returns `null` when the source is unreadable or the span is out-of-bounds.
+ * Inputs (`offset`, `length`) are byte units, matching oxlint's native span representation.
+ * Output columns (`startCol`, `endCol`) are 1-origin UTF-16 code units.
+ *
+ * End position is inclusive (points to the last code unit of the span, 1-origin).
+ * Zero-length spans collapse end → start.
+ * Returns `null` when the source is unreadable or the span is out-of-bounds.
  */
 export function resolveSpan(
   cache: SourceCache,
@@ -63,12 +67,19 @@ export function resolveSpan(
   const text = buffer.subarray(offset, offset + length).toString("utf8");
   const start = findLine(lineStartOffsets, offset);
   const startLine = start.line;
-  const startCol = offset - start.lineStart + 1;
+  const startCol = utf16LengthInLine(buffer, start.lineStart, offset) + 1;
   const lastByte = length > 0 ? offset + length - 1 : offset;
   const end = findLine(lineStartOffsets, lastByte);
   const endLine = end.line;
-  const endCol = length > 0 ? lastByte - end.lineStart + 1 : startCol;
+  const endCol = length > 0 ? utf16LengthInLine(buffer, end.lineStart, offset + length) : startCol;
   return { text, startLine, startCol, endLine, endCol };
+}
+
+/**
+ * UTF-16 code unit length of the line slice `[lineStart, byteEnd)`.
+ */
+function utf16LengthInLine(buffer: Buffer, lineStart: number, byteEnd: number): number {
+  return buffer.subarray(lineStart, byteEnd).toString("utf8").length;
 }
 
 /**

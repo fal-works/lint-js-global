@@ -33,10 +33,25 @@ export interface ResolvedDiagnostic {
   errorCode: string;
 
   message: string;
+
+  /** 1-origin line number of the span start. */
   startLine: number;
+
+  /**
+   * 1-origin column of the span start, in UTF-16 code units.
+   * In byte units when `slice` is {@link UNREADABLE_SLICE}.
+   */
   startCol: number;
+
+  /** 1-origin line number of the span end (inclusive). */
   endLine: number;
+
+  /**
+   * 1-origin column of the span end (inclusive), in UTF-16 code units.
+   * In byte units when `slice` is {@link UNREADABLE_SLICE}.
+   */
   endCol: number;
+
   slice: string;
   sliceTruncated: boolean;
 }

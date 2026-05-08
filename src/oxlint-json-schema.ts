@@ -10,6 +10,9 @@ export type Result<T, E> = { ok: true; value: T } | { ok: false; reason: E };
 
 /**
  * Per-diagnostic shape after schema validation. Only fields downstream consumers use are kept.
+ *
+ * `span` carries oxlint's native units: `offset` and `length` are byte counts;
+ * `line` and `column` are 1-origin, with `column` byte-based.
  */
 export interface ValidatedDiagnostic {
   filename: string;

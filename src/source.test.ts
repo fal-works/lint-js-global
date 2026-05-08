@@ -34,7 +34,7 @@ void test("resolveSpan: happy path on LF source returns text and 1-origin L:C", 
   });
 });
 
-void test("resolveSpan: start column counts bytes (not code points) for multi-byte preceding chars", (t) => {
+void test("resolveSpan: start column counts UTF-16 code units, treating preceding BMP multi-byte chars as 1 unit each", (t) => {
   // Source: "// あ = 'いう';\n"
   // Bytes:  0='/' 1='/' 2=' ' 3..5=あ 6=' ' 7='=' 8=' ' 9='\'' 10..12=い 13..15=う 16='\'' 17=';' 18='\n'
   // Span over "'いう'": offset 9, length 8.
@@ -43,13 +43,13 @@ void test("resolveSpan: start column counts bytes (not code points) for multi-by
 
   const result = resolveSpan(cache, join(dir, "x.ts"), 9, 8);
 
-  // startCol = 9 - 0 + 1 = 10 (byte-based; char-based would be 8).
+  // startCol counts UTF-16 code units in bytes [0, 9) = "// あ = " (length 7), + 1 = 8.
   assert.equal(result?.text, "'いう'");
   assert.equal(result?.startLine, 1);
-  assert.equal(result?.startCol, 10);
+  assert.equal(result?.startCol, 8);
 });
 
-void test("resolveSpan: end column counts bytes across a multi-line span ending in multi-byte chars", (t) => {
+void test("resolveSpan: end column counts UTF-16 code units across a multi-line span", (t) => {
   // Line 1: "x = 0;\n"        (bytes 0..6, line 2 starts at byte 7)
   // Line 2: "// あいう\n"      (bytes 7..19; "う" occupies 16..18)
   const src = "x = 0;\n// あいう\n";
@@ -59,9 +59,26 @@ void test("resolveSpan: end column counts bytes across a multi-line span ending 
   // Span ending at the last byte of "う" (byte 18).
   const result = resolveSpan(cache, join(dir, "x.ts"), 0, 19);
 
-  // endCol = 18 - 7 + 1 = 12 (byte-based; char-based would be 6).
+  // endCol counts UTF-16 code units in bytes [7, 19) = "// あいう" (length 6).
   assert.equal(result?.endLine, 2);
-  assert.equal(result?.endCol, 12);
+  assert.equal(result?.endCol, 6);
+});
+
+void test("resolveSpan: column counts UTF-16 code units, treating surrogate pairs as length 2", (t) => {
+  // "𠮷" is U+20BB7: 4 bytes UTF-8, 1 code point, but a UTF-16 surrogate pair (length 2).
+  // Source: "// 𠮷\n"
+  // Bytes:  0='/' 1='/' 2=' ' 3..6=𠮷 7='\n'
+  const dir = setupFixture(t, { "x.ts": "// 𠮷\n" });
+  const cache = createSourceCache(dir);
+
+  // Span over "𠮷": offset 3, length 4.
+  const result = resolveSpan(cache, join(dir, "x.ts"), 3, 4);
+
+  assert.equal(result?.text, "𠮷");
+  // startCol: 3 ASCII units precede + 1 = 4.
+  assert.equal(result?.startCol, 4);
+  // endCol: 3 ASCII + 2 surrogate units = 5.
+  assert.equal(result?.endCol, 5);
 });
 
 void test("resolveSpan: CRLF source builds line index from LF byte only", (t) => {
