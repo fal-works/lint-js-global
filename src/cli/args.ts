@@ -25,7 +25,7 @@ node_modules is always skipped; each tool's standard ignore files (like .gitigno
  * `help` / `version` short-circuit the run before any other validation fires,
  * so they are modeled as their own variants and do not carry run-mode fields.
  */
-export type CliArgs = { kind: "help" } | { kind: "version" } | { kind: "run"; args: RunArgs };
+type CliArgs = { kind: "help" } | { kind: "version" } | { kind: "run"; args: RunArgs };
 
 /**
  * Parse and validate `argv` (the slice after node + script).

@@ -3,8 +3,40 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { TestContext } from "node:test";
 
+import type {
+  ResolvedDiagnostic,
+  ResolvedProjectDiagnostic,
+} from "../src/lint-diagnostics/resolve.ts";
+
 /** Path used wherever a `weakTypingsDocPath` is required by the formatter. */
 export const HINT_PATH = "/opt/lint-js/docs/guide/weak-typings.md";
+
+/** Build a {@link ResolvedDiagnostic} fixture; pinned defaults map to a 1:1 `debugger;` span. */
+export function makeResolved(overrides: Partial<ResolvedDiagnostic> = {}): ResolvedDiagnostic {
+  return {
+    filename: "/x.ts",
+    errorCode: "eslint(no-debugger)",
+    message: "msg",
+    startLine: 1,
+    startCol: 1,
+    endLine: 1,
+    endCol: 8,
+    spanText: "debugger",
+    ...overrides,
+  };
+}
+
+/** Build a {@link ResolvedProjectDiagnostic} fixture; defaults to a tsconfig-level entry. */
+export function makeProject(
+  overrides: Partial<ResolvedProjectDiagnostic> = {},
+): ResolvedProjectDiagnostic {
+  return {
+    filename: "tsconfig.json",
+    errorCode: "typescript(tsconfig-error)",
+    message: "Cannot find type definition file for 'node'.",
+    ...overrides,
+  };
+}
 
 /**
  * Minimal subset of an oxlint diagnostic entry,

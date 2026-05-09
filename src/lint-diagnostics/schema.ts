@@ -6,10 +6,10 @@
  */
 
 /** Discriminated-union result type for fallible validators. */
-export type Result<T, E> = { ok: true; value: T } | { ok: false; reason: E };
+type Result<T, E> = { ok: true; value: T } | { ok: false; reason: E };
 
 /** Byte span pinning a diagnostic to a region of source. */
-export interface ValidatedSpan {
+interface ValidatedSpan {
   /** Byte offset from the start of the file. */
   offset: number;
 
@@ -18,7 +18,7 @@ export interface ValidatedSpan {
 }
 
 /** Per-label structural unit. */
-export interface ValidatedLabel {
+interface ValidatedLabel {
   /** Source span the rule points at. */
   span: ValidatedSpan;
 }
@@ -57,6 +57,16 @@ export interface ValidatedProjectDiagnostic {
   code: string | null;
 
   message: string;
+}
+
+/**
+ * Validated diagnostics partitioned by source-locatability.
+ *
+ * Invariant when carried inside `LintRunState.findings`: `file.length + project.length > 0`.
+ */
+export interface ValidatedFindings {
+  file: readonly ValidatedFileDiagnostic[];
+  project: readonly ValidatedProjectDiagnostic[];
 }
 
 /**

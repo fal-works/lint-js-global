@@ -11,7 +11,7 @@ import { runToolCapturingCombined } from "../system/subprocess.ts";
  * @param targets - Positional paths to process.
  * @param check - Verify only; do not rewrite files.
  */
-export function buildOxfmtArgs(
+function buildOxfmtArgs(
   config: string,
   ignorePatterns: readonly string[],
   targets: readonly string[],
@@ -30,13 +30,13 @@ export function buildOxfmtArgs(
   ];
 }
 
-export interface FmtPhaseOptions {
+interface FmtPhaseOptions {
   check: boolean;
   targets: readonly string[];
   ignorePatterns: readonly string[];
 }
 
-export interface FmtPhaseContext {
+interface FmtPhaseContext {
   cwd: string;
   logger: Logger;
 }

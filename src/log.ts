@@ -52,7 +52,7 @@ export interface Logger {
  *
  * `msg` is always non-empty and may contain embedded `"\n"` characters.
  */
-export interface LoggerSink {
+interface LoggerSink {
   write(stream: "out" | "err", msg: string): void;
 }
 

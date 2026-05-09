@@ -3,7 +3,9 @@ import test from "node:test";
 
 import type { FmtPhaseOutcome } from "./fmt.ts";
 import type { LintPhaseOutcome } from "./lint.ts";
-import { buildSummary, type BuildSummaryOptions } from "./summary.ts";
+import { buildSummary } from "./summary.ts";
+
+type BuildSummaryOptions = Parameters<typeof buildSummary>[0];
 
 const FMT_OK: FmtPhaseOutcome = { kind: "ok" };
 const FMT_FATAL: FmtPhaseOutcome = { kind: "fatal" };

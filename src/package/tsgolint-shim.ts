@@ -8,7 +8,7 @@ import { resolvePackageBin } from "./info.ts";
  * A temporary directory containing a `tsgolint` executable shim that delegates to the
  * bundled `oxlint-tsgolint` entry point.
  */
-export interface TsgolintShimHandle {
+interface TsgolintShimHandle {
   /**
    * Path of the shim directory.
    *

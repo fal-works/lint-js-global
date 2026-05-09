@@ -1,24 +1,21 @@
 import { LintJsError } from "../error.ts";
-import { classifyLintRun } from "../lint-diagnostics/classify.ts";
-import { type LintOutputMode, renderLintFindings } from "../lint-diagnostics/render.ts";
-import { resolveAll } from "../lint-diagnostics/resolve.ts";
+import { type LintOutputMode, processLintRun } from "../lint-diagnostics/process.ts";
 import type { Logger } from "../log.ts";
 import { resolvePackageBin } from "../package/info.ts";
 import { OXLINT_CONFIG, WEAK_TYPINGS_DOC } from "../package/paths.ts";
 import { createTsgolintShimDir } from "../package/tsgolint-shim.ts";
-import { createSourceCache } from "../source.ts";
 import { buildPathInjectedEnv, runToolCapturingOutput } from "../system/subprocess.ts";
 
 /**
  * Build CLI args for oxlint. Always invokes `--format=json`;
- * the per-diagnostic stdout layout is selected downstream in {@link renderLintFindings}.
+ * the per-diagnostic stdout layout is selected downstream in {@link processLintRun}.
  *
  * @param config - Path to the oxlint config file.
  * @param ignorePatterns - Gitignore-style patterns.
  * @param targets - Positional paths to process.
  * @param check - Report only; do not apply auto-fix.
  */
-export function buildOxlintArgs(
+function buildOxlintArgs(
   config: string,
   ignorePatterns: readonly string[],
   targets: readonly string[],
@@ -37,14 +34,14 @@ export function buildOxlintArgs(
   ];
 }
 
-export interface LintPhaseOptions {
+interface LintPhaseOptions {
   check: boolean;
   outputMode: LintOutputMode;
   targets: readonly string[];
   ignorePatterns: readonly string[];
 }
 
-export interface LintPhaseContext {
+interface LintPhaseContext {
   cwd: string;
   logger: Logger;
 }
@@ -99,8 +96,13 @@ export async function runLintPhase(
 
   logger.writeErr(capturedStderr);
 
-  const state = classifyLintRun(capturedStdout);
-  switch (state.kind) {
+  const processed = processLintRun(capturedStdout, cwd, {
+    outputMode,
+    check,
+    weakTypingsDocPath: WEAK_TYPINGS_DOC,
+  });
+
+  switch (processed.kind) {
     case "no-files":
       // Rewrite to stderr so stdout stays clean for downstream consumers.
       logger.writeErr("No files found to lint.\n");
@@ -110,7 +112,11 @@ export async function runLintPhase(
       // Route the raw payload through LintJsError.details so stdout stays reserved for diagnostics
       // and stderr stays reserved for wrapper notifications.
       throw new LintJsError("oxlint output contract mismatch.", {
-        details: [state.reason, "--- raw stdout ---", ...state.rawStdout.trimEnd().split("\n")],
+        details: [
+          processed.reason,
+          "--- raw stdout ---",
+          ...processed.rawStdout.trimEnd().split("\n"),
+        ],
       });
 
     case "clean":
@@ -127,19 +133,7 @@ export async function runLintPhase(
       return { kind: "ok" };
 
     case "findings": {
-      const cache = createSourceCache(cwd);
-      const resolved = resolveAll(state, cache);
-      if (resolved.kind === "contract-failure") {
-        // Raw payload aids investigation. Same shape as the classify-stage path.
-        throw new LintJsError("oxlint output contract mismatch.", {
-          details: [resolved.reason, "--- raw stdout ---", ...capturedStdout.trimEnd().split("\n")],
-        });
-      }
-      const rendered = renderLintFindings(resolved, {
-        outputMode,
-        check,
-        weakTypingsDocPath: WEAK_TYPINGS_DOC,
-      });
+      const { rendered } = processed;
       if (rendered.projectBlock !== "") {
         logger.markBlankSeparator();
         logger.writeErr(rendered.projectBlock);

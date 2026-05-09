@@ -11,7 +11,7 @@ import { LintJsError } from "../error.ts";
  * Launch failures and signal-driven termination are routed through {@link LintJsError},
  * so a returned {@link SpawnResult} always represents a normal exit.
  */
-export interface SpawnResult {
+interface SpawnResult {
   status: number | null;
   signal: NodeJS.Signals | null;
 }
@@ -122,7 +122,7 @@ export async function runCommandCapturingOutput({
  *
  * Throws {@link LintJsError} on launch failure or signal-driven termination.
  */
-export async function runCommandCapturingCombined({
+async function runCommandCapturingCombined({
   name,
   command,
   args,

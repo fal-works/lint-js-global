@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { LintJsError } from "../error.ts";
-import type { LintOutputMode } from "../lint-diagnostics/render.ts";
+import type { LintOutputMode } from "../lint-diagnostics/process.ts";
 import type { Logger } from "../log.ts";
 import { getSystemIgnorePatterns } from "../system/ignore.ts";
 import { type FmtPhaseOutcome, runFmtPhase } from "./fmt.ts";
@@ -26,7 +26,7 @@ export interface RunArgs {
 }
 
 /** Ambient context for {@link run}. */
-export interface RunContext {
+interface RunContext {
   /** Working directory used for filesystem checks and child-process spawning. */
   cwd: string;
 
@@ -45,7 +45,7 @@ export interface RunContext {
  * `--check` runs only the leading fmt pass before lint.
  * `--format-only` and `--lint-only` collapse to a single phase as named.
  *
- * Exit codes follow the wrapper-wide convention (see `src/cli/index.ts`):
+ * Exit codes follow the wrapper-wide convention:
  * 0 success, 1 fmt/lint findings remain or run halted, 2 reserved for {@link LintJsError}.
  *
  * May throw {@link LintJsError}; the CLI boundary catches it and maps to exit 2.

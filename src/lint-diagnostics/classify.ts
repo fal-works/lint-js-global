@@ -1,7 +1,8 @@
 import {
-  validatePayload,
   type ValidatedFileDiagnostic,
+  type ValidatedFindings,
   type ValidatedProjectDiagnostic,
+  validatePayload,
 } from "./schema.ts";
 
 /** Matches the signal oxlint ≥1.61 prepends to stdout when no files match the targets. */
@@ -22,16 +23,10 @@ export type LintRunState =
   | { kind: "no-files" }
   | { kind: "contract-failure"; reason: string; rawStdout: string }
   | { kind: "clean" }
-  | {
-      kind: "findings";
-      file: readonly ValidatedFileDiagnostic[];
-      project: readonly ValidatedProjectDiagnostic[];
-    };
+  | ({ kind: "findings" } & ValidatedFindings);
 
 /**
  * Classify the raw oxlint stdout into a {@link LintRunState}.
- *
- * Pure: reads no source files, emits no output.
  */
 export function classifyLintRun(capturedStdout: string): LintRunState {
   if (OXLINT_NO_FILES_RE.test(capturedStdout)) return { kind: "no-files" };

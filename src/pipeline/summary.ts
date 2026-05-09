@@ -2,7 +2,7 @@ import type { FmtPhaseOutcome } from "./fmt.ts";
 import type { LintPhaseOutcome } from "./lint.ts";
 import type { RunMode } from "./runner.ts";
 
-export interface BuildSummaryOptions {
+interface BuildSummaryOptions {
   mode: RunMode;
   check: boolean;
 

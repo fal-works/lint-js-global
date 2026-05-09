@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { Logger } from "../log.ts";
-import { runCli } from "./index.ts";
+import { runCli } from "./run.ts";
 
 interface CapturingLogger {
   logger: Logger;
@@ -59,7 +59,7 @@ void test("--version / -v: writes 'lint-js <semver>' to stdout and returns 0", a
 
 void test("argv parse error routes through the boundary as exit 2 + tagged stderr", async () => {
   // Representative case for the LintJsError boundary in `runCli`. Branch coverage of
-  // `parseCliArgs` lives in `src/cli/args.test.ts`; here we just confirm a parse error
+  // `parseCliArgs` lives in `args.test.ts`; here we just confirm a parse error
   // surfaces as exit 2 with the diagnostic on stderr (and not stdout).
   const cap = createCapturingLogger();
   const code = await runCli(["--no-such-flag"], process.cwd(), cap.logger);
