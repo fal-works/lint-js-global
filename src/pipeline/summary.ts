@@ -25,7 +25,7 @@ export interface BuildSummaryOptions {
  * Outcomes default to a binary verdict plus whether fixes may have been applied.
  * Failure attribution is left to the tool output rendered earlier in the run.
  *
- * Three cases override the default with dedicated wording:
+ * Four cases override the default with dedicated wording:
  *
  * - Halted runs: lint and trailing fmt were skipped, so the summary points the user back at the
  *   format errors above.
@@ -34,6 +34,8 @@ export interface BuildSummaryOptions {
  *   failure as a lint issue.
  * - Successful runs that matched no files: "Issues fixed where possible." would imply work happened
  *   on a phase with nothing to check.
+ * - Lint clean but a format pass failed: the generic "unfixed issues remain" wording would send the
+ *   user hunting for nonexistent lint findings.
  */
 export function buildSummary({
   mode,
@@ -61,6 +63,9 @@ export function buildSummary({
     return ok
       ? "Completed successfully. No issues found."
       : "Failed. Issues found; fixes required.";
+  }
+  if (!fmtOk && lintOk) {
+    return "Failed. Lint clean; format errors remain.";
   }
   return ok
     ? "Completed successfully. Issues fixed where possible."

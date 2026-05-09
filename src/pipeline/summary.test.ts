@@ -100,6 +100,10 @@ void test("non-check failure returns the unfixed-issues-remain summary", () => {
   );
 });
 
+void test("non-check lint-clean run with a failed format pass returns the lint-clean summary", () => {
+  assert.equal(summary({ trailingFmt: FMT_FATAL }), "Failed. Lint clean; format errors remain.");
+});
+
 void test("skipped phases (null) are treated as ok and don't drag the verdict", () => {
   // --lint-only path: leadingFmt and trailingFmt skipped, only lint contributes.
   assert.equal(
