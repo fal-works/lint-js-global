@@ -1,8 +1,18 @@
 # @fal-works/lint-js-global
 
-Runs Oxfmt and Oxlint (+ auto-fix).
+Runs [Oxfmt](https://oxc.rs/docs/guide/usage/formatter.html) and [Oxlint](https://oxc.rs/docs/guide/usage/linter.html) (+ auto-fix).
 
 Intended as a globally-installed alternative to adding linter devDependencies to every small project.
+
+## Highlights
+
+- Bundles `oxfmt`, `oxlint`, and `oxlint-tsgolint` (type-aware) with a strict shipped ruleset; no per-project config.
+- Pipe-friendly streams: per-file lint findings on stdout, everything else on stderr.
+- Diagnostics tuned for LLM coding agents:
+    - Source slice inline per finding.
+    - Per-file grouping resembling ESLint stylish.
+    - `L:C` columns in UTF-16 code units (matches ESLint, LSP, VS Code, and JS string indices).
+    - `no-unsafe-*` findings carry a remediation hint.
 
 ## Install
 
@@ -18,7 +28,7 @@ Run from a project root:
 lint-js [--check] [--format-only | --lint-only] [--unix] [path...]
 ```
 
-The current directory must contain `package.json`, as a guard against running without target paths in a wide location such as `~/`.
+The current directory must contain `package.json`, as a guard against running without target paths in a wide location such as `~/`.  
 Target paths themselves may point anywhere; without them the whole project is processed.
 
 ### Options
@@ -30,10 +40,7 @@ Target paths themselves may point anywhere; without them the whole project is pr
 
 `--format-only` and `--lint-only` are mutually exclusive.
 
-### Output
-
-stdout carries lint findings only, so it can be piped into another tool without further filtering.
-Auxiliary text (issue-count summary, final status line, formatter failures) goes to stderr.
+## Example (stdout)
 
 ```
 src/index.ts
