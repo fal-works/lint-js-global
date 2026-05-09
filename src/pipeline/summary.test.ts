@@ -46,8 +46,7 @@ void test("non-check --format-only failure returns the fmt-specific failure summ
 });
 
 void test("--check --format-only failure routes through the generic check-failure summary", () => {
-  // The fmt-specific wording fires only on non-check fmt-only runs, where no findings/check
-  // result is meaningful.
+  // The fmt-specific wording fires only on non-check fmt-only runs.
   assert.equal(
     summary({
       mode: "format-only",
@@ -105,12 +104,10 @@ void test("non-check lint-clean run with a failed format pass returns the lint-c
 });
 
 void test("skipped phases (null) are treated as ok and don't drag the verdict", () => {
-  // --lint-only path: leadingFmt and trailingFmt skipped, only lint contributes.
   assert.equal(
     summary({ mode: "lint-only", leadingFmt: null, lint: LINT_OK, trailingFmt: null }),
     "Completed successfully. Issues fixed where possible.",
   );
-  // --format-only path under --check: only leadingFmt contributes.
   assert.equal(
     summary({
       mode: "format-only",
