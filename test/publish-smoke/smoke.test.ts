@@ -20,10 +20,26 @@ interface PublishLayout {
 async function runOrThrow(params: SpawnCapturingParams): Promise<void> {
   const result = await spawnCapturing(params);
   if (result.status !== 0) {
+    const sandboxHint = maybeSandboxFailureHint(params.name, result.stdout, result.stderr);
     throw new Error(
-      `${params.name} failed: exit ${result.status}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+      `${params.name} failed: exit ${result.status}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}${sandboxHint ? `\n\n${sandboxHint}` : ""}`,
     );
   }
+}
+
+function maybeSandboxFailureHint(name: string, stdout: string, stderr: string): string | null {
+  if (name !== "pnpm install") return null;
+
+  const output = `${stdout}\n${stderr}`;
+  const matchesRestrictedNetwork =
+    output.includes("EAI_AGAIN") && output.includes("registry.npmjs.org");
+  const matchesReadOnlyStore =
+    output.includes("EROFS") &&
+    output.includes("read-only file system") &&
+    output.includes("/store/v");
+  if (!matchesRestrictedNetwork && !matchesReadOnlyStore) return null;
+
+  return "If this ran in the AI agent sandbox, sandbox restrictions may be the cause. Re-run `pnpm smoke:publish` outside the sandbox.";
 }
 
 /**
@@ -89,6 +105,8 @@ async function preparePublishLayout(): Promise<PublishLayout> {
 void describe("smoke against the published layout", () => {
   let layout: PublishLayout;
 
+  // package.json runs this file with `--test-isolation=none` so setup failures here
+  // keep their command output instead of collapsing into a file-level runner failure.
   before(async () => {
     layout = await preparePublishLayout();
   });

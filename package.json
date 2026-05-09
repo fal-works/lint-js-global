@@ -27,7 +27,7 @@
     "test": "node --test --test-reporter=dot 'src/**/*.test.ts' 'test/integration/*.test.ts' 'test/cli/*.test.ts'",
     "build": "tsc -p tsconfig.build.json",
     "clean": "node scripts/clean.ts",
-    "smoke:publish": "node --test --test-reporter=dot test/publish-smoke/*.test.ts",
+    "smoke:publish": "node --test --test-isolation=none test/publish-smoke/*.test.ts",
     "prepublishOnly": "pnpm lint --check && pnpm test && pnpm clean && pnpm build && pnpm smoke:publish"
   },
   "dependencies": {
