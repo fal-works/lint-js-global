@@ -47,7 +47,9 @@ The format phase is silent on success.
 All reported columns are 1-origin UTF-16 code units.
 
 Default lint output groups diagnostics per file.
-Each diagnostic occupies two lines: a head line with the location (`L:C` or `L:C-L:C`), the diagnostic message, and the bracketed error code; followed by a continuation line carrying the exact source-code slice the rule points at.
+Each diagnostic occupies two lines: a head line with the location (`L:C` or `L:C-L:C`), the diagnostic message, and the bracketed error code; followed by a continuation line carrying a source-code slice.
+The slice shows the first line of the span, capped at 40 code points, with `...` marking truncation.
+The head line widens to `L:C-L:C` whenever content is hidden.
 
 ```
 src/index.ts
