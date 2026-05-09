@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import {
   cpSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
-  readFileSync,
   rmSync,
-  symlinkSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
 
@@ -17,6 +17,7 @@ import { spawnCapturing } from "../cli-helpers.ts";
 
 const repoRoot = join(import.meta.dirname, "..", "..");
 const fixtureRoot = join(repoRoot, "test", "fixtures");
+const PACKAGE_NAME = "@fal-works/lint-js-global";
 
 interface PublishLayout {
   packageRoot: string;
@@ -25,84 +26,63 @@ interface PublishLayout {
 }
 
 /**
- * Resolve the absolute path of the `lint-js` bin entry as declared by the
- * extracted package's own `package.json`. Fails the smoke if the `bin`
- * mapping is malformed or points outside what the package actually ships.
- */
-function resolveLintJsBin(packageRoot: string): string {
-  const manifestPath = join(packageRoot, "package.json");
-  const manifest: unknown = JSON.parse(readFileSync(manifestPath, "utf8"));
-  assert.ok(
-    typeof manifest === "object" && manifest !== null,
-    `expected object manifest at ${manifestPath}`,
-  );
-  const { bin } = manifest as { bin?: unknown };
-  assert.ok(
-    typeof bin === "object" && bin !== null && !Array.isArray(bin),
-    "expected `bin` field to be an object in published package.json",
-  );
-  const entry = (bin as Record<string, unknown>)["lint-js"];
-  assert.equal(
-    typeof entry,
-    "string",
-    'expected `bin["lint-js"]` to be a string in published package.json',
-  );
-  const binPath = join(packageRoot, entry as string);
-  assert.ok(
-    existsSync(binPath),
-    `bin entry \`lint-js\` -> ${entry as string} is not present in the published package (check the \`files\` array)`,
-  );
-  return binPath;
-}
-
-/**
- * Build a temp install of the package as it will be published.
+ * Install the packed tarball into a fresh consumer directory and return paths into it.
  *
- * Smoke checks against this layout exercise `package.json` `files` resolution,
- * so a missing shipped asset (e.g. `cfg/` or `docs/guide/`) fails the smoke
- * rather than surfacing on the first user run.
- *
- * The repo's `node_modules` is symlinked into the extracted package so runtime
- * dependency resolution succeeds without a fresh install.
+ * Going through `pnpm install` makes the smoke see the same dependency graph and
+ * `node_modules/.bin/` shims a downstream user would. An undeclared runtime dep
+ * or a `bin` target outside `files` then fails the smoke instead of the first user run.
  */
 async function preparePublishLayout(): Promise<PublishLayout> {
-  const packDir = mkdtempSync(join(tmpdir(), "lint-js-smoke-pack-"));
-  const extractDir = mkdtempSync(join(tmpdir(), "lint-js-smoke-extracted-"));
-  const dispose = () => {
-    rmSync(packDir, { recursive: true, force: true });
-    rmSync(extractDir, { recursive: true, force: true });
-  };
+  const root = mkdtempSync(join(tmpdir(), "lint-js-smoke-"));
+  const dispose = () => rmSync(root, { recursive: true, force: true });
   try {
     const pack = await spawnCapturing({
       name: "pnpm pack",
       command: "pnpm",
-      args: ["pack", "--pack-destination", packDir],
+      args: ["pack", "--pack-destination", root],
       cwd: repoRoot,
     });
     if (pack.status !== 0) {
       throw new Error(`pnpm pack failed: exit ${pack.status}\nstderr:\n${pack.stderr}`);
     }
-    const tarballs = readdirSync(packDir).filter((name) => name.endsWith(".tgz"));
+    const tarballs = readdirSync(root).filter((name) => name.endsWith(".tgz"));
     const [tarballName, ...rest] = tarballs;
     if (!tarballName || rest.length > 0) {
       throw new Error(
         `expected exactly one .tgz in pack dir, found: ${tarballs.join(", ") || "(none)"}`,
       );
     }
-    const tarballPath = join(packDir, tarballName);
-    const tar = await spawnCapturing({
-      name: "tar",
-      command: "tar",
-      args: ["-xf", tarballPath, "-C", extractDir],
+    const tarballPath = join(root, tarballName);
+
+    const consumerDir = join(root, "consumer");
+    mkdirSync(consumerDir);
+    writeFileSync(
+      join(consumerDir, "package.json"),
+      `${JSON.stringify(
+        {
+          name: "lint-js-smoke-consumer",
+          private: true,
+          dependencies: { [PACKAGE_NAME]: `file:${tarballPath}` },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    const install = await spawnCapturing({
+      name: "pnpm install",
+      command: "pnpm",
+      args: ["install", "--prefer-offline", "--ignore-workspace"],
+      cwd: consumerDir,
     });
-    if (tar.status !== 0) {
-      throw new Error(`tar extract failed: exit ${tar.status}\nstderr:\n${tar.stderr}`);
+    if (install.status !== 0) {
+      throw new Error(
+        `pnpm install failed: exit ${install.status}\nstdout:\n${install.stdout}\nstderr:\n${install.stderr}`,
+      );
     }
-    const packageRoot = join(extractDir, "package");
-    symlinkSync(join(repoRoot, "node_modules"), join(packageRoot, "node_modules"));
+
     return {
-      packageRoot,
-      binPath: resolveLintJsBin(packageRoot),
+      packageRoot: join(consumerDir, "node_modules", PACKAGE_NAME),
+      binPath: join(consumerDir, "node_modules", ".bin", "lint-js"),
       dispose,
     };
   } catch (err) {
@@ -124,8 +104,8 @@ void describe("smoke against the published layout", () => {
   void it("--help: prints usage and exits 0", async () => {
     const result = await spawnCapturing({
       name: "lint-js --help",
-      command: process.execPath,
-      args: [layout.binPath, "--help"],
+      command: layout.binPath,
+      args: ["--help"],
     });
     assert.equal(result.status, 0, `expected exit 0\nstderr:\n${result.stderr}`);
     assert.match(result.stdout, /Usage: lint-js/, "expected usage on stdout");
@@ -141,8 +121,8 @@ void describe("smoke against the published layout", () => {
 
     const result = await spawnCapturing({
       name: "lint-js --check",
-      command: process.execPath,
-      args: [layout.binPath, "--check"],
+      command: layout.binPath,
+      args: ["--check"],
       cwd: dir,
     });
     assert.equal(
@@ -153,10 +133,9 @@ void describe("smoke against the published layout", () => {
   });
 
   void it("shipped-paths: every path exported by package/paths.ts exists", async () => {
-    // Some entries (e.g. doc paths embedded in diagnostic hints) appear as strings in CLI output
-    // without being read at startup, so their absence would slip past the CLI-running stages above.
-    const buildRoot = dirname(layout.binPath);
-    const url = pathToFileURL(join(buildRoot, "package", "paths.js")).href;
+    // Some entries appear as strings in CLI output without being read at startup,
+    // so their absence would slip past the CLI-running tests above.
+    const url = pathToFileURL(join(layout.packageRoot, "dist", "package", "paths.js")).href;
     const mod: unknown = await import(url);
     assert.ok(
       typeof mod === "object" && mod !== null,
