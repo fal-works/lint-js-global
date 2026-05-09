@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { LintJsError } from "../error.ts";
-import type { LintOutputMode } from "../lint-diagnostics/index.ts";
+import type { LintOutputMode } from "../lint-diagnostics/render.ts";
 import type { Logger } from "../log.ts";
 import { getSystemIgnorePatterns } from "../system/ignore.ts";
 import { type FmtPhaseOutcome, runFmtPhase } from "./fmt.ts";

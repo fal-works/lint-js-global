@@ -12,6 +12,44 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 const PROJECT_PLACEHOLDER_HEADING = "(project)";
 
 /**
+ * Per-diagnostic line layout selector.
+ *
+ * - `stylish`: per-file grouped layout.
+ * - `unix`: one self-contained `<filename>:<L>:<C>: <message> [<code>]` line per diagnostic.
+ */
+export type LintOutputMode = "stylish" | "unix";
+
+/**
+ * Composed rendering of a `findings` lint run.
+ *
+ * Each block carries its own trailing `\n` when non-empty, or is empty when nothing applies.
+ */
+export interface RenderedLintOutput {
+  /** Per-file diagnostics block; `""` when no file diagnostics apply. */
+  fileBlock: string;
+
+  /** Project-level diagnostics block; `""` when none apply. */
+  projectBlock: string;
+
+  /** Weak-typings hint block; `""` when no `no-unsafe-*` diagnostic is present. */
+  weakTypingsHint: string;
+
+  /** Summary line stating how many issues remain. No trailing `\n`. */
+  summaryLine: string;
+}
+
+/** Per-run rendering options. */
+export interface RenderOptions {
+  outputMode: LintOutputMode;
+
+  /** Whether the run is `--check` (no auto-fix attempted); drops the "unfixed" qualifier. */
+  check: boolean;
+
+  /** Absolute path included in the weak-typings hint. */
+  weakTypingsDocPath: string;
+}
+
+/**
  * Render output split into two parallel blocks the caller emits independently.
  *
  * Each string carries its own trailing newline, or is empty when nothing applies.
@@ -22,6 +60,44 @@ export interface RenderedDiagnostics {
 
   /** Location-less diagnostics block. */
   project: string;
+}
+
+/**
+ * Compose every block of a `findings`-state lint output.
+ *
+ * Precondition: `resolved.file.length + resolved.project.length > 0`.
+ */
+export function renderLintFindings(
+  resolved: {
+    file: readonly ResolvedDiagnostic[];
+    project: readonly ResolvedProjectDiagnostic[];
+  },
+  options: RenderOptions,
+): RenderedLintOutput {
+  const blocks = renderForMode(options.outputMode, resolved.file, resolved.project);
+  const weakTypingsHint = hasUnsafeDiagnostic(resolved.file)
+    ? `${renderWeakTypingsHint(options.weakTypingsDocPath).join("\n")}\n`
+    : "";
+  const summaryLine = formatSummary(options.check, resolved.file.length + resolved.project.length);
+  return {
+    fileBlock: blocks.file,
+    projectBlock: blocks.project,
+    weakTypingsHint,
+    summaryLine,
+  };
+}
+
+function renderForMode(
+  mode: LintOutputMode,
+  resolved: readonly ResolvedDiagnostic[],
+  project: readonly ResolvedProjectDiagnostic[],
+): RenderedDiagnostics {
+  switch (mode) {
+    case "stylish":
+      return renderStylish(resolved, project);
+    case "unix":
+      return renderUnix(resolved, project);
+  }
 }
 
 /**

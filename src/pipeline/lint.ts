@@ -1,14 +1,17 @@
 import { LintJsError } from "../error.ts";
-import { formatLintOutput, type LintOutputMode } from "../lint-diagnostics/index.ts";
+import { classifyLintRun } from "../lint-diagnostics/classify.ts";
+import { type LintOutputMode, renderLintFindings } from "../lint-diagnostics/render.ts";
+import { resolveAll } from "../lint-diagnostics/resolve.ts";
 import type { Logger } from "../log.ts";
 import { resolvePackageBin } from "../package/info.ts";
 import { OXLINT_CONFIG, WEAK_TYPINGS_DOC } from "../package/paths.ts";
 import { createTsgolintShimDir } from "../package/tsgolint-shim.ts";
+import { createSourceCache } from "../source.ts";
 import { buildPathInjectedEnv, runToolCapturingOutput } from "../system/subprocess.ts";
 
 /**
  * Build CLI args for oxlint. Always invokes `--format=json`;
- * the per-diagnostic stdout layout is selected downstream in {@link formatLintOutput}.
+ * the per-diagnostic stdout layout is selected downstream in {@link renderLintFindings}.
  *
  * @param config - Path to the oxlint config file.
  * @param ignorePatterns - Gitignore-style patterns.
@@ -57,8 +60,7 @@ export interface LintPhaseContext {
 export type LintPhaseOutcome = { kind: "ok" } | { kind: "no-files" } | { kind: "findings" };
 
 /**
- * Run the lint phase: spawn oxlint, validate the payload through {@link formatLintOutput},
- * and emit diagnostics plus auxiliary text through `ctx.logger`.
+ * Spawn oxlint and emit diagnostics plus auxiliary text through `ctx.logger`.
  *
  * Per-file diagnostics route to stdout in the layout selected by `outputMode`.
  * Location-less diagnostics, the weak-typings hint (when applicable), and the issue-count
@@ -97,15 +99,8 @@ export async function runLintPhase(
 
   logger.writeErr(capturedStderr);
 
-  const formatted = formatLintOutput({
-    capturedStdout,
-    check,
-    outputMode,
-    weakTypingsDocPath: WEAK_TYPINGS_DOC,
-    cwd,
-  });
-
-  switch (formatted.kind) {
+  const state = classifyLintRun(capturedStdout);
+  switch (state.kind) {
     case "no-files":
       // Rewrite to stderr so stdout stays clean for downstream consumers.
       logger.writeErr("No files found to lint.\n");
@@ -115,19 +110,13 @@ export async function runLintPhase(
       // Route the raw payload through LintJsError.details so stdout stays reserved for diagnostics
       // and stderr stays reserved for wrapper notifications.
       throw new LintJsError("oxlint output contract mismatch.", {
-        details: [
-          formatted.reason,
-          "--- raw stdout ---",
-          ...formatted.rawStdout.trimEnd().split("\n"),
-        ],
+        details: [state.reason, "--- raw stdout ---", ...state.rawStdout.trimEnd().split("\n")],
       });
 
-    case "diagnostics": {
-      const { fileDiagnostics, projectDiagnostics, weakTypingsHint, linterSummary } = formatted;
-      // Non-zero exit with no validated diagnostics (empty stdout, or `{"diagnostics":[]}`)
-      // means oxlint signaled failure without producing findings.
-      // Surface it as a tool failure so the run does not display the misleading "unfixed issues remain" summary.
-      if (linterSummary === null && result.status !== 0) {
+    case "clean":
+      // A non-zero exit on a clean payload means oxlint failed as a tool, not as a linter.
+      // Surface it through LintJsError so the run is not reported as a successful lint.
+      if (result.status !== 0) {
         throw new LintJsError("oxlint exited non-zero without producing diagnostics.", {
           details: [
             `exit status: ${result.status ?? "(none)"}`,
@@ -135,20 +124,34 @@ export async function runLintPhase(
           ],
         });
       }
-      if (projectDiagnostics !== "") {
-        logger.markBlankSeparator();
-        logger.writeErr(projectDiagnostics);
+      return { kind: "ok" };
+
+    case "findings": {
+      const cache = createSourceCache(cwd);
+      const resolved = resolveAll(state, cache);
+      if (resolved.kind === "contract-failure") {
+        // Raw payload aids investigation. Same shape as the classify-stage path.
+        throw new LintJsError("oxlint output contract mismatch.", {
+          details: [resolved.reason, "--- raw stdout ---", ...capturedStdout.trimEnd().split("\n")],
+        });
       }
-      logger.writeOut(fileDiagnostics);
-      if (weakTypingsHint !== null) {
+      const rendered = renderLintFindings(resolved, {
+        outputMode,
+        check,
+        weakTypingsDocPath: WEAK_TYPINGS_DOC,
+      });
+      if (rendered.projectBlock !== "") {
         logger.markBlankSeparator();
-        logger.writeErr(weakTypingsHint);
+        logger.writeErr(rendered.projectBlock);
       }
-      if (linterSummary !== null) {
+      logger.writeOut(rendered.fileBlock);
+      if (rendered.weakTypingsHint !== "") {
         logger.markBlankSeparator();
-        logger.writeErr(`${linterSummary}\n`);
+        logger.writeErr(rendered.weakTypingsHint);
       }
-      return result.status === 0 ? { kind: "ok" } : { kind: "findings" };
+      logger.markBlankSeparator();
+      logger.writeErr(`${rendered.summaryLine}\n`);
+      return { kind: "findings" };
     }
   }
 }

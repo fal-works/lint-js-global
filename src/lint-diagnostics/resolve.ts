@@ -102,6 +102,49 @@ export function resolveProjectDiagnostic(
 }
 
 /**
+ * Outcome of resolving a full validated payload through {@link resolveAll}.
+ *
+ * Discriminated by `kind`:
+ * - `ok`: every file diagnostic resolved successfully; project diagnostics passed through.
+ * - `contract-failure`: at least one file diagnostic could not be resolved against the source.
+ * `reason` is human-readable and follows `failed to resolve span: filename=…, offset=…, length=…`.
+ */
+export type ResolveResult =
+  | {
+      kind: "ok";
+      file: readonly ResolvedDiagnostic[];
+      project: readonly ResolvedProjectDiagnostic[];
+    }
+  | { kind: "contract-failure"; reason: string };
+
+/**
+ * Resolve a full validated payload against the source cache.
+ *
+ * Short-circuits on the first file diagnostic that fails to resolve, returning `contract-failure`.
+ */
+export function resolveAll(
+  validated: {
+    file: readonly ValidatedFileDiagnostic[];
+    project: readonly ValidatedProjectDiagnostic[];
+  },
+  cache: SourceCache,
+): ResolveResult {
+  const file: ResolvedDiagnostic[] = [];
+  for (const diag of validated.file) {
+    const entry = resolveDiagnostic(diag, cache);
+    if (entry === null) return { kind: "contract-failure", reason: formatResolveFailure(diag) };
+    file.push(entry);
+  }
+  const project = validated.project.map(resolveProjectDiagnostic);
+  return { kind: "ok", file, project };
+}
+
+function formatResolveFailure(diag: ValidatedFileDiagnostic): string {
+  const { offset, length } = diag.labels[0].span;
+  return `failed to resolve span: filename=${diag.filename}, offset=${offset}, length=${length}`;
+}
+
+/**
  * Extract the first line, truncate if too long,
  * and append a multi-line marker if more lines follow.
  */

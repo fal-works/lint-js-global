@@ -7,7 +7,8 @@ import type { TestContext } from "node:test";
 export const HINT_PATH = "/opt/lint-js/docs/guide/weak-typings.md";
 
 /**
- * Minimal subset of an oxlint diagnostic entry, just enough to drive `formatLintOutput`.
+ * Minimal subset of an oxlint diagnostic entry,
+ * just enough to drive `classifyLintRun` and the downstream resolve/render stages.
  *
  * `labels` is optional so fixtures can express the project-level shape oxlint emits
  * for diagnostics with no source span (omitted entirely or `[]`).
