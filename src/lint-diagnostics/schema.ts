@@ -8,19 +8,13 @@
 /** Discriminated-union result type for fallible validators. */
 export type Result<T, E> = { ok: true; value: T } | { ok: false; reason: E };
 
-/** Native oxlint span units. */
+/** Byte span pinning a diagnostic to a region of source. */
 export interface ValidatedSpan {
   /** Byte offset from the start of the file. */
   offset: number;
 
   /** Span length in bytes. */
   length: number;
-
-  /** 1-origin line number. */
-  line: number;
-
-  /** 1-origin column, byte-based. */
-  column: number;
 }
 
 /** Per-label structural unit. */
@@ -131,20 +125,12 @@ function validateLabel(label: unknown, index: number): Result<ValidatedLabel, st
   if (!isNonNegativeInteger(span.length)) {
     return { ok: false, reason: `\`${at}.span.length\` is not a non-negative integer` };
   }
-  if (!isPositiveInteger(span.line)) {
-    return { ok: false, reason: `\`${at}.span.line\` is not a positive integer` };
-  }
-  if (!isPositiveInteger(span.column)) {
-    return { ok: false, reason: `\`${at}.span.column\` is not a positive integer` };
-  }
   return {
     ok: true,
     value: {
       span: {
         offset: span.offset,
         length: span.length,
-        line: span.line,
-        column: span.column,
       },
     },
   };
@@ -176,8 +162,4 @@ function isUnknownArray(v: unknown): v is unknown[] {
 
 function isNonNegativeInteger(v: unknown): v is number {
   return typeof v === "number" && Number.isInteger(v) && v >= 0;
-}
-
-function isPositiveInteger(v: unknown): v is number {
-  return typeof v === "number" && Number.isInteger(v) && v >= 1;
 }

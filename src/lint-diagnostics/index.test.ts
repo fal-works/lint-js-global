@@ -19,7 +19,7 @@ void test("stylish mode: single file, single diagnostic produces grouped output 
       code: "eslint(no-debugger)",
       severity: "error",
       filename: file,
-      labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
+      labels: [{ span: { offset: 0, length: 8 } }],
     },
   ]);
 
@@ -50,7 +50,7 @@ void test("unix mode: single file, single diagnostic produces a single flat line
       code: "eslint(no-debugger)",
       severity: "error",
       filename: file,
-      labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
+      labels: [{ span: { offset: 0, length: 8 } }],
     },
   ]);
 
@@ -79,7 +79,7 @@ void test("no-unsafe-* diagnostic surfaces weakTypingsHint alongside the diagnos
       code: "typescript-eslint(no-unsafe-member-access)",
       severity: "error",
       filename: file,
-      labels: [{ span: { offset: 14, length: 3, line: 2, column: 6 } }],
+      labels: [{ span: { offset: 14, length: 3 } }],
     },
   ]);
 
@@ -110,7 +110,7 @@ void test("no-unsafe-* diagnostic surfaces weakTypingsHint under unix mode too",
       code: "typescript-eslint(no-unsafe-member-access)",
       severity: "error",
       filename: file,
-      labels: [{ span: { offset: 14, length: 3, line: 2, column: 6 } }],
+      labels: [{ span: { offset: 14, length: 3 } }],
     },
   ]);
 
@@ -226,7 +226,7 @@ void test("span-resolution failure surfaces as contract-failure with filename/of
       code: "eslint(no-debugger)",
       severity: "error",
       filename,
-      labels: [{ span: { offset: 7, length: 3, line: 1, column: 1 } }],
+      labels: [{ span: { offset: 7, length: 3 } }],
     },
   ]);
 
@@ -276,7 +276,7 @@ void test("oxc parse-error diagnostic stays a lint finding (stylish mode)", (t) 
       code: null,
       severity: "error",
       filename: file,
-      labels: [{ span: { offset: 10, length: 1, line: 1, column: 11 } }],
+      labels: [{ span: { offset: 10, length: 1 } }],
     },
   ]);
 
@@ -302,7 +302,7 @@ void test("oxc parse-error diagnostic stays a lint finding (unix mode)", (t) => 
       code: null,
       severity: "error",
       filename: file,
-      labels: [{ span: { offset: 10, length: 1, line: 1, column: 11 } }],
+      labels: [{ span: { offset: 10, length: 1 } }],
     },
   ]);
 
@@ -434,7 +434,7 @@ void test("mixed payload splits project and file blocks across separate fields (
       code: "eslint(no-debugger)",
       severity: "error",
       filename: file,
-      labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
+      labels: [{ span: { offset: 0, length: 8 } }],
     },
     {
       message: "Cannot find type definition file for 'node'.",

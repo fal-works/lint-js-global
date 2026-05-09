@@ -10,7 +10,7 @@ void test("valid payload with one diagnostic resolves to a file-kind ValidatedDi
         filename: "/x.ts",
         code: "eslint(no-debugger)",
         message: "ok",
-        labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
+        labels: [{ span: { offset: 0, length: 8 } }],
       },
     ],
   });
@@ -22,7 +22,7 @@ void test("valid payload with one diagnostic resolves to a file-kind ValidatedDi
       filename: "/x.ts",
       code: "eslint(no-debugger)",
       message: "ok",
-      labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
+      labels: [{ span: { offset: 0, length: 8 } }],
     },
   ]);
 });
@@ -92,10 +92,7 @@ void test("multi-label entry returns all labels in input order", () => {
         filename: "/x.ts",
         code: "eslint(no-dupe-keys)",
         message: "duplicate key",
-        labels: [
-          { span: { offset: 0, length: 3, line: 1, column: 1 } },
-          { span: { offset: 10, length: 3, line: 2, column: 1 } },
-        ],
+        labels: [{ span: { offset: 0, length: 3 } }, { span: { offset: 10, length: 3 } }],
       },
     ],
   });
@@ -104,8 +101,8 @@ void test("multi-label entry returns all labels in input order", () => {
   const first = result.ok ? result.value[0] : null;
   assert.equal(first?.kind, "file");
   assert.deepEqual(first?.kind === "file" ? first.labels : null, [
-    { span: { offset: 0, length: 3, line: 1, column: 1 } },
-    { span: { offset: 10, length: 3, line: 2, column: 1 } },
+    { span: { offset: 0, length: 3 } },
+    { span: { offset: 10, length: 3 } },
   ]);
 });
 
@@ -116,10 +113,7 @@ void test("integrity check is applied per label, reporting the failing index", (
         filename: "/x.ts",
         code: "eslint(no-dupe-keys)",
         message: "duplicate key",
-        labels: [
-          { span: { offset: 0, length: 3, line: 1, column: 1 } },
-          { span: { offset: -1, length: 3, line: 2, column: 1 } },
-        ],
+        labels: [{ span: { offset: 0, length: 3 } }, { span: { offset: -1, length: 3 } }],
       },
     ],
   });
@@ -142,7 +136,7 @@ void test("explicit null code is accepted and surfaces as null", () => {
         filename: "/x.ts",
         code: null,
         message: "Unexpected token",
-        labels: [{ span: { offset: 0, length: 1, line: 1, column: 1 } }],
+        labels: [{ span: { offset: 0, length: 1 } }],
       },
     ],
   });
@@ -157,7 +151,7 @@ void test("missing code field is treated as null (omitted, not absent contract)"
       {
         filename: "/x.ts",
         message: "Unexpected token",
-        labels: [{ span: { offset: 0, length: 1, line: 1, column: 1 } }],
+        labels: [{ span: { offset: 0, length: 1 } }],
       },
     ],
   });
@@ -190,7 +184,7 @@ void test("entry missing filename is rejected with index", () => {
       {
         code: "eslint(no-debugger)",
         message: "x",
-        labels: [{ span: { offset: 0, length: 1, line: 1, column: 1 } }],
+        labels: [{ span: { offset: 0, length: 1 } }],
       },
     ],
   });
@@ -208,7 +202,7 @@ void test("entry missing message is rejected", () => {
       {
         filename: "/x.ts",
         code: "eslint(no-debugger)",
-        labels: [{ span: { offset: 0, length: 1, line: 1, column: 1 } }],
+        labels: [{ span: { offset: 0, length: 1 } }],
       },
     ],
   });
@@ -226,7 +220,7 @@ void test("entry with non-string code (object) is rejected", () => {
         filename: "/x.ts",
         code: { plugin: "eslint", rule: "no-debugger" },
         message: "ok",
-        labels: [{ span: { offset: 0, length: 1, line: 1, column: 1 } }],
+        labels: [{ span: { offset: 0, length: 1 } }],
       },
     ],
   });
@@ -242,7 +236,7 @@ void test("entry with non-string message (number) is rejected", () => {
         filename: "/x.ts",
         code: "eslint(no-debugger)",
         message: 42,
-        labels: [{ span: { offset: 0, length: 1, line: 1, column: 1 } }],
+        labels: [{ span: { offset: 0, length: 1 } }],
       },
     ],
   });
@@ -274,7 +268,7 @@ void test("entry with non-numeric span.offset is rejected", () => {
         filename: "/x.ts",
         code: "eslint(no-debugger)",
         message: "x",
-        labels: [{ span: { offset: "0", length: 1, line: 1, column: 1 } }],
+        labels: [{ span: { offset: "0", length: 1 } }],
       },
     ],
   });
@@ -290,7 +284,7 @@ void test("entry with negative span.offset is rejected", () => {
         filename: "/x.ts",
         code: "eslint(no-debugger)",
         message: "x",
-        labels: [{ span: { offset: -1, length: 1, line: 1, column: 1 } }],
+        labels: [{ span: { offset: -1, length: 1 } }],
       },
     ],
   });
@@ -306,45 +300,13 @@ void test("entry with fractional span.length is rejected", () => {
         filename: "/x.ts",
         code: "eslint(no-debugger)",
         message: "x",
-        labels: [{ span: { offset: 0, length: 1.5, line: 1, column: 1 } }],
+        labels: [{ span: { offset: 0, length: 1.5 } }],
       },
     ],
   });
 
   assert.equal(result.ok, false);
   assert.match(result.ok ? "" : result.reason, /length.*non-negative/);
-});
-
-void test("entry with span.line below 1 is rejected", () => {
-  const result = validatePayload({
-    diagnostics: [
-      {
-        filename: "/x.ts",
-        code: "eslint(no-debugger)",
-        message: "x",
-        labels: [{ span: { offset: 0, length: 1, line: 0, column: 1 } }],
-      },
-    ],
-  });
-
-  assert.equal(result.ok, false);
-  assert.match(result.ok ? "" : result.reason, /line.*positive/);
-});
-
-void test("entry with span.column below 1 is rejected", () => {
-  const result = validatePayload({
-    diagnostics: [
-      {
-        filename: "/x.ts",
-        code: "eslint(no-debugger)",
-        message: "x",
-        labels: [{ span: { offset: 0, length: 1, line: 1, column: 0 } }],
-      },
-    ],
-  });
-
-  assert.equal(result.ok, false);
-  assert.match(result.ok ? "" : result.reason, /column.*positive/);
 });
 
 void test("first failing entry's index is reported", () => {
@@ -354,13 +316,13 @@ void test("first failing entry's index is reported", () => {
         filename: "/x.ts",
         code: "eslint(no-debugger)",
         message: "ok",
-        labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
+        labels: [{ span: { offset: 0, length: 8 } }],
       },
       {
         filename: "/x.ts",
         code: "eslint(no-debugger)",
         message: "broken",
-        labels: [{ span: { offset: -1, length: 1, line: 1, column: 1 } }],
+        labels: [{ span: { offset: -1, length: 1 } }],
       },
     ],
   });
