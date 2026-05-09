@@ -55,6 +55,7 @@ async function preparePublishLayout(): Promise<PublishLayout> {
     const tarballPath = join(root, tarballName);
 
     const consumerDir = join(root, "consumer");
+    const storeDir = join(root, "store");
     mkdirSync(consumerDir);
     writeFileSync(
       join(consumerDir, "package.json"),
@@ -68,10 +69,11 @@ async function preparePublishLayout(): Promise<PublishLayout> {
         2,
       )}\n`,
     );
+    // Self-contained store, so the smoke runs even where the default pnpm store is read-only.
     const install = await spawnCapturing({
       name: "pnpm install",
       command: "pnpm",
-      args: ["install", "--prefer-offline", "--ignore-workspace"],
+      args: ["install", "--store-dir", storeDir, "--ignore-workspace"],
       cwd: consumerDir,
     });
     if (install.status !== 0) {
