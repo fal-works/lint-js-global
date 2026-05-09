@@ -2,6 +2,7 @@ import { createSourceCache } from "../source.ts";
 import {
   formatSummary,
   hasUnsafeDiagnostic,
+  type RenderedDiagnostics,
   renderStylish,
   renderUnix,
   renderWeakTypingsHint,
@@ -50,10 +51,16 @@ export interface FormatDiagnosticsResult {
   kind: "diagnostics";
 
   /**
-   * Per-diagnostic stdout payload, ending with a trailing newline. Empty when there are no
-   * diagnostics to report.
+   * Per-file diagnostics block, laid out per `outputMode`.
+   * Ends with a trailing newline, or is empty when no file diagnostics apply.
    */
-  formattedDiagnostics: string;
+  fileDiagnostics: string;
+
+  /**
+   * Location-less diagnostics block (e.g. tsconfig-level errors).
+   * Ends with a trailing newline, or is empty when no project diagnostics apply.
+   */
+  projectDiagnostics: string;
 
   /**
    * Weak-typings hint block, non-null when any `no-unsafe-*` diagnostic is present.
@@ -142,7 +149,7 @@ export function formatLintOutput({
   }
   const resolvedProject = projectDiagnostics.map(resolveProjectDiagnostic);
 
-  const formattedDiagnostics = renderForMode(outputMode, resolved, resolvedProject);
+  const rendered = renderForMode(outputMode, resolved, resolvedProject);
   const weakTypingsHint = hasUnsafeDiagnostic(resolved)
     ? `${renderWeakTypingsHint(weakTypingsDocPath).join("\n")}\n`
     : null;
@@ -150,7 +157,8 @@ export function formatLintOutput({
 
   return {
     kind: "diagnostics",
-    formattedDiagnostics,
+    fileDiagnostics: rendered.file,
+    projectDiagnostics: rendered.project,
     weakTypingsHint,
     linterSummary,
   };
@@ -160,7 +168,7 @@ function renderForMode(
   mode: LintOutputMode,
   resolved: readonly ResolvedDiagnostic[],
   project: readonly ResolvedProjectDiagnostic[],
-): string {
+): RenderedDiagnostics {
   switch (mode) {
     case "stylish":
       return renderStylish(resolved, project);
@@ -172,7 +180,8 @@ function renderForMode(
 function emptyDiagnostics(): FormatDiagnosticsResult {
   return {
     kind: "diagnostics",
-    formattedDiagnostics: "",
+    fileDiagnostics: "",
+    projectDiagnostics: "",
     weakTypingsHint: null,
     linterSummary: null,
   };

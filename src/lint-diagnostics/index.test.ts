@@ -32,9 +32,10 @@ void test("stylish mode: single file, single diagnostic produces grouped output 
 
   assert.deepEqual(result, {
     kind: "diagnostics",
-    formattedDiagnostics: joinSections([
+    fileDiagnostics: joinSections([
       [file, "  1:1 `debugger` statement is not allowed. [eslint(no-debugger)]", "    debugger"],
     ]),
+    projectDiagnostics: "",
     weakTypingsHint: null,
     linterSummary: "1 unfixed lint issue.",
   });
@@ -62,7 +63,8 @@ void test("unix mode: single file, single diagnostic produces a single flat line
 
   assert.deepEqual(result, {
     kind: "diagnostics",
-    formattedDiagnostics: `${file}:1:1: \`debugger\` statement is not allowed. [eslint(no-debugger)]\n`,
+    fileDiagnostics: `${file}:1:1: \`debugger\` statement is not allowed. [eslint(no-debugger)]\n`,
+    projectDiagnostics: "",
     weakTypingsHint: null,
     linterSummary: "1 unfixed lint issue.",
   });
@@ -90,8 +92,8 @@ void test("no-unsafe-* diagnostic surfaces weakTypingsHint alongside the diagnos
 
   assert.equal(result.kind, "diagnostics");
   if (result.kind !== "diagnostics") return;
-  assert.match(result.formattedDiagnostics, /no-unsafe-member-access/);
-  assert.ok(!result.formattedDiagnostics.includes("Hint on the"));
+  assert.match(result.fileDiagnostics, /no-unsafe-member-access/);
+  assert.ok(!result.fileDiagnostics.includes("Hint on the"));
   assert.ok(result.weakTypingsHint !== null);
   assert.match(result.weakTypingsHint, /^Hint on the `no-unsafe-\*` diagnostics:/);
   assert.match(result.weakTypingsHint, new RegExp(`- See: ${HINT_PATH}\\n$`));
@@ -122,7 +124,7 @@ void test("no-unsafe-* diagnostic surfaces weakTypingsHint under unix mode too",
   assert.equal(result.kind, "diagnostics");
   if (result.kind !== "diagnostics") return;
   assert.equal(
-    result.formattedDiagnostics,
+    result.fileDiagnostics,
     `${file}:2:5: Unsafe member access .foo on an \`any\` value. [typescript-eslint(no-unsafe-member-access)]\n`,
   );
   assert.ok(result.weakTypingsHint !== null);
@@ -140,7 +142,8 @@ void test("zero diagnostics yields empty payload and null aux fields (stylish mo
 
   assert.deepEqual(result, {
     kind: "diagnostics",
-    formattedDiagnostics: "",
+    fileDiagnostics: "",
+    projectDiagnostics: "",
     weakTypingsHint: null,
     linterSummary: null,
   });
@@ -156,7 +159,8 @@ void test("zero diagnostics yields empty payload and null aux fields (unix mode)
 
   assert.deepEqual(result, {
     kind: "diagnostics",
-    formattedDiagnostics: "",
+    fileDiagnostics: "",
+    projectDiagnostics: "",
     weakTypingsHint: null,
     linterSummary: null,
   });
@@ -172,7 +176,8 @@ void test("empty stdout is treated as a clean diagnostics run, not a contract fa
 
   assert.deepEqual(result, {
     kind: "diagnostics",
-    formattedDiagnostics: "",
+    fileDiagnostics: "",
+    projectDiagnostics: "",
     weakTypingsHint: null,
     linterSummary: null,
   });
@@ -284,7 +289,7 @@ void test("oxc parse-error diagnostic stays a lint finding (stylish mode)", (t) 
 
   assert.equal(result.kind, "diagnostics");
   if (result.kind !== "diagnostics") return;
-  assert.match(result.formattedDiagnostics, /\[parse-error\]/);
+  assert.match(result.fileDiagnostics, /\[parse-error\]/);
   assert.equal(result.linterSummary, "1 unfixed lint issue.");
 });
 
@@ -310,7 +315,8 @@ void test("oxc parse-error diagnostic stays a lint finding (unix mode)", (t) => 
 
   assert.deepEqual(result, {
     kind: "diagnostics",
-    formattedDiagnostics: `${file}:1:11: Unexpected token. [parse-error]\n`,
+    fileDiagnostics: `${file}:1:11: Unexpected token. [parse-error]\n`,
+    projectDiagnostics: "",
     weakTypingsHint: null,
     linterSummary: "1 unfixed lint issue.",
   });
@@ -339,7 +345,7 @@ void test('"No files found to lint." prefix is treated as a no-files run (unix m
   assert.deepEqual(result, { kind: "no-files" });
 });
 
-void test("project-level diagnostic (empty labels) renders under its filename heading (stylish mode)", () => {
+void test("project-level diagnostic (empty labels) renders into the project block (stylish mode)", () => {
   // Surfaces as an ordinary lint finding rather than escalating to a contract failure.
   const stdout = makeStdout([
     {
@@ -360,7 +366,8 @@ void test("project-level diagnostic (empty labels) renders under its filename he
 
   assert.deepEqual(result, {
     kind: "diagnostics",
-    formattedDiagnostics:
+    fileDiagnostics: "",
+    projectDiagnostics:
       "tsconfig.json\n  Cannot find type definition file for 'node'. [typescript(tsconfig-error)]\n",
     weakTypingsHint: null,
     linterSummary: "1 unfixed lint issue.",
@@ -388,9 +395,10 @@ void test("project-level diagnostic with empty filename uses the (project) place
   assert.equal(result.kind, "diagnostics");
   if (result.kind !== "diagnostics") return;
   assert.equal(
-    result.formattedDiagnostics,
+    result.projectDiagnostics,
     "(project)\n  Cannot find type definition file for 'node'. [typescript(tsconfig-error)]\n",
   );
+  assert.equal(result.fileDiagnostics, "");
 });
 
 void test("project-level diagnostic renders one location-less line in unix mode", () => {
@@ -413,10 +421,11 @@ void test("project-level diagnostic renders one location-less line in unix mode"
 
   assert.equal(result.kind, "diagnostics");
   if (result.kind !== "diagnostics") return;
-  assert.equal(result.formattedDiagnostics, "tsconfig.json: msg [typescript(tsconfig-error)]\n");
+  assert.equal(result.projectDiagnostics, "tsconfig.json: msg [typescript(tsconfig-error)]\n");
+  assert.equal(result.fileDiagnostics, "");
 });
 
-void test("mixed payload places project diagnostics before file diagnostics (stylish mode)", (t) => {
+void test("mixed payload splits project and file blocks across separate fields (stylish mode)", (t) => {
   const dir = setupFixture(t, { "x.ts": "debugger;\n" });
   const file = join(dir, "x.ts");
   const stdout = makeStdout([
@@ -445,13 +454,11 @@ void test("mixed payload places project diagnostics before file diagnostics (sty
 
   assert.deepEqual(result, {
     kind: "diagnostics",
-    formattedDiagnostics: joinSections([
-      [
-        "tsconfig.json",
-        "  Cannot find type definition file for 'node'. [typescript(tsconfig-error)]",
-      ],
+    fileDiagnostics: joinSections([
       [file, "  1:1 `debugger` statement is not allowed. [eslint(no-debugger)]", "    debugger"],
     ]),
+    projectDiagnostics:
+      "tsconfig.json\n  Cannot find type definition file for 'node'. [typescript(tsconfig-error)]\n",
     weakTypingsHint: null,
     linterSummary: "2 unfixed lint issues.",
   });
@@ -482,6 +489,7 @@ void test("project-level diagnostic with omitted `labels` field is accepted just
 
   assert.equal(result.kind, "diagnostics");
   if (result.kind !== "diagnostics") return;
-  assert.equal(result.formattedDiagnostics, "tsconfig.json: msg [typescript(tsconfig-error)]\n");
+  assert.equal(result.projectDiagnostics, "tsconfig.json: msg [typescript(tsconfig-error)]\n");
+  assert.equal(result.fileDiagnostics, "");
   assert.equal(result.linterSummary, "1 unfixed lint issue.");
 });

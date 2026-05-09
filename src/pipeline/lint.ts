@@ -60,8 +60,9 @@ export type LintPhaseOutcome = { kind: "ok" } | { kind: "no-files" } | { kind: "
  * Run the lint phase: spawn oxlint, validate the payload through {@link formatLintOutput},
  * and emit diagnostics plus auxiliary text through `ctx.logger`.
  *
- * Diagnostics route to stdout in the layout selected by `outputMode`;
- * the weak-typings hint (when applicable) and the issue-count summary always route to stderr.
+ * Per-file diagnostics route to stdout in the layout selected by `outputMode`.
+ * Location-less diagnostics, the weak-typings hint (when applicable), and the issue-count
+ * summary all route to stderr so stdout stays a uniform per-line stream.
  *
  * @throws {LintJsError} on launch failure, signal-driven termination,
  *   or oxlint output-contract mismatch.
@@ -122,7 +123,7 @@ export async function runLintPhase(
       });
 
     case "diagnostics": {
-      const { formattedDiagnostics, weakTypingsHint, linterSummary } = formatted;
+      const { fileDiagnostics, projectDiagnostics, weakTypingsHint, linterSummary } = formatted;
       // Non-zero exit with no validated diagnostics (empty stdout, or `{"diagnostics":[]}`)
       // means oxlint signaled failure without producing findings.
       // Surface it as a tool failure so the run does not display the misleading "unfixed issues remain" summary.
@@ -134,7 +135,11 @@ export async function runLintPhase(
           ],
         });
       }
-      logger.writeOut(formattedDiagnostics);
+      if (projectDiagnostics !== "") {
+        logger.markBlankSeparator();
+        logger.writeErr(projectDiagnostics);
+      }
+      logger.writeOut(fileDiagnostics);
       if (weakTypingsHint !== null) {
         logger.markBlankSeparator();
         logger.writeErr(weakTypingsHint);

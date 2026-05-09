@@ -40,8 +40,9 @@ Each tool's standard ignore files (like `.gitignore`) are respected.
 
 ### Output
 
-stdout carries lint-result text only, so it can be piped into another tool without further filtering.
-Auxiliary text goes to stderr: the issue-count summary, the final tagged status line, formatter failures, and (when applicable) a short hint pointing to some diagnostic rules.
+stdout carries per-file lint findings only, so it can be piped into another tool without further filtering.
+Every stdout line points at a source location.
+Auxiliary text goes to stderr: location-less findings (e.g. tsconfig errors), the issue-count summary, the final tagged status line, formatter failures, and (when applicable) a short hint pointing to some diagnostic rules.
 The format phase is silent on success.
 
 All reported columns are 1-origin UTF-16 code units.
@@ -60,7 +61,8 @@ src/index.ts
 The bracketed error code is the raw oxlint `code` field in `plugin(rule)` form (e.g. `eslint(no-debugger)`, `typescript-eslint(no-floating-promises)`, `typescript(TS2591)`).
 For oxc parser errors, which carry no rule code, the placeholder `parse-error` appears in the brackets instead.
 
-Under `--unix`, each diagnostic is emitted as a single self-contained line of the form `<filename>:<line>:<column>: <message> [<code>]`, suitable for VS Code terminal link detection.
+Under `--unix`, each per-file diagnostic on stdout is emitted as a single self-contained line of the form `<filename>:<line>:<column>: <message> [<code>]`, suitable for VS Code terminal link detection.
+Location-less findings stay on stderr in both modes, so the stdout line shape carries no exceptions.
 
 ## Type-aware linting
 

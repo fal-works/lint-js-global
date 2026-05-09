@@ -12,38 +12,57 @@ const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 const PROJECT_PLACEHOLDER_HEADING = "(project)";
 
 /**
- * Render the stylish layout: project sections first, then per-file sections.
- * Returns an empty string when both inputs are empty.
+ * Render output split into two parallel blocks the caller emits independently.
+ *
+ * Each string carries its own trailing newline, or is empty when nothing applies.
+ */
+export interface RenderedDiagnostics {
+  /** Per-file diagnostics block, one entry per locatable diagnostic. */
+  file: string;
+
+  /** Location-less diagnostics block. */
+  project: string;
+}
+
+/**
+ * Render the stylish layout: per-file sections grouped under a filename heading,
+ * with location-less diagnostics rendered as a parallel `(project)`-style block.
  */
 export function renderStylish(
   resolved: readonly ResolvedDiagnostic[],
   project: readonly ResolvedProjectDiagnostic[],
-): string {
-  if (resolved.length === 0 && project.length === 0) return "";
-  const sections: string[] = [];
-  const sortedProject = [...project].sort(compareProjectDiagnostics);
-  for (const [heading, diags] of groupProjectByHeading(sortedProject)) {
-    sections.push([heading, ...diags.map(formatProjectStylishEntry)].join("\n"));
-  }
+): RenderedDiagnostics {
+  const fileSections: string[] = [];
   const sortedFile = [...resolved].sort(compareDiagnostics);
   for (const [filename, diags] of groupByFilename(sortedFile)) {
-    sections.push([filename, ...diags.map(formatStylishEntry)].join("\n"));
+    fileSections.push([filename, ...diags.map(formatStylishEntry)].join("\n"));
   }
-  return `${sections.join("\n\n")}\n`;
+  const projectSections: string[] = [];
+  const sortedProject = [...project].sort(compareProjectDiagnostics);
+  for (const [heading, diags] of groupProjectByHeading(sortedProject)) {
+    projectSections.push([heading, ...diags.map(formatProjectStylishEntry)].join("\n"));
+  }
+  return {
+    file: fileSections.length === 0 ? "" : `${fileSections.join("\n\n")}\n`,
+    project: projectSections.length === 0 ? "" : `${projectSections.join("\n\n")}\n`,
+  };
 }
 
 /**
- * Render the unix layout: project lines first, then per-file lines.
- * Returns an empty string when both inputs are empty.
+ * Render the unix layout: one `<filename>:<L>:<C>: <message> [<code>]` line per
+ * file diagnostic, with location-less diagnostics rendered as a parallel
+ * `<heading>: <message> [<code>]` block.
  */
 export function renderUnix(
   resolved: readonly ResolvedDiagnostic[],
   project: readonly ResolvedProjectDiagnostic[],
-): string {
-  if (resolved.length === 0 && project.length === 0) return "";
-  const projectLines = [...project].sort(compareProjectDiagnostics).map(formatProjectUnixLine);
+): RenderedDiagnostics {
   const fileLines = [...resolved].sort(compareDiagnostics).map(formatUnixLine);
-  return `${[...projectLines, ...fileLines].join("\n")}\n`;
+  const projectLines = [...project].sort(compareProjectDiagnostics).map(formatProjectUnixLine);
+  return {
+    file: fileLines.length === 0 ? "" : `${fileLines.join("\n")}\n`,
+    project: projectLines.length === 0 ? "" : `${projectLines.join("\n")}\n`,
+  };
 }
 
 /**
