@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
-import { cpSync, existsSync, mkdtempSync, readdirSync, rmSync, symlinkSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
 
@@ -12,8 +20,39 @@ const fixtureRoot = join(repoRoot, "test", "fixtures");
 
 interface PublishLayout {
   packageRoot: string;
-  distBin: string;
+  binPath: string;
   dispose: () => void;
+}
+
+/**
+ * Resolve the absolute path of the `lint-js` bin entry as declared by the
+ * extracted package's own `package.json`. Fails the smoke if the `bin`
+ * mapping is malformed or points outside what the package actually ships.
+ */
+function resolveLintJsBin(packageRoot: string): string {
+  const manifestPath = join(packageRoot, "package.json");
+  const manifest: unknown = JSON.parse(readFileSync(manifestPath, "utf8"));
+  assert.ok(
+    typeof manifest === "object" && manifest !== null,
+    `expected object manifest at ${manifestPath}`,
+  );
+  const { bin } = manifest as { bin?: unknown };
+  assert.ok(
+    typeof bin === "object" && bin !== null && !Array.isArray(bin),
+    "expected `bin` field to be an object in published package.json",
+  );
+  const entry = (bin as Record<string, unknown>)["lint-js"];
+  assert.equal(
+    typeof entry,
+    "string",
+    'expected `bin["lint-js"]` to be a string in published package.json',
+  );
+  const binPath = join(packageRoot, entry as string);
+  assert.ok(
+    existsSync(binPath),
+    `bin entry \`lint-js\` -> ${entry as string} is not present in the published package (check the \`files\` array)`,
+  );
+  return binPath;
 }
 
 /**
@@ -63,7 +102,7 @@ async function preparePublishLayout(): Promise<PublishLayout> {
     symlinkSync(join(repoRoot, "node_modules"), join(packageRoot, "node_modules"));
     return {
       packageRoot,
-      distBin: join(packageRoot, "dist", "bin.js"),
+      binPath: resolveLintJsBin(packageRoot),
       dispose,
     };
   } catch (err) {
@@ -86,7 +125,7 @@ void describe("smoke against the published layout", () => {
     const result = await spawnCapturing({
       name: "lint-js --help",
       command: process.execPath,
-      args: [layout.distBin, "--help"],
+      args: [layout.binPath, "--help"],
     });
     assert.equal(result.status, 0, `expected exit 0\nstderr:\n${result.stderr}`);
     assert.match(result.stdout, /Usage: lint-js/, "expected usage on stdout");
@@ -103,7 +142,7 @@ void describe("smoke against the published layout", () => {
     const result = await spawnCapturing({
       name: "lint-js --check",
       command: process.execPath,
-      args: [layout.distBin, "--check"],
+      args: [layout.binPath, "--check"],
       cwd: dir,
     });
     assert.equal(
@@ -116,7 +155,8 @@ void describe("smoke against the published layout", () => {
   void it("shipped-paths: every path exported by package/paths.ts exists", async () => {
     // Some entries (e.g. doc paths embedded in diagnostic hints) appear as strings in CLI output
     // without being read at startup, so their absence would slip past the CLI-running stages above.
-    const url = pathToFileURL(join(layout.packageRoot, "dist", "package", "paths.js")).href;
+    const buildRoot = dirname(layout.binPath);
+    const url = pathToFileURL(join(buildRoot, "package", "paths.js")).href;
     const mod: unknown = await import(url);
     assert.ok(
       typeof mod === "object" && mod !== null,
