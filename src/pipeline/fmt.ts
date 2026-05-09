@@ -46,10 +46,10 @@ export interface FmtPhaseContext {
  *
  * - `ok`: oxfmt exited 0.
  * - `findings`: `--check` reported files needing formatting (oxfmt exit 1).
- * - `fatal`: oxfmt rejected the input.
- *   Covers parse error (exit ≥ 2 in either mode) and write failure (any non-zero in write mode),
- *   both user-source attributable.
- * - Tool-side failures (launch, signal-driven termination) escalate to `LintJsError` and never reach this outcome.
+ * - `fatal`: oxfmt rejected the input. Covers parse error (exit ≥ 2 in either mode) and write failure
+ *   (any non-zero in write mode), both user-source attributable.
+ * - Tool-side failures (launch, signal-driven termination) escalate to `LintJsError` and never reach
+ *   this outcome.
  */
 export type FmtPhaseOutcome = { kind: "ok" } | { kind: "findings" } | { kind: "fatal" };
 
