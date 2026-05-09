@@ -4,7 +4,6 @@ import test from "node:test";
 import { joinSections } from "../../test/lint-diagnostics-helpers.ts";
 import {
   compareDiagnostics,
-  countFiles,
   formatStylishEntry,
   formatSummary,
   formatUnixLine,
@@ -154,31 +153,20 @@ void test("hasUnsafeDiagnostic: true when any errorCode matches typescript-eslin
   );
 });
 
-void test("countFiles: counts distinct filenames", () => {
-  assert.equal(
-    countFiles([
-      makeResolved({ filename: "/a.ts" }),
-      makeResolved({ filename: "/a.ts", startLine: 2 }),
-      makeResolved({ filename: "/b.ts" }),
-    ]),
-    2,
-  );
+void test("formatSummary: non-check plural form has 'unfixed' qualifier and plural word", () => {
+  assert.equal(formatSummary(false, 3), "3 unfixed lint issues.");
 });
 
-void test("formatSummary: non-check plural form has 'unfixed' qualifier and plural words", () => {
-  assert.equal(formatSummary(false, 3, 2), "3 unfixed lint issues in 2 files.");
-});
-
-void test("formatSummary: non-check singular form keeps 'unfixed' but uses singular words", () => {
-  assert.equal(formatSummary(false, 1, 1), "1 unfixed lint issue in 1 file.");
+void test("formatSummary: non-check singular form keeps 'unfixed' but uses the singular word", () => {
+  assert.equal(formatSummary(false, 1), "1 unfixed lint issue.");
 });
 
 void test("formatSummary: check mode drops the 'unfixed' qualifier (plural)", () => {
-  assert.equal(formatSummary(true, 2, 1), "2 lint issues in 1 file.");
+  assert.equal(formatSummary(true, 2), "2 lint issues.");
 });
 
 void test("formatSummary: check mode drops the 'unfixed' qualifier (singular)", () => {
-  assert.equal(formatSummary(true, 1, 1), "1 lint issue in 1 file.");
+  assert.equal(formatSummary(true, 1), "1 lint issue.");
 });
 
 void test("renderStylish: groups by filename and sorts within each group", () => {

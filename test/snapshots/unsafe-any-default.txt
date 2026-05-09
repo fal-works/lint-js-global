@@ -9,7 +9,7 @@ ERR - Remedies: `*.d.ts` augmentation, `unknown` + type predicates, or boundary 
 ERR - Inline disable (`// oxlint-disable-next-line`) is not a fix; use only when explicitly permitted by the project maintainer.
 ERR - See: <PACKAGE_ROOT>/docs/guide/weak-typings.md
 ERR
-ERR 2 unfixed lint issues in 1 file.
+ERR 2 unfixed lint issues.
 ERR
 ERR lint-js: Failed. Issues fixed where possible; unfixed issues remain.
 EXIT 1

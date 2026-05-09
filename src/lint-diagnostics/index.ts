@@ -1,6 +1,5 @@
 import { createSourceCache } from "../source.ts";
 import {
-  countFiles,
   formatSummary,
   hasUnsafeDiagnostic,
   renderStylish,
@@ -130,7 +129,7 @@ export function formatLintOutput({
   const weakTypingsHint = hasUnsafeDiagnostic(resolved)
     ? `${renderWeakTypingsHint(weakTypingsDocPath).join("\n")}\n`
     : null;
-  const linterSummary = formatSummary(check, resolved.length, countFiles(resolved));
+  const linterSummary = formatSummary(check, resolved.length);
 
   return {
     kind: "diagnostics",

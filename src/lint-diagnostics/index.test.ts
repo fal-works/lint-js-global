@@ -36,7 +36,7 @@ void test("stylish mode: single file, single diagnostic produces grouped output 
       [file, "  1:1 `debugger` statement is not allowed. [eslint(no-debugger)]", "    debugger"],
     ]),
     weakTypingsHint: null,
-    linterSummary: "1 unfixed lint issue in 1 file.",
+    linterSummary: "1 unfixed lint issue.",
   });
 });
 
@@ -64,7 +64,7 @@ void test("unix mode: single file, single diagnostic produces a single flat line
     kind: "diagnostics",
     formattedDiagnostics: `${file}:1:1: \`debugger\` statement is not allowed. [eslint(no-debugger)]\n`,
     weakTypingsHint: null,
-    linterSummary: "1 unfixed lint issue in 1 file.",
+    linterSummary: "1 unfixed lint issue.",
   });
 });
 
@@ -95,7 +95,7 @@ void test("no-unsafe-* diagnostic surfaces weakTypingsHint alongside the diagnos
   assert.ok(result.weakTypingsHint !== null);
   assert.match(result.weakTypingsHint, /^Hint on the `no-unsafe-\*` diagnostics:/);
   assert.match(result.weakTypingsHint, new RegExp(`- See: ${HINT_PATH}\\n$`));
-  assert.equal(result.linterSummary, "1 unfixed lint issue in 1 file.");
+  assert.equal(result.linterSummary, "1 unfixed lint issue.");
 });
 
 void test("no-unsafe-* diagnostic surfaces weakTypingsHint under unix mode too", (t) => {
@@ -127,7 +127,7 @@ void test("no-unsafe-* diagnostic surfaces weakTypingsHint under unix mode too",
   );
   assert.ok(result.weakTypingsHint !== null);
   assert.match(result.weakTypingsHint, /^Hint on the `no-unsafe-\*` diagnostics:/);
-  assert.equal(result.linterSummary, "1 unfixed lint issue in 1 file.");
+  assert.equal(result.linterSummary, "1 unfixed lint issue.");
 });
 
 void test("zero diagnostics yields empty payload and null aux fields (stylish mode)", () => {
@@ -285,7 +285,7 @@ void test("oxc parse-error diagnostic stays a lint finding (stylish mode)", (t) 
   assert.equal(result.kind, "diagnostics");
   if (result.kind !== "diagnostics") return;
   assert.match(result.formattedDiagnostics, /\[parse-error\]/);
-  assert.equal(result.linterSummary, "1 unfixed lint issue in 1 file.");
+  assert.equal(result.linterSummary, "1 unfixed lint issue.");
 });
 
 void test("oxc parse-error diagnostic stays a lint finding (unix mode)", (t) => {
@@ -312,7 +312,7 @@ void test("oxc parse-error diagnostic stays a lint finding (unix mode)", (t) => 
     kind: "diagnostics",
     formattedDiagnostics: `${file}:1:11: Unexpected token. [parse-error]\n`,
     weakTypingsHint: null,
-    linterSummary: "1 unfixed lint issue in 1 file.",
+    linterSummary: "1 unfixed lint issue.",
   });
 });
 

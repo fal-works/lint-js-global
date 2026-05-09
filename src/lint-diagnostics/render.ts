@@ -35,11 +35,10 @@ export function renderUnix(resolved: readonly ResolvedDiagnostic[]): string {
  * Compose the human-readable summary line stating how many issues remain.
  * In `--check` mode the "unfixed" qualifier is dropped.
  */
-export function formatSummary(check: boolean, issueCount: number, fileCount: number): string {
+export function formatSummary(check: boolean, issueCount: number): string {
   const issueWord = issueCount === 1 ? "lint issue" : "lint issues";
-  const fileWord = fileCount === 1 ? "file" : "files";
   const qualifier = check ? "" : "unfixed ";
-  return `${issueCount} ${qualifier}${issueWord} in ${fileCount} ${fileWord}.`;
+  return `${issueCount} ${qualifier}${issueWord}.`;
 }
 
 /**
@@ -57,13 +56,6 @@ export function renderWeakTypingsHint(docPath: string): string[] {
 /** True when any diagnostic in the set carries a `typescript-eslint(no-unsafe-*)` code. */
 export function hasUnsafeDiagnostic(resolved: readonly ResolvedDiagnostic[]): boolean {
   return resolved.some((d) => UNSAFE_CODE_PATTERN.test(d.errorCode));
-}
-
-/** Number of distinct filenames the resolved set spans. */
-export function countFiles(resolved: readonly ResolvedDiagnostic[]): number {
-  const set = new Set<string>();
-  for (const d of resolved) set.add(d.filename);
-  return set.size;
 }
 
 /**
