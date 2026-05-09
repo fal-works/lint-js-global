@@ -18,38 +18,22 @@ Run from a project root:
 lint-js [--check] [--format-only | --lint-only] [--unix] [path...]
 ```
 
-The current directory must contain `package.json` (contents not read), as a guard against accidentally running without target paths in a wide location such as `~/`.
-Target paths themselves may point anywhere.
+The current directory must contain `package.json`, as a guard against running without target paths in a wide location such as `~/`.
+Target paths themselves may point anywhere; without them the whole project is processed.
 
 ### Options
 
-- `--check` verifies formatting and lint without rewriting files.
-- `--format-only` runs only the format phase; the lint phase is skipped entirely.
-- `--lint-only` is the symmetric counterpart (runs only the lint phase).
-- `--unix` emits unix-format diagnostic lines on stdout (one per diagnostic) instead of the default per-file grouped layout.
+- `--check` verifies without rewriting files.
+- `--format-only` runs only the format phase.
+- `--lint-only` runs only the lint phase.
+- `--unix` emits one diagnostic per line on stdout (`<file>:<line>:<col>: <message> [<code>]`), for tools that consume that form.
 
 `--format-only` and `--lint-only` are mutually exclusive.
-
-### Target Paths
-
-Paths are optional; without them the whole project is processed.  
-Each path must be an existing file or directory.
-
-`node_modules` is always skipped.  
-Each tool's standard ignore files (like `.gitignore`) are respected.
 
 ### Output
 
 stdout carries lint findings only, so it can be piped into another tool without further filtering.
-Auxiliary text goes to stderr: location-less findings (e.g. tsconfig errors), the issue-count summary, the final tagged status line, formatter failures, and (when applicable) a short hint pointing to some diagnostic rules.
-The format phase is silent on success.
-
-All reported columns are 1-origin UTF-16 code units.
-
-Default lint output groups diagnostics per file.
-Each diagnostic occupies two lines: a head line with the location (`L:C` or `L:C-L:C`), the diagnostic message, and the bracketed error code; followed by a continuation line carrying a source-code slice.
-The slice shows the first line of the span, capped at 40 code points, with `...` marking truncation.
-The head line widens to `L:C-L:C` whenever content is hidden.
+Auxiliary text (issue-count summary, final status line, formatter failures) goes to stderr.
 
 ```
 src/index.ts
@@ -58,23 +42,3 @@ src/index.ts
   2:18 Unsafe member access .foo on an `any` value. [typescript-eslint(no-unsafe-member-access)]
     foo
 ```
-
-The bracketed error code is the raw oxlint `code` field in `plugin(rule)` form (e.g. `eslint(no-debugger)`, `typescript-eslint(no-floating-promises)`, `typescript(TS2591)`).
-For oxc parser errors, which carry no rule code, the placeholder `parse-error` appears in the brackets instead.
-
-Under `--unix`, each diagnostic is emitted as a single self-contained line of the form `<filename>:<line>:<column>: <message> [<code>]`, suitable for VS Code terminal link detection.
-
-## Type-aware linting
-
-Type-aware linting is always on.  
-`lint-js` runs `oxlint --type-aware --type-check` with `oxlint-tsgolint` bundled.  
-`tsconfig.json` is auto-detected per file; sub-directory tsconfigs are respected.
-
-Strict rules including `no-floating-promises` and `no-unsafe-*` are enforced.  
-See [docs/guide/weak-typings.md](docs/guide/weak-typings.md) for escape hatches.
-
-Test files (`**/*.test.{js,ts}`) relax the `no-unsafe-*` family to accommodate mocks, fixtures, and boundary I/O.
-
-## Notes
-
-Rule config is currently fixed and not per-project configurable.
