@@ -1,28 +1,29 @@
 import assert from "node:assert/strict";
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { pathToFileURL } from "node:url";
 
-import { spawnCapturing } from "../cli-helpers.ts";
+import { spawnCapturing, type SpawnCapturingParams } from "../cli-helpers.ts";
+import { copyFixture, makeTempDir } from "../fixture-helpers.ts";
 
 const repoRoot = join(import.meta.dirname, "..", "..");
-const fixtureRoot = join(repoRoot, "test", "fixtures");
 const PACKAGE_NAME = "@fal-works/lint-js-global";
 
 interface PublishLayout {
   packageRoot: string;
   binPath: string;
   dispose: () => void;
+}
+
+/** Run a command via {@link spawnCapturing} and throw if it exits non-zero. */
+async function runOrThrow(params: SpawnCapturingParams): Promise<void> {
+  const result = await spawnCapturing(params);
+  if (result.status !== 0) {
+    throw new Error(
+      `${params.name} failed: exit ${result.status}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+    );
+  }
 }
 
 /**
@@ -33,18 +34,15 @@ interface PublishLayout {
  * or a `bin` target outside `files` then fails the smoke instead of the first user run.
  */
 async function preparePublishLayout(): Promise<PublishLayout> {
-  const root = mkdtempSync(join(tmpdir(), "lint-js-smoke-"));
+  const root = makeTempDir("smoke");
   const dispose = () => rmSync(root, { recursive: true, force: true });
   try {
-    const pack = await spawnCapturing({
+    await runOrThrow({
       name: "pnpm pack",
       command: "pnpm",
       args: ["pack", "--pack-destination", root],
       cwd: repoRoot,
     });
-    if (pack.status !== 0) {
-      throw new Error(`pnpm pack failed: exit ${pack.status}\nstderr:\n${pack.stderr}`);
-    }
     const tarballs = readdirSync(root).filter((name) => name.endsWith(".tgz"));
     const [tarballName, ...rest] = tarballs;
     if (!tarballName || rest.length > 0) {
@@ -70,17 +68,12 @@ async function preparePublishLayout(): Promise<PublishLayout> {
       )}\n`,
     );
     // Self-contained store, so the smoke runs even where the default pnpm store is read-only.
-    const install = await spawnCapturing({
+    await runOrThrow({
       name: "pnpm install",
       command: "pnpm",
       args: ["install", "--store-dir", storeDir, "--ignore-workspace"],
       cwd: consumerDir,
     });
-    if (install.status !== 0) {
-      throw new Error(
-        `pnpm install failed: exit ${install.status}\nstdout:\n${install.stdout}\nstderr:\n${install.stderr}`,
-      );
-    }
 
     return {
       packageRoot: join(consumerDir, "node_modules", PACKAGE_NAME),
@@ -117,9 +110,8 @@ void describe("smoke against the published layout", () => {
     // `basic` is intentionally dirty, so a successful end-to-end run reports findings and exits 1.
     // Exit 1 therefore proves the full pipeline reached the underlying tools.
     // Exit 2 would mean a `LintJsError` aborted the run before findings were produced.
-    const dir = mkdtempSync(join(tmpdir(), "lint-js-smoke-basic-"));
+    const dir = copyFixture("basic");
     t.after(() => rmSync(dir, { recursive: true, force: true }));
-    cpSync(join(fixtureRoot, "basic"), dir, { recursive: true });
 
     const result = await spawnCapturing({
       name: "lint-js --check",
@@ -143,11 +135,9 @@ void describe("smoke against the published layout", () => {
       typeof mod === "object" && mod !== null,
       "expected module namespace object from package/paths.js",
     );
-    const missing: string[] = [];
-    for (const [name, value] of Object.entries(mod as Record<string, unknown>)) {
-      if (typeof value !== "string") continue;
-      if (!existsSync(value)) missing.push(`${name} -> ${value}`);
-    }
+    const missing = Object.entries(mod as Record<string, unknown>)
+      .filter(([, value]) => typeof value === "string" && !existsSync(value))
+      .map(([name, value]) => `${name} -> ${value as string}`);
     assert.deepEqual(
       missing,
       [],

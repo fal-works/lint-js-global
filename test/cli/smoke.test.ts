@@ -7,10 +7,8 @@ import { runLintJsCli } from "../cli-helpers.ts";
 import { copyFixture, DIRTY_SOURCE } from "../fixture-helpers.ts";
 
 void test("end-to-end smoke: full pipeline reaches the tools and reports through the configured streams", async (t) => {
-  // Confirms the CLI binary wires `process.argv`, `process.cwd()`, `process.exitCode`,
-  // `createConsoleLogger`, and the `LintJsError` boundary together. The basic fixture
-  // is intentionally dirty, so a successful end-to-end run reports findings and exits 1.
-  // Detailed output structure lives in `test/integration/runner.test.ts`.
+  // Confirms the CLI binary's wiring reaches the runner.
+  // The basic fixture is dirty, so a clean run exits 1 with findings.
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -27,9 +25,8 @@ void test("end-to-end smoke: full pipeline reaches the tools and reports through
 });
 
 void test("end-to-end smoke: non-default flags reach run() unchanged", async (t) => {
-  // Each parsed CliArgs field has an observable that differs from the default run, so a
-  // regression where cli.ts drops or hardcodes any of them surfaces as one of the asserts
-  // below failing. Per-field branch coverage of the parser and runner lives upstream.
+  // Each parsed CliArgs field has an observable distinct from the default run.
+  // If cli.ts drops or hardcodes any of them, one of the asserts below fails.
   const dir = copyFixture("basic");
   t.after(() => rmSync(dir, { recursive: true, force: true }));
 
@@ -41,11 +38,8 @@ void test("end-to-end smoke: non-default flags reach run() unchanged", async (t)
   const result = await runLintJsCli(dir, ["--check", "--unix", "src"]);
 
   assert.equal(result.status, 1, "expected exit 1 from fmt or lint findings");
-  // --check forwarded: even files inside the positional target are not rewritten.
   assert.equal(readFileSync(target, "utf8"), before, "--check must suppress rewrites");
-  // positional `src` forwarded: files outside it are unaffected regardless of mode.
   assert.equal(readFileSync(outside, "utf8"), DIRTY_SOURCE, "positional must narrow scope");
-  // --unix forwarded: stdout carries one flat `<file>:<L>:<C>: <msg> [<code>]` line.
   assert.match(
     result.stdout,
     /^src\/index\.ts:\d+:\d+: .* \[typescript-eslint\(no-floating-promises\)\]$/m,
