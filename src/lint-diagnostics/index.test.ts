@@ -338,3 +338,150 @@ void test('"No files found to lint." prefix is treated as a no-files run (unix m
 
   assert.deepEqual(result, { kind: "no-files" });
 });
+
+void test("project-level diagnostic (empty labels) renders under its filename heading (stylish mode)", () => {
+  // Surfaces as an ordinary lint finding rather than escalating to a contract failure.
+  const stdout = makeStdout([
+    {
+      message: "Cannot find type definition file for 'node'.",
+      code: "typescript(tsconfig-error)",
+      severity: "error",
+      filename: "tsconfig.json",
+      labels: [],
+    },
+  ]);
+
+  const result = formatLintOutput({
+    capturedStdout: stdout,
+    check: false,
+    outputMode: "stylish",
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.deepEqual(result, {
+    kind: "diagnostics",
+    formattedDiagnostics:
+      "tsconfig.json\n  Cannot find type definition file for 'node'. [typescript(tsconfig-error)]\n",
+    weakTypingsHint: null,
+    linterSummary: "1 unfixed lint issue.",
+  });
+});
+
+void test("project-level diagnostic with empty filename uses the (project) placeholder (stylish mode)", () => {
+  const stdout = makeStdout([
+    {
+      message: "Cannot find type definition file for 'node'.",
+      code: "typescript(tsconfig-error)",
+      severity: "error",
+      filename: "",
+      labels: [],
+    },
+  ]);
+
+  const result = formatLintOutput({
+    capturedStdout: stdout,
+    check: false,
+    outputMode: "stylish",
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(result.kind, "diagnostics");
+  if (result.kind !== "diagnostics") return;
+  assert.equal(
+    result.formattedDiagnostics,
+    "(project)\n  Cannot find type definition file for 'node'. [typescript(tsconfig-error)]\n",
+  );
+});
+
+void test("project-level diagnostic renders one location-less line in unix mode", () => {
+  const stdout = makeStdout([
+    {
+      message: "msg",
+      code: "typescript(tsconfig-error)",
+      severity: "error",
+      filename: "tsconfig.json",
+      labels: [],
+    },
+  ]);
+
+  const result = formatLintOutput({
+    capturedStdout: stdout,
+    check: false,
+    outputMode: "unix",
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(result.kind, "diagnostics");
+  if (result.kind !== "diagnostics") return;
+  assert.equal(result.formattedDiagnostics, "tsconfig.json: msg [typescript(tsconfig-error)]\n");
+});
+
+void test("mixed payload places project diagnostics before file diagnostics (stylish mode)", (t) => {
+  const dir = setupFixture(t, { "x.ts": "debugger;\n" });
+  const file = join(dir, "x.ts");
+  const stdout = makeStdout([
+    {
+      message: "`debugger` statement is not allowed.",
+      code: "eslint(no-debugger)",
+      severity: "error",
+      filename: file,
+      labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
+    },
+    {
+      message: "Cannot find type definition file for 'node'.",
+      code: "typescript(tsconfig-error)",
+      severity: "error",
+      filename: "tsconfig.json",
+      labels: [],
+    },
+  ]);
+
+  const result = formatLintOutput({
+    capturedStdout: stdout,
+    check: false,
+    outputMode: "stylish",
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.deepEqual(result, {
+    kind: "diagnostics",
+    formattedDiagnostics: joinSections([
+      [
+        "tsconfig.json",
+        "  Cannot find type definition file for 'node'. [typescript(tsconfig-error)]",
+      ],
+      [file, "  1:1 `debugger` statement is not allowed. [eslint(no-debugger)]", "    debugger"],
+    ]),
+    weakTypingsHint: null,
+    linterSummary: "2 unfixed lint issues.",
+  });
+});
+
+void test("project-level diagnostic with omitted `labels` field is accepted just like an empty array", () => {
+  // Hand-crafted raw stdout because `makeStdout` always carries a `labels` field.
+  const raw = JSON.stringify({
+    diagnostics: [
+      {
+        filename: "tsconfig.json",
+        code: "typescript(tsconfig-error)",
+        message: "msg",
+      },
+    ],
+    number_of_files: 0,
+    number_of_rules: 0,
+    threads_count: 1,
+    start_time: 0,
+  });
+
+  const result = formatLintOutput({
+    capturedStdout: raw,
+    check: false,
+    outputMode: "unix",
+    weakTypingsDocPath: HINT_PATH,
+  });
+
+  assert.equal(result.kind, "diagnostics");
+  if (result.kind !== "diagnostics") return;
+  assert.equal(result.formattedDiagnostics, "tsconfig.json: msg [typescript(tsconfig-error)]\n");
+  assert.equal(result.linterSummary, "1 unfixed lint issue.");
+});

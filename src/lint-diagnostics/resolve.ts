@@ -1,5 +1,5 @@
 import { type SourceCache, resolveSpan } from "../source.ts";
-import type { ValidatedDiagnostic } from "./schema.ts";
+import type { ValidatedFileDiagnostic, ValidatedProjectDiagnostic } from "./schema.ts";
 
 /**
  * Synthetic placeholder used in the `[...]` bracket when a diagnostic has no `code` (oxc parser
@@ -59,7 +59,7 @@ export interface ResolvedDiagnostic {
  * multi-label rules (e.g. `no-dupe-keys`) typically duplicate the same slice across entries.
  */
 export function resolveDiagnostic(
-  diag: ValidatedDiagnostic,
+  diag: ValidatedFileDiagnostic,
   cache: SourceCache,
 ): ResolvedDiagnostic | null {
   const span = diag.labels[0].span;
@@ -76,6 +76,28 @@ export function resolveDiagnostic(
     endCol: resolved.endCol,
     slice: slice.text,
     sliceTruncated: slice.truncated,
+  };
+}
+
+/**
+ * Render-ready unit for a project-level diagnostic. Carries no source location.
+ */
+export interface ResolvedProjectDiagnostic {
+  filename: string;
+  errorCode: string;
+  message: string;
+}
+
+/**
+ * Project counterpart to {@link resolveDiagnostic}. Reads no source files.
+ */
+export function resolveProjectDiagnostic(
+  diag: ValidatedProjectDiagnostic,
+): ResolvedProjectDiagnostic {
+  return {
+    filename: diag.filename,
+    errorCode: diag.code ?? PARSE_ERROR_CODE,
+    message: diag.message,
   };
 }
 

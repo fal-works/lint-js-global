@@ -6,8 +6,17 @@ import {
   renderUnix,
   renderWeakTypingsHint,
 } from "./render.ts";
-import { resolveDiagnostic, type ResolvedDiagnostic } from "./resolve.ts";
-import { validatePayload, type ValidatedDiagnostic } from "./schema.ts";
+import {
+  resolveDiagnostic,
+  resolveProjectDiagnostic,
+  type ResolvedDiagnostic,
+  type ResolvedProjectDiagnostic,
+} from "./resolve.ts";
+import {
+  validatePayload,
+  type ValidatedFileDiagnostic,
+  type ValidatedProjectDiagnostic,
+} from "./schema.ts";
 
 /** Matches the signal oxlint ≥1.61 prepends to stdout when no files match the targets. */
 const OXLINT_NO_FILES_RE = /^No files found to lint\./;
@@ -117,19 +126,27 @@ export function formatLintOutput({
   const validated = validation.value;
   if (validated.length === 0) return emptyDiagnostics();
 
+  const fileDiagnostics: ValidatedFileDiagnostic[] = [];
+  const projectDiagnostics: ValidatedProjectDiagnostic[] = [];
+  for (const v of validated) {
+    if (v.kind === "file") fileDiagnostics.push(v);
+    else projectDiagnostics.push(v);
+  }
+
   const cache = createSourceCache(cwd ?? process.cwd());
   const resolved: ResolvedDiagnostic[] = [];
-  for (const diag of validated) {
+  for (const diag of fileDiagnostics) {
     const entry = resolveDiagnostic(diag, cache);
     if (entry === null) return contractFailure(capturedStdout, formatResolveFailure(diag));
     resolved.push(entry);
   }
+  const resolvedProject = projectDiagnostics.map(resolveProjectDiagnostic);
 
-  const formattedDiagnostics = renderForMode(outputMode, resolved);
+  const formattedDiagnostics = renderForMode(outputMode, resolved, resolvedProject);
   const weakTypingsHint = hasUnsafeDiagnostic(resolved)
     ? `${renderWeakTypingsHint(weakTypingsDocPath).join("\n")}\n`
     : null;
-  const linterSummary = formatSummary(check, resolved.length);
+  const linterSummary = formatSummary(check, resolved.length + resolvedProject.length);
 
   return {
     kind: "diagnostics",
@@ -139,12 +156,16 @@ export function formatLintOutput({
   };
 }
 
-function renderForMode(mode: LintOutputMode, resolved: readonly ResolvedDiagnostic[]): string {
+function renderForMode(
+  mode: LintOutputMode,
+  resolved: readonly ResolvedDiagnostic[],
+  project: readonly ResolvedProjectDiagnostic[],
+): string {
   switch (mode) {
     case "stylish":
-      return renderStylish(resolved);
+      return renderStylish(resolved, project);
     case "unix":
-      return renderUnix(resolved);
+      return renderUnix(resolved, project);
   }
 }
 
@@ -161,7 +182,7 @@ function contractFailure(rawStdout: string, reason: string): FormatLintResult {
   return { kind: "contract-failure", rawStdout, reason };
 }
 
-function formatResolveFailure(diag: ValidatedDiagnostic): string {
+function formatResolveFailure(diag: ValidatedFileDiagnostic): string {
   const { offset, length } = diag.labels[0].span;
   return `failed to resolve span: filename=${diag.filename}, offset=${offset}, length=${length}`;
 }

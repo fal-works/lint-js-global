@@ -4,6 +4,9 @@ import test from "node:test";
 import { joinSections } from "../../test/lint-diagnostics-helpers.ts";
 import {
   compareDiagnostics,
+  compareProjectDiagnostics,
+  formatProjectStylishEntry,
+  formatProjectUnixLine,
   formatStylishEntry,
   formatSummary,
   formatUnixLine,
@@ -12,7 +15,7 @@ import {
   renderUnix,
   renderWeakTypingsHint,
 } from "./render.ts";
-import type { ResolvedDiagnostic } from "./resolve.ts";
+import type { ResolvedDiagnostic, ResolvedProjectDiagnostic } from "./resolve.ts";
 
 function makeResolved(overrides: Partial<ResolvedDiagnostic> = {}): ResolvedDiagnostic {
   return {
@@ -25,6 +28,17 @@ function makeResolved(overrides: Partial<ResolvedDiagnostic> = {}): ResolvedDiag
     endCol: 8,
     slice: "debugger",
     sliceTruncated: false,
+    ...overrides,
+  };
+}
+
+function makeProject(
+  overrides: Partial<ResolvedProjectDiagnostic> = {},
+): ResolvedProjectDiagnostic {
+  return {
+    filename: "tsconfig.json",
+    errorCode: "typescript(tsconfig-error)",
+    message: "Cannot find type definition file for 'node'.",
     ...overrides,
   };
 }
@@ -187,7 +201,7 @@ void test("renderStylish: groups by filename and sorts within each group", () =>
     slice: "y",
   });
 
-  const result = renderStylish([b1, a2, a1]);
+  const result = renderStylish([b1, a2, a1], []);
 
   assert.equal(
     result,
@@ -204,8 +218,46 @@ void test("renderStylish: groups by filename and sorts within each group", () =>
   );
 });
 
+void test("renderStylish: project sections precede file sections, separated by a blank line", () => {
+  const fileDiag = makeResolved({ filename: "/src/foo.ts", message: "msg" });
+  const projectDiag = makeProject({ filename: "tsconfig.json", message: "tsconfig msg" });
+
+  const result = renderStylish([fileDiag], [projectDiag]);
+
+  assert.equal(
+    result,
+    joinSections([
+      ["tsconfig.json", "  tsconfig msg [typescript(tsconfig-error)]"],
+      ["/src/foo.ts", "  1:1 msg [eslint(no-debugger)]", "    debugger"],
+    ]),
+  );
+});
+
+void test("renderStylish: empty filename surfaces under the (project) placeholder heading", () => {
+  const result = renderStylish([], [makeProject({ filename: "", message: "no path" })]);
+
+  assert.equal(result, "(project)\n  no path [typescript(tsconfig-error)]\n");
+});
+
+void test("renderStylish: project entries with the same heading cluster under one section", () => {
+  const a = makeProject({ filename: "tsconfig.json", message: "a" });
+  const b = makeProject({ filename: "tsconfig.json", message: "b" });
+
+  const result = renderStylish([], [b, a]);
+
+  assert.equal(
+    result,
+    [
+      "tsconfig.json",
+      "  a [typescript(tsconfig-error)]",
+      "  b [typescript(tsconfig-error)]",
+      "",
+    ].join("\n"),
+  );
+});
+
 void test("renderStylish: empty input produces empty output", () => {
-  assert.equal(renderStylish([]), "");
+  assert.equal(renderStylish([], []), "");
 });
 
 void test("renderUnix: emits one line per diagnostic in sorted order", () => {
@@ -223,7 +275,7 @@ void test("renderUnix: emits one line per diagnostic in sorted order", () => {
     startCol: 5,
   });
 
-  const result = renderUnix([b1, a2, a1]);
+  const result = renderUnix([b1, a2, a1], []);
 
   assert.equal(
     result,
@@ -236,6 +288,62 @@ void test("renderUnix: emits one line per diagnostic in sorted order", () => {
   );
 });
 
+void test("renderUnix: project lines precede file lines and omit the L:C column", () => {
+  const fileDiag = makeResolved({ filename: "/src/foo.ts", message: "msg" });
+  const projectDiag = makeProject({ filename: "tsconfig.json", message: "tsconfig msg" });
+
+  const result = renderUnix([fileDiag], [projectDiag]);
+
+  assert.equal(
+    result,
+    [
+      "tsconfig.json: tsconfig msg [typescript(tsconfig-error)]",
+      "/src/foo.ts:1:1: msg [eslint(no-debugger)]",
+      "",
+    ].join("\n"),
+  );
+});
+
+void test("renderUnix: empty filename in unix mode surfaces as the (project) placeholder", () => {
+  const result = renderUnix([], [makeProject({ filename: "", message: "no path" })]);
+
+  assert.equal(result, "(project): no path [typescript(tsconfig-error)]\n");
+});
+
 void test("renderUnix: empty input produces empty output", () => {
-  assert.equal(renderUnix([]), "");
+  assert.equal(renderUnix([], []), "");
+});
+
+void test("formatProjectStylishEntry: indented one-line shape with no L:C and no slice", () => {
+  const result = formatProjectStylishEntry(makeProject({ message: "tsconfig msg" }));
+  assert.equal(result, "  tsconfig msg [typescript(tsconfig-error)]");
+});
+
+void test("formatProjectStylishEntry: collapses newlines in the message to single spaces", () => {
+  const result = formatProjectStylishEntry(makeProject({ message: "first\nsecond\r\nthird" }));
+  assert.equal(result, "  first second third [typescript(tsconfig-error)]");
+});
+
+void test("formatProjectUnixLine: emits <heading>: <message> [<code>] without L:C", () => {
+  const result = formatProjectUnixLine(makeProject({ message: "msg" }));
+  assert.equal(result, "tsconfig.json: msg [typescript(tsconfig-error)]");
+});
+
+void test("formatProjectUnixLine: empty filename uses the (project) placeholder", () => {
+  const result = formatProjectUnixLine(makeProject({ filename: "", message: "msg" }));
+  assert.equal(result, "(project): msg [typescript(tsconfig-error)]");
+});
+
+void test("compareProjectDiagnostics: orders by heading, then errorCode, then message", () => {
+  const a = makeProject({ filename: "tsconfig.json", errorCode: "X", message: "a" });
+  const b = makeProject({ filename: "tsconfig.json", errorCode: "X", message: "b" });
+  const c = makeProject({ filename: "tsconfig.json", errorCode: "Y", message: "a" });
+  const d = makeProject({ filename: "z.json", errorCode: "X", message: "a" });
+
+  const sorted = [d, c, b, a].sort(compareProjectDiagnostics);
+
+  assert.deepEqual(
+    sorted.map((p) => `${p.filename}|${p.errorCode}|${p.message}`),
+    ["tsconfig.json|X|a", "tsconfig.json|X|b", "tsconfig.json|Y|a", "z.json|X|a"],
+  );
 });

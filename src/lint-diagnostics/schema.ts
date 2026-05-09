@@ -31,8 +31,17 @@ export interface ValidatedLabel {
 
 /**
  * Per-diagnostic shape after schema validation. Only fields downstream consumers use are kept.
+ *
+ * Discriminated by `kind`:
+ * - `file`: oxlint pinned the diagnostic at one or more source spans.
+ * - `project`: oxlint emitted the diagnostic without any span (e.g. tsconfig-level
+ * configuration errors). Carries no resolvable location.
  */
-export interface ValidatedDiagnostic {
+export type ValidatedDiagnostic = ValidatedFileDiagnostic | ValidatedProjectDiagnostic;
+
+export interface ValidatedFileDiagnostic {
+  kind: "file";
+
   filename: string;
 
   /** Nullable: oxc parser-error diagnostics omit `code`. */
@@ -42,6 +51,18 @@ export interface ValidatedDiagnostic {
 
   /** Non-empty array of labels emitted by oxlint. */
   labels: [ValidatedLabel, ...ValidatedLabel[]];
+}
+
+export interface ValidatedProjectDiagnostic {
+  kind: "project";
+
+  /** May be the empty string when oxlint cannot attribute the diagnostic to any path. */
+  filename: string;
+
+  /** Nullable; project-level entries may also omit `code`. */
+  code: string | null;
+
+  message: string;
 }
 
 /**
@@ -74,20 +95,26 @@ function validateDiagnostic(diag: unknown): Result<ValidatedDiagnostic, string> 
     return { ok: false, reason: "`message` is missing or not a string" };
   }
   const message = diag.message;
-  if (!isUnknownArray(diag.labels) || diag.labels.length === 0) {
-    return { ok: false, reason: "`labels` is missing or empty" };
+  const rawLabels = diag.labels;
+  // Missing or empty `labels` is the project-diagnostic signal (e.g. tsconfig-error). A
+  // present-but-non-array value is reserved for a real schema mismatch.
+  if (rawLabels === undefined || (isUnknownArray(rawLabels) && rawLabels.length === 0)) {
+    return { ok: true, value: { kind: "project", filename: diag.filename, code, message } };
   }
-  const firstResult = validateLabel(diag.labels[0], 0);
+  if (!isUnknownArray(rawLabels)) {
+    return { ok: false, reason: "`labels` is present but not an array" };
+  }
+  const firstResult = validateLabel(rawLabels[0], 0);
   if (!firstResult.ok) return firstResult;
   const labels: [ValidatedLabel, ...ValidatedLabel[]] = [firstResult.value];
-  for (let i = 1; i < diag.labels.length; i++) {
-    const result = validateLabel(diag.labels[i], i);
+  for (let i = 1; i < rawLabels.length; i++) {
+    const result = validateLabel(rawLabels[i], i);
     if (!result.ok) return result;
     labels.push(result.value);
   }
   return {
     ok: true,
-    value: { filename: diag.filename, code, message, labels },
+    value: { kind: "file", filename: diag.filename, code, message, labels },
   };
 }
 

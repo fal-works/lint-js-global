@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { validatePayload } from "./schema.ts";
 
-void test("valid payload with one diagnostic resolves to ValidatedDiagnostic[]", () => {
+void test("valid payload with one diagnostic resolves to a file-kind ValidatedDiagnostic", () => {
   const result = validatePayload({
     diagnostics: [
       {
@@ -18,12 +18,71 @@ void test("valid payload with one diagnostic resolves to ValidatedDiagnostic[]",
   assert.equal(result.ok, true);
   assert.deepEqual(result.ok ? result.value : null, [
     {
+      kind: "file",
       filename: "/x.ts",
       code: "eslint(no-debugger)",
       message: "ok",
       labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
     },
   ]);
+});
+
+void test("empty `labels` array resolves to a project-kind diagnostic", () => {
+  // oxlint emits this shape for diagnostics it cannot pin to a source span
+  // (e.g. `typescript(tsconfig-error)` for a missing `@types/...` package).
+  const result = validatePayload({
+    diagnostics: [
+      {
+        filename: "",
+        code: "typescript(tsconfig-error)",
+        message: "Cannot find type definition file for 'node'.",
+        labels: [],
+      },
+    ],
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.ok ? result.value : null, [
+    {
+      kind: "project",
+      filename: "",
+      code: "typescript(tsconfig-error)",
+      message: "Cannot find type definition file for 'node'.",
+    },
+  ]);
+});
+
+void test("missing `labels` field also resolves to a project-kind diagnostic", () => {
+  // Some oxlint versions may omit `labels` entirely instead of emitting `[]`.
+  // Both shapes signal the same project-level intent.
+  const result = validatePayload({
+    diagnostics: [
+      {
+        filename: "tsconfig.json",
+        code: "typescript(tsconfig-error)",
+        message: "ok",
+      },
+    ],
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.ok ? result.value[0]?.kind : null, "project");
+});
+
+void test("non-array `labels` (e.g. a string) is rejected as a contract mismatch", () => {
+  const result = validatePayload({
+    diagnostics: [
+      {
+        filename: "/x.ts",
+        code: "eslint(no-debugger)",
+        message: "x",
+        labels: "oops",
+      },
+    ],
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.ok ? "" : result.reason, /labels/);
 });
 
 void test("multi-label entry returns all labels in input order", () => {
@@ -42,7 +101,9 @@ void test("multi-label entry returns all labels in input order", () => {
   });
 
   assert.equal(result.ok, true);
-  assert.deepEqual(result.ok ? result.value[0]?.labels : null, [
+  const first = result.ok ? result.value[0] : null;
+  assert.equal(first?.kind, "file");
+  assert.deepEqual(first?.kind === "file" ? first.labels : null, [
     { span: { offset: 0, length: 3, line: 1, column: 1 } },
     { span: { offset: 10, length: 3, line: 2, column: 1 } },
   ]);
@@ -296,15 +357,15 @@ void test("first failing entry's index is reported", () => {
         labels: [{ span: { offset: 0, length: 8, line: 1, column: 1 } }],
       },
       {
-        // second entry malformed: missing labels
         filename: "/x.ts",
         code: "eslint(no-debugger)",
         message: "broken",
+        labels: [{ span: { offset: -1, length: 1, line: 1, column: 1 } }],
       },
     ],
   });
 
   assert.equal(result.ok, false);
   assert.match(result.ok ? "" : result.reason, /diagnostics\[1\]/);
-  assert.match(result.ok ? "" : result.reason, /labels/);
+  assert.match(result.ok ? "" : result.reason, /offset/);
 });

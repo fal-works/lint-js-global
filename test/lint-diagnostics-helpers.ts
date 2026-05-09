@@ -8,13 +8,16 @@ export const HINT_PATH = "/opt/lint-js/docs/guide/weak-typings.md";
 
 /**
  * Minimal subset of an oxlint diagnostic entry, just enough to drive `formatLintOutput`.
+ *
+ * `labels` is optional so fixtures can express the project-level shape oxlint emits
+ * for diagnostics with no source span (omitted entirely or `[]`).
  */
 export interface FakeDiag {
   message: string;
   code?: string | null;
   severity?: string;
   filename: string;
-  labels: Array<{ span: { offset: number; length: number; line: number; column: number } }>;
+  labels?: Array<{ span: { offset: number; length: number; line: number; column: number } }>;
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { ResolvedDiagnostic } from "./resolve.ts";
+import type { ResolvedDiagnostic, ResolvedProjectDiagnostic } from "./resolve.ts";
 
 /**
  * Pattern matching the `errorCode` of `typescript-eslint(no-unsafe-*)` diagnostics, which
@@ -7,28 +7,43 @@ import type { ResolvedDiagnostic } from "./resolve.ts";
 const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 
 /**
- * Render the stylish layout: per-file sections, two lines per diagnostic.
- * Returns an empty string for an empty input.
+ * Heading shown in place of an empty `filename` for project-level diagnostics.
  */
-export function renderStylish(resolved: readonly ResolvedDiagnostic[]): string {
-  if (resolved.length === 0) return "";
-  const sorted = [...resolved].sort(compareDiagnostics);
-  const fileGroups = groupByFilename(sorted);
+const PROJECT_PLACEHOLDER_HEADING = "(project)";
+
+/**
+ * Render the stylish layout: project sections first, then per-file sections.
+ * Returns an empty string when both inputs are empty.
+ */
+export function renderStylish(
+  resolved: readonly ResolvedDiagnostic[],
+  project: readonly ResolvedProjectDiagnostic[],
+): string {
+  if (resolved.length === 0 && project.length === 0) return "";
   const sections: string[] = [];
-  for (const [filename, diags] of fileGroups) {
-    const lines = [filename, ...diags.map(formatStylishEntry)];
-    sections.push(lines.join("\n"));
+  const sortedProject = [...project].sort(compareProjectDiagnostics);
+  for (const [heading, diags] of groupProjectByHeading(sortedProject)) {
+    sections.push([heading, ...diags.map(formatProjectStylishEntry)].join("\n"));
+  }
+  const sortedFile = [...resolved].sort(compareDiagnostics);
+  for (const [filename, diags] of groupByFilename(sortedFile)) {
+    sections.push([filename, ...diags.map(formatStylishEntry)].join("\n"));
   }
   return `${sections.join("\n\n")}\n`;
 }
 
 /**
- * Render the unix layout: one line per diagnostic. Returns an empty string for an empty input.
+ * Render the unix layout: project lines first, then per-file lines.
+ * Returns an empty string when both inputs are empty.
  */
-export function renderUnix(resolved: readonly ResolvedDiagnostic[]): string {
-  if (resolved.length === 0) return "";
-  const sorted = [...resolved].sort(compareDiagnostics);
-  return `${sorted.map(formatUnixLine).join("\n")}\n`;
+export function renderUnix(
+  resolved: readonly ResolvedDiagnostic[],
+  project: readonly ResolvedProjectDiagnostic[],
+): string {
+  if (resolved.length === 0 && project.length === 0) return "";
+  const projectLines = [...project].sort(compareProjectDiagnostics).map(formatProjectUnixLine);
+  const fileLines = [...resolved].sort(compareDiagnostics).map(formatUnixLine);
+  return `${[...projectLines, ...fileLines].join("\n")}\n`;
 }
 
 /**
@@ -106,6 +121,60 @@ export function formatStylishEntry(d: ResolvedDiagnostic): string {
 export function formatUnixLine(d: ResolvedDiagnostic): string {
   const message = collapseNewlines(d.message);
   return `${d.filename}:${d.startLine}:${d.startCol}: ${message} [${d.errorCode}]`;
+}
+
+/**
+ * Stable ordering for project-level diagnostics: heading → error code → message.
+ * Empty `filename` is normalized through {@link PROJECT_PLACEHOLDER_HEADING} so it
+ * sorts alongside other entries that share the placeholder.
+ */
+export function compareProjectDiagnostics(
+  a: ResolvedProjectDiagnostic,
+  b: ResolvedProjectDiagnostic,
+): number {
+  const aHeading = projectHeading(a.filename);
+  const bHeading = projectHeading(b.filename);
+  if (aHeading !== bHeading) return aHeading < bHeading ? -1 : 1;
+  if (a.errorCode !== b.errorCode) return a.errorCode < b.errorCode ? -1 : 1;
+  if (a.message !== b.message) return a.message < b.message ? -1 : 1;
+  return 0;
+}
+
+/**
+ * Group already-sorted project diagnostics by their displayed heading, preserving order.
+ */
+export function groupProjectByHeading(
+  project: readonly ResolvedProjectDiagnostic[],
+): Map<string, ResolvedProjectDiagnostic[]> {
+  const map = new Map<string, ResolvedProjectDiagnostic[]>();
+  for (const d of project) {
+    const heading = projectHeading(d.filename);
+    const arr = map.get(heading);
+    if (arr !== undefined) arr.push(d);
+    else map.set(heading, [d]);
+  }
+  return map;
+}
+
+/**
+ * Render one project diagnostic as the stylish layout's indented one-line entry.
+ * Carries no location and no source slice.
+ */
+export function formatProjectStylishEntry(d: ResolvedProjectDiagnostic): string {
+  const message = collapseNewlines(d.message);
+  return `  ${message} [${d.errorCode}]`;
+}
+
+/**
+ * Render one project diagnostic as a single `<heading>: <message> [<code>]` line.
+ */
+export function formatProjectUnixLine(d: ResolvedProjectDiagnostic): string {
+  const message = collapseNewlines(d.message);
+  return `${projectHeading(d.filename)}: ${message} [${d.errorCode}]`;
+}
+
+function projectHeading(filename: string): string {
+  return filename === "" ? PROJECT_PLACEHOLDER_HEADING : filename;
 }
 
 function collapseNewlines(text: string): string {

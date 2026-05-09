@@ -4,11 +4,17 @@ import test from "node:test";
 
 import { setupFixture } from "../../test/lint-diagnostics-helpers.ts";
 import { createSourceCache } from "../source.ts";
-import { formatCodeSlice, PARSE_ERROR_CODE, resolveDiagnostic } from "./resolve.ts";
-import type { ValidatedDiagnostic } from "./schema.ts";
+import {
+  formatCodeSlice,
+  PARSE_ERROR_CODE,
+  resolveDiagnostic,
+  resolveProjectDiagnostic,
+} from "./resolve.ts";
+import type { ValidatedFileDiagnostic } from "./schema.ts";
 
-function makeValidated(overrides: Partial<ValidatedDiagnostic> = {}): ValidatedDiagnostic {
+function makeValidated(overrides: Partial<ValidatedFileDiagnostic> = {}): ValidatedFileDiagnostic {
   return {
+    kind: "file",
     filename: "/x.ts",
     code: "eslint(no-debugger)",
     message: "msg",
@@ -104,6 +110,33 @@ void test("resolveDiagnostic: out-of-bounds span returns null", (t) => {
   );
 
   assert.equal(result, null);
+});
+
+void test("resolveProjectDiagnostic: passes filename and message through; substitutes parse-error for null code", () => {
+  const result = resolveProjectDiagnostic({
+    kind: "project",
+    filename: "tsconfig.json",
+    code: null,
+    message: "Cannot find type definition file for 'node'.",
+  });
+
+  assert.deepEqual(result, {
+    filename: "tsconfig.json",
+    errorCode: PARSE_ERROR_CODE,
+    message: "Cannot find type definition file for 'node'.",
+  });
+});
+
+void test("resolveProjectDiagnostic: keeps a non-null code as the errorCode", () => {
+  const result = resolveProjectDiagnostic({
+    kind: "project",
+    filename: "",
+    code: "typescript(tsconfig-error)",
+    message: "msg",
+  });
+
+  assert.equal(result.errorCode, "typescript(tsconfig-error)");
+  assert.equal(result.filename, "");
 });
 
 void test("formatCodeSlice: short single-line text passes through unchanged", () => {
