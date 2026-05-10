@@ -8,7 +8,8 @@ Targets small JS/TS projects and LLM coding agents that iterate lint+fix autonom
 
 ## Design stance
 
-Prefer simple, bold designs over defensive, conservative ones.
+- Prefer simple, bold designs over defensive, conservative ones.
+- Model the data first; make illegal states unrepresentable.
 
 ## Layout
 
