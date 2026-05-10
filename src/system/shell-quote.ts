@@ -1,15 +1,15 @@
 /**
- * Wrap a value as a POSIX shell double-quoted string, escaping characters that
- * remain active inside `"..."`: `\`, `"`, `$`, and `` ` ``.
+ * Wrap as a POSIX shell double-quoted string,
+ * escaping characters that remain active inside `"..."`: `\`, `"`, `$`, and `` ` ``.
  */
-export function quoteForPosixDoubleQuoted(value: string): string {
-  return `"${value.replace(/[\\"$`]/g, "\\$&")}"`;
+export function quotePathForPosixDoubleQuoted(path: string): string {
+  return `"${path.replace(/[\\"$`]/g, "\\$&")}"`;
 }
 
 /**
- * Wrap a value as a Windows batch double-quoted string, doubling `%` so that
- * variable substitution does not fire on values that happen to contain it.
+ * Wrap as a Windows batch double-quoted string,
+ * doubling `%` so that variable substitution does not fire on paths that happen to contain it.
  */
-export function quoteForBatchDoubleQuoted(value: string): string {
-  return `"${value.replace(/%/g, "%%")}"`;
+export function quotePathForBatchDoubleQuoted(path: string): string {
+  return `"${path.replace(/%/g, "%%")}"`;
 }

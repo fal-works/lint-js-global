@@ -1,21 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { quoteForBatchDoubleQuoted, quoteForPosixDoubleQuoted } from "./shell-quote.ts";
+import { quotePathForBatchDoubleQuoted, quotePathForPosixDoubleQuoted } from "./shell-quote.ts";
 
-void test("quoteForPosixDoubleQuoted: escapes characters active inside POSIX double quotes", () => {
-  assert.equal(quoteForPosixDoubleQuoted("/plain/path"), '"/plain/path"');
-  assert.equal(quoteForPosixDoubleQuoted("/with space/path"), '"/with space/path"');
-  assert.equal(quoteForPosixDoubleQuoted("/has$VAR/x"), '"/has\\$VAR/x"');
-  assert.equal(quoteForPosixDoubleQuoted("/has`cmd`/x"), '"/has\\`cmd\\`/x"');
-  assert.equal(quoteForPosixDoubleQuoted("/has\\backslash"), '"/has\\\\backslash"');
-  assert.equal(quoteForPosixDoubleQuoted('/has"quote'), '"/has\\"quote"');
-  assert.equal(quoteForPosixDoubleQuoted("/has%percent"), '"/has%percent"');
+void test("quotePathForPosixDoubleQuoted: escapes characters active inside POSIX double quotes", () => {
+  assert.equal(quotePathForPosixDoubleQuoted("/plain/path"), '"/plain/path"');
+  assert.equal(quotePathForPosixDoubleQuoted("/with space/path"), '"/with space/path"');
+  assert.equal(quotePathForPosixDoubleQuoted("/has$VAR/x"), '"/has\\$VAR/x"');
+  assert.equal(quotePathForPosixDoubleQuoted("/has`cmd`/x"), '"/has\\`cmd\\`/x"');
+  assert.equal(quotePathForPosixDoubleQuoted("/has\\backslash"), '"/has\\\\backslash"');
+  assert.equal(quotePathForPosixDoubleQuoted('/has"quote'), '"/has\\"quote"');
+  assert.equal(quotePathForPosixDoubleQuoted("/has%percent"), '"/has%percent"');
 });
 
-void test("quoteForBatchDoubleQuoted: doubles % so variable substitution does not fire", () => {
-  assert.equal(quoteForBatchDoubleQuoted("C:\\plain\\path"), '"C:\\plain\\path"');
-  assert.equal(quoteForBatchDoubleQuoted("C:\\with space\\path"), '"C:\\with space\\path"');
-  assert.equal(quoteForBatchDoubleQuoted("C:\\has%VAR%\\x"), '"C:\\has%%VAR%%\\x"');
-  assert.equal(quoteForBatchDoubleQuoted("C:\\has$VAR\\x"), '"C:\\has$VAR\\x"');
+void test("quotePathForBatchDoubleQuoted: doubles % so variable substitution does not fire", () => {
+  assert.equal(quotePathForBatchDoubleQuoted("C:\\plain\\path"), '"C:\\plain\\path"');
+  assert.equal(quotePathForBatchDoubleQuoted("C:\\with space\\path"), '"C:\\with space\\path"');
+  assert.equal(quotePathForBatchDoubleQuoted("C:\\has%VAR%\\x"), '"C:\\has%%VAR%%\\x"');
+  assert.equal(quotePathForBatchDoubleQuoted("C:\\has$VAR\\x"), '"C:\\has$VAR\\x"');
 });

@@ -2,7 +2,10 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { quoteForBatchDoubleQuoted, quoteForPosixDoubleQuoted } from "../system/shell-quote.ts";
+import {
+  quotePathForBatchDoubleQuoted,
+  quotePathForPosixDoubleQuoted,
+} from "../system/shell-quote.ts";
 import { resolvePackageBin } from "./info.ts";
 
 /**
@@ -36,10 +39,10 @@ export function createTsgolintShimDir(): TsgolintShimHandle {
   const dir = mkdtempSync(join(tmpdir(), "lint-js-shim-"));
   try {
     if (process.platform === "win32") {
-      const content = `@${quoteForBatchDoubleQuoted(process.execPath)} ${quoteForBatchDoubleQuoted(tsgolintEntry)} %*\r\n`;
+      const content = `@${quotePathForBatchDoubleQuoted(process.execPath)} ${quotePathForBatchDoubleQuoted(tsgolintEntry)} %*\r\n`;
       writeFileSync(join(dir, "tsgolint.cmd"), content);
     } else {
-      const content = `#!/bin/sh\nexec ${quoteForPosixDoubleQuoted(process.execPath)} ${quoteForPosixDoubleQuoted(tsgolintEntry)} "$@"\n`;
+      const content = `#!/bin/sh\nexec ${quotePathForPosixDoubleQuoted(process.execPath)} ${quotePathForPosixDoubleQuoted(tsgolintEntry)} "$@"\n`;
       const path = join(dir, "tsgolint");
       writeFileSync(path, content);
       chmodSync(path, 0o755);
