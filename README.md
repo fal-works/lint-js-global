@@ -40,6 +40,12 @@ Target paths themselves may point anywhere; without them the whole project is pr
 
 `--format-only` and `--lint-only` are mutually exclusive.
 
+### Exit codes
+
+- `0`: success; no unfixed findings remain.
+- `1`: unfixed fmt/lint findings were reported.
+- `2`: lint-js itself failed (e.g. invalid arguments, missing `package.json`, or tool launch failure).
+
 ## Example (stdout)
 
 ```
