@@ -36,7 +36,7 @@ Target paths themselves may point anywhere; without them the whole project is pr
 - `--check` verifies without rewriting files.
 - `--format-only` runs only the format phase.
 - `--lint-only` runs only the lint phase.
-- `--unix` emits one diagnostic per line on stdout (`<file>:<line>:<col>: <message> [<code>]`), for tools that consume that form.
+- `--unix` emits one diagnostic per line (`<file>:<line>:<col>: <message> [<code>]`), for tools that consume that form.
 
 `--format-only` and `--lint-only` are mutually exclusive.
 

@@ -12,7 +12,7 @@ Options:
   --check         Verify only; do not rewrite files.
   --format-only   Run only the format phase (skip lint).
   --lint-only     Run only the lint phase (skip format).
-  --unix          Emit unix-format diagnostic lines on stdout (one per diagnostic).
+  --unix          Emit unix-format diagnostic lines (one per finding).
   -h, --help      Show this help.
   -v, --version   Show version.
 
