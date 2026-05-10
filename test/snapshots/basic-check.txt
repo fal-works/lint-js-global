@@ -6,7 +6,7 @@ ERR Format issues found in above 1 files. Run without `--check` to fix.
 ERR Finished in <DUR>ms on <N> files using <T> threads.
 ERR
 OUT src/index.ts
-OUT   5:1 Promises must be awaited, add void operator to ignore. [typescript-eslint(no-floating-promises)]
+OUT   5:1 Promises must be awaited, add void operator to ignore. [typescript(no-floating-promises)]
 OUT     foo( );
 ERR
 ERR 1 lint issue.

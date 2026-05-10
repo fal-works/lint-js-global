@@ -1,7 +1,7 @@
 OUT src/index.ts
-OUT   1:7 Unsafe assignment of an any value. [typescript-eslint(no-unsafe-assignment)]
+OUT   1:7 Unsafe assignment of an any value. [typescript(no-unsafe-assignment)]
 OUT     data = JSON.parse("{}")
-OUT   2:18 Unsafe member access .foo on an `any` value. [typescript-eslint(no-unsafe-member-access)]
+OUT   2:18 Unsafe member access .foo on an `any` value. [typescript(no-unsafe-member-access)]
 OUT     foo
 ERR
 ERR Hint on the `no-unsafe-*` diagnostics:

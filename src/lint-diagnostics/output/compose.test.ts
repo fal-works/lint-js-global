@@ -53,7 +53,7 @@ void test("renderFindings: a no-unsafe-* finding surfaces the weak-typings hint 
     {
       file: [
         makeFileFinding({
-          code: "typescript-eslint(no-unsafe-member-access)",
+          code: "typescript(no-unsafe-member-access)",
           message: "Unsafe member access .foo on an `any` value.",
         }),
       ],
@@ -75,7 +75,7 @@ void test("renderFindings: a no-unsafe-* finding surfaces the weak-typings hint 
     {
       file: [
         makeFileFinding({
-          code: "typescript-eslint(no-unsafe-member-access)",
+          code: "typescript(no-unsafe-member-access)",
           message: "Unsafe member access .foo on an `any` value.",
         }),
       ],

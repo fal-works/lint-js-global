@@ -3,10 +3,10 @@ import { renderStylish } from "./stylish.ts";
 import { renderUnix } from "./unix.ts";
 
 /**
- * Pattern matching the `code` of `typescript-eslint(no-unsafe-*)` findings, which trigger the
+ * Pattern matching the `code` of `typescript(no-unsafe-*)` findings, which trigger the
  * weak-typings hint block.
  */
-const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
+const UNSAFE_CODE_PATTERN = /^typescript\(no-unsafe-/;
 
 /**
  * Per-finding line layout selector.

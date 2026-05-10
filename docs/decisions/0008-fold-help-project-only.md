@@ -20,7 +20,7 @@ The wrapper has to decide whether to surface it, and whether the choice should b
 Chosen option: **surface `help` only for project-level diagnostics**, folded into the displayed message.
 
 File-level diagnostics drop `help`: the source span and rule code already pin the offending code, and `help` is non-actionable for some rules.
-For instance, `typescript-eslint(unbound-method)` emits:
+For instance, `typescript(unbound-method)` emits:
 
 > If your function does not access `this`, you can annotate it with `this: void`, or consider using an arrow function instead.
 

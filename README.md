@@ -50,8 +50,8 @@ Target paths themselves may point anywhere; without them the whole project is pr
 
 ```
 src/index.ts
-  1:7 Unsafe assignment of an `any` value. [typescript-eslint(no-unsafe-assignment)]
+  1:7 Unsafe assignment of an `any` value. [typescript(no-unsafe-assignment)]
     data = JSON.parse("{}")
-  2:18 Unsafe member access .foo on an `any` value. [typescript-eslint(no-unsafe-member-access)]
+  2:18 Unsafe member access .foo on an `any` value. [typescript(no-unsafe-member-access)]
     foo
 ```

@@ -1,4 +1,4 @@
-OUT src/index.ts:5:1: Promises must be awaited, add void operator to ignore. [typescript-eslint(no-floating-promises)]
+OUT src/index.ts:5:1: Promises must be awaited, add void operator to ignore. [typescript(no-floating-promises)]
 ERR
 ERR 1 unfixed lint issue.
 ERR

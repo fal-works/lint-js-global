@@ -11,12 +11,12 @@ void test("formatUnixLine: emits filename:line:col plus message and bracketed co
       startLine: 5,
       startCol: 1,
       message: "Promises must be awaited.",
-      code: "typescript-eslint(no-floating-promises)",
+      code: "typescript(no-floating-promises)",
     }),
   );
   assert.equal(
     result,
-    "/path/to/file.ts:5:1: Promises must be awaited. [typescript-eslint(no-floating-promises)]",
+    "/path/to/file.ts:5:1: Promises must be awaited. [typescript(no-floating-promises)]",
   );
 });
 

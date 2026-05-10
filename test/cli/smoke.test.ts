@@ -42,7 +42,7 @@ void test("end-to-end smoke: non-default flags reach run() unchanged", async (t)
   assert.equal(readFileSync(outside, "utf8"), DIRTY_SOURCE, "positional must narrow scope");
   assert.match(
     result.stdout,
-    /^src\/index\.ts:\d+:\d+: .* \[typescript-eslint\(no-floating-promises\)\]$/m,
+    /^src\/index\.ts:\d+:\d+: .* \[typescript\(no-floating-promises\)\]$/m,
     "--unix must select the unix output layout",
   );
 });
