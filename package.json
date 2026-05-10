@@ -33,7 +33,7 @@
     "clean": "node scripts/clean.ts",
     "prepack": "pnpm clean && pnpm build",
     "smoke:publish": "node --test --test-isolation=none test/publish-smoke/*.test.ts",
-    "prepublishOnly": "pnpm lint --check && pnpm test && pnpm smoke:publish"
+    "prepublishOnly": "pnpm audit && pnpm lint --check && pnpm test && pnpm smoke:publish"
   },
   "dependencies": {
     "oxfmt": "^0.48.0",
