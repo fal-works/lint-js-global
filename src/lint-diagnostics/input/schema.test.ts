@@ -48,6 +48,7 @@ void test("empty `labels` array resolves to a project-kind diagnostic", () => {
       filename: "",
       code: "typescript(tsconfig-error)",
       message: "Cannot find type definition file for 'node'.",
+      help: null,
     },
   ]);
 });
@@ -67,6 +68,96 @@ void test("missing `labels` field also resolves to a project-kind diagnostic", (
 
   assert.equal(result.ok, true);
   assert.equal(result.ok ? result.value[0]?.kind : null, "project");
+});
+
+void test("project diagnostic carries oxlint's `help` field through", () => {
+  const result = validatePayload({
+    diagnostics: [
+      {
+        filename: "",
+        code: "typescript(tsconfig-error)",
+        message: "Invalid tsconfig",
+        help: "Cannot find type definition file for 'node'.",
+        labels: [],
+      },
+    ],
+  });
+
+  assert.equal(result.ok, true);
+  const first = result.ok ? result.value[0] : null;
+  assert.equal(
+    first?.kind === "project" ? first.help : null,
+    "Cannot find type definition file for 'node'.",
+  );
+});
+
+void test("project diagnostic with missing `help` normalizes to null", () => {
+  const result = validatePayload({
+    diagnostics: [
+      { filename: "tsconfig.json", code: "typescript(tsconfig-error)", message: "msg" },
+    ],
+  });
+
+  assert.equal(result.ok, true);
+  const first = result.ok ? result.value[0] : null;
+  assert.equal(first?.kind === "project" ? first.help : "x", null);
+});
+
+void test("project diagnostic with empty-string `help` normalizes to null", () => {
+  // Empty `help` must collapse so the renderer never produces a trailing `${msg}: `.
+  const result = validatePayload({
+    diagnostics: [
+      {
+        filename: "tsconfig.json",
+        code: "typescript(tsconfig-error)",
+        message: "msg",
+        help: "",
+        labels: [],
+      },
+    ],
+  });
+
+  assert.equal(result.ok, true);
+  const first = result.ok ? result.value[0] : null;
+  assert.equal(first?.kind === "project" ? first.help : "x", null);
+});
+
+void test("project diagnostic with non-string `help` (number) is rejected", () => {
+  const result = validatePayload({
+    diagnostics: [
+      {
+        filename: "tsconfig.json",
+        code: "typescript(tsconfig-error)",
+        message: "msg",
+        help: 42,
+        labels: [],
+      },
+    ],
+  });
+
+  assert.equal(result.ok, false);
+  assert.match(result.ok ? "" : result.reason, /help/);
+});
+
+void test("file diagnostic carrying a `help` field is accepted (field is intentionally discarded)", () => {
+  // File-kind drops `help` (see ADR 0008); upstream emitting it must not break validation.
+  const result = validatePayload({
+    diagnostics: [
+      {
+        filename: "/x.ts",
+        code: "eslint(no-debugger)",
+        message: "msg",
+        help: "use a logger instead",
+        labels: [{ span: { offset: 0, length: 8 } }],
+      },
+    ],
+  });
+
+  assert.equal(result.ok, true);
+  const first = result.ok ? result.value[0] : null;
+  assert.equal(first?.kind, "file");
+  // Verify `help` is really dropped, not stowed on the value.
+  assert.equal(first !== null && "help" in first, false);
 });
 
 void test("non-array `labels` (e.g. a string) is rejected as a contract mismatch", () => {

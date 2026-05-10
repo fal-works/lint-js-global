@@ -57,6 +57,13 @@ export interface ValidatedProjectDiagnostic {
   code: string | null;
 
   message: string;
+
+  /**
+   * Optional remediation hint emitted by oxlint (see ADR 0008).
+   *
+   * Normalized so missing, `null`, and `""` all collapse to `null`.
+   */
+  help: string | null;
 }
 
 /**
@@ -103,7 +110,13 @@ function validateDiagnostic(diag: unknown): Result<ValidatedDiagnostic, string> 
   // Missing or empty `labels` is the project-diagnostic signal (e.g. tsconfig-error). A
   // present-but-non-array value is reserved for a real schema mismatch.
   if (rawLabels === undefined || (isUnknownArray(rawLabels) && rawLabels.length === 0)) {
-    return { ok: true, value: { kind: "project", filename: diag.filename, code, message } };
+    const helpResult = validateOptionalString(diag.help, "help");
+    if (!helpResult.ok) return helpResult;
+    const help = helpResult.value === "" ? null : helpResult.value;
+    return {
+      ok: true,
+      value: { kind: "project", filename: diag.filename, code, message, help },
+    };
   }
   if (!isUnknownArray(rawLabels)) {
     return { ok: false, reason: "`labels` is present but not an array" };

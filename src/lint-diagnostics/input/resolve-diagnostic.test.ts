@@ -111,6 +111,7 @@ void test("resolveProjectDiagnostic: passes filename, message, and null code thr
     filename: "tsconfig.json",
     code: null,
     message: "Cannot find type definition file for 'node'.",
+    help: null,
   });
 
   assert.deepEqual(result, {
@@ -126,8 +127,22 @@ void test("resolveProjectDiagnostic: keeps a non-null code as the code", () => {
     filename: "",
     code: "typescript(tsconfig-error)",
     message: "msg",
+    help: null,
   });
 
   assert.equal(result.code, "typescript(tsconfig-error)");
   assert.equal(result.filename, "");
+});
+
+void test("resolveProjectDiagnostic: folds help into message with a `: ` separator", () => {
+  // ADR 0008's worked example.
+  const result = resolveProjectDiagnostic({
+    kind: "project",
+    filename: "tsconfig.json",
+    code: "typescript(tsconfig-error)",
+    message: "Invalid tsconfig",
+    help: "Cannot find type definition file for 'node'.",
+  });
+
+  assert.equal(result.message, "Invalid tsconfig: Cannot find type definition file for 'node'.");
 });

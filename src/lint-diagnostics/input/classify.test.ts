@@ -105,6 +105,7 @@ void test("classifyLintRun: project-only payload (empty labels) routes to findin
       filename: "tsconfig.json",
       code: "typescript(tsconfig-error)",
       message: "Cannot find type definition file for 'node'.",
+      help: null,
     },
   ]);
 });
@@ -135,6 +136,7 @@ void test("classifyLintRun: project-only payload with omitted `labels` field acc
       filename: "tsconfig.json",
       code: "typescript(tsconfig-error)",
       message: "msg",
+      help: null,
     },
   ]);
 });

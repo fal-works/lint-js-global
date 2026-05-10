@@ -26,6 +26,7 @@ function makeValidatedProject(
     filename: "tsconfig.json",
     code: "typescript(tsconfig-error)",
     message: "msg",
+    help: null,
     ...overrides,
   };
 }

@@ -15,6 +15,7 @@ export interface FileFinding {
    */
   code: string | null;
 
+  /** Human-readable message. */
   message: string;
 
   /** 1-origin line number of the span start. */
@@ -43,6 +44,7 @@ export interface ProjectFinding {
   /** Same opaque-string treatment as {@link FileFinding.code}; `null` is the parse-error signal. */
   code: string | null;
 
+  /** Human-readable message. oxlint's `help`, when present, is already folded in (see ADR 0008). */
   message: string;
 }
 

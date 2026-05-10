@@ -46,6 +46,7 @@ export interface FakeDiag {
   severity?: string;
   filename: string;
   labels?: Array<{ span: { offset: number; length: number } }>;
+  help?: string | null;
 }
 
 /**

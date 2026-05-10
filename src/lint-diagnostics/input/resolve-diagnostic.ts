@@ -34,9 +34,10 @@ export function resolveDiagnostic(
  * Project counterpart to {@link resolveDiagnostic}.
  */
 export function resolveProjectDiagnostic(diag: ValidatedProjectDiagnostic): ProjectFinding {
+  const message = diag.help === null ? diag.message : `${diag.message}: ${diag.help}`;
   return {
     filename: diag.filename,
     code: diag.code,
-    message: diag.message,
+    message,
   };
 }
