@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { makeStdout } from "../../test/lint-diagnostics-helpers.ts";
+import { makeStdout } from "../../../test/lint-diagnostics-helpers.ts";
 import { classifyLintRun } from "./classify.ts";
 
 void test("classifyLintRun: 'No files found to lint.' prefix routes to no-files", () => {

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import test from "node:test";
 
-import { setupFixture } from "../../test/lint-diagnostics-helpers.ts";
-import { createSourceCache } from "../system/source-cache.ts";
+import { setupFixture } from "../../../test/lint-diagnostics-helpers.ts";
+import { createSourceCache } from "../../system/source-cache.ts";
 import { resolveAll } from "./resolve.ts";
 import type { ValidatedFileDiagnostic, ValidatedProjectDiagnostic } from "./schema.ts";
 
@@ -49,7 +49,7 @@ void test("resolveAll: file diagnostic resolved against the source cache flows t
   assert.deepEqual(result.file, [
     {
       filename: file,
-      errorCode: "eslint(no-debugger)",
+      code: "eslint(no-debugger)",
       message: "msg",
       startLine: 1,
       startCol: 1,
@@ -82,7 +82,7 @@ void test("resolveAll: project diagnostics pass through resolveProjectDiagnostic
   assert.deepEqual(result.project, [
     {
       filename: "tsconfig.json",
-      errorCode: "typescript(tsconfig-error)",
+      code: "typescript(tsconfig-error)",
       message: "tsconfig msg",
     },
   ]);

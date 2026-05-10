@@ -1,5 +1,6 @@
 import { LintJsError } from "../error.ts";
-import { type LintOutputMode, processLintRun } from "../lint-diagnostics/process.ts";
+import { interpretOxlintOutput } from "../lint-diagnostics/input/interpret.ts";
+import { type LintOutputMode, renderFindings } from "../lint-diagnostics/output/compose.ts";
 import type { Logger } from "../log.ts";
 import { resolvePackageBin } from "../package/info.ts";
 import { OXLINT_CONFIG, WEAK_TYPINGS_DOC } from "../package/paths.ts";
@@ -8,7 +9,7 @@ import { buildPathInjectedEnv, runToolCapturingOutput } from "../system/subproce
 
 /**
  * Build CLI args for oxlint. Always invokes `--format=json`;
- * the per-diagnostic stdout layout is selected downstream in {@link processLintRun}.
+ * the per-diagnostic stdout layout is selected downstream in {@link renderFindings}.
  *
  * @param config - Path to the oxlint config file.
  * @param ignorePatterns - Gitignore-style patterns.
@@ -96,13 +97,9 @@ export async function runLintPhase(
 
   logger.writeErr(capturedStderr);
 
-  const processed = processLintRun(capturedStdout, cwd, {
-    outputMode,
-    check,
-    weakTypingsDocPath: WEAK_TYPINGS_DOC,
-  });
+  const outcome = interpretOxlintOutput(capturedStdout, cwd);
 
-  switch (processed.kind) {
+  switch (outcome.kind) {
     case "no-files":
       // Rewrite to stderr so stdout stays clean for downstream consumers.
       logger.writeErr("No files found to lint.\n");
@@ -112,11 +109,7 @@ export async function runLintPhase(
       // Route the raw payload through LintJsError.details so stdout stays reserved for diagnostics
       // and stderr stays reserved for wrapper notifications.
       throw new LintJsError("oxlint output contract mismatch.", {
-        details: [
-          processed.reason,
-          "--- raw stdout ---",
-          ...processed.rawStdout.trimEnd().split("\n"),
-        ],
+        details: [outcome.reason, "--- raw stdout ---", ...outcome.rawStdout.trimEnd().split("\n")],
       });
 
     case "clean":
@@ -133,7 +126,11 @@ export async function runLintPhase(
       return { kind: "ok" };
 
     case "findings": {
-      const { rendered } = processed;
+      const rendered = renderFindings(outcome.findings, {
+        outputMode,
+        check,
+        weakTypingsDocPath: WEAK_TYPINGS_DOC,
+      });
       if (rendered.projectBlock !== "") {
         logger.markBlankSeparator();
         logger.writeErr(rendered.projectBlock);

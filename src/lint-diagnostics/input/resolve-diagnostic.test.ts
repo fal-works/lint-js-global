@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import test from "node:test";
 
-import { setupFixture } from "../../test/lint-diagnostics-helpers.ts";
-import { createSourceCache } from "../system/source-cache.ts";
+import { setupFixture } from "../../../test/lint-diagnostics-helpers.ts";
+import { createSourceCache } from "../../system/source-cache.ts";
 import { resolveDiagnostic, resolveProjectDiagnostic } from "./resolve-diagnostic.ts";
 import type { ValidatedFileDiagnostic } from "./schema.ts";
 
@@ -27,7 +27,7 @@ void test("resolveDiagnostic: happy path exposes start/end position and the raw 
 
   assert.ok(result !== null);
   assert.equal(result.filename, file);
-  assert.equal(result.errorCode, "eslint(no-debugger)");
+  assert.equal(result.code, "eslint(no-debugger)");
   assert.equal(result.message, "msg");
   assert.equal(result.startLine, 1);
   assert.equal(result.startCol, 1);
@@ -36,7 +36,7 @@ void test("resolveDiagnostic: happy path exposes start/end position and the raw 
   assert.equal(result.spanText, "debugger");
 });
 
-void test("resolveDiagnostic: null code is replaced with the parse-error placeholder", (t) => {
+void test("resolveDiagnostic: null code is preserved as null in the IR", (t) => {
   const dir = setupFixture(t, { "x.ts": "const x = ;\n" });
   const file = join(dir, "x.ts");
   const cache = createSourceCache(dir);
@@ -51,7 +51,7 @@ void test("resolveDiagnostic: null code is replaced with the parse-error placeho
   );
 
   assert.ok(result !== null);
-  assert.equal(result.errorCode, "parse-error");
+  assert.equal(result.code, null);
   assert.equal(result.spanText, ";");
 });
 
@@ -105,7 +105,7 @@ void test("resolveDiagnostic: out-of-bounds span returns null", (t) => {
   assert.equal(result, null);
 });
 
-void test("resolveProjectDiagnostic: passes filename and message through; substitutes parse-error for null code", () => {
+void test("resolveProjectDiagnostic: passes filename, message, and null code through", () => {
   const result = resolveProjectDiagnostic({
     kind: "project",
     filename: "tsconfig.json",
@@ -115,12 +115,12 @@ void test("resolveProjectDiagnostic: passes filename and message through; substi
 
   assert.deepEqual(result, {
     filename: "tsconfig.json",
-    errorCode: "parse-error",
+    code: null,
     message: "Cannot find type definition file for 'node'.",
   });
 });
 
-void test("resolveProjectDiagnostic: keeps a non-null code as the errorCode", () => {
+void test("resolveProjectDiagnostic: keeps a non-null code as the code", () => {
   const result = resolveProjectDiagnostic({
     kind: "project",
     filename: "",
@@ -128,6 +128,6 @@ void test("resolveProjectDiagnostic: keeps a non-null code as the errorCode", ()
     message: "msg",
   });
 
-  assert.equal(result.errorCode, "typescript(tsconfig-error)");
+  assert.equal(result.code, "typescript(tsconfig-error)");
   assert.equal(result.filename, "");
 });

@@ -4,14 +4,14 @@ import test from "node:test";
 import {
   HINT_PATH,
   joinSections,
-  makeProject,
-  makeResolved,
+  makeFileFinding,
+  makeProjectFinding,
 } from "../../../test/lint-diagnostics-helpers.ts";
-import { renderLintFindings } from "./compose.ts";
+import { renderFindings } from "./compose.ts";
 
-void test("renderLintFindings: stylish mode, single file diagnostic, populates fileBlock and summaryLine", () => {
-  const result = renderLintFindings(
-    { file: [makeResolved({ filename: "/x.ts", message: "boom" })], project: [] },
+void test("renderFindings: stylish mode, single file finding, populates fileBlock and summaryLine", () => {
+  const result = renderFindings(
+    { file: [makeFileFinding({ filename: "/x.ts", message: "boom" })], project: [] },
     { outputMode: "stylish", check: false, weakTypingsDocPath: HINT_PATH },
   );
 
@@ -24,14 +24,14 @@ void test("renderLintFindings: stylish mode, single file diagnostic, populates f
   assert.equal(result.summaryLine, "1 unfixed lint issue.");
 });
 
-void test("renderLintFindings: unix mode emits one flat line per diagnostic in fileBlock", () => {
-  const result = renderLintFindings(
+void test("renderFindings: unix mode emits one flat line per finding in fileBlock", () => {
+  const result = renderFindings(
     {
       file: [
-        makeResolved({
+        makeFileFinding({
           filename: "/x.ts",
           message: "`debugger` statement is not allowed.",
-          errorCode: "eslint(no-debugger)",
+          code: "eslint(no-debugger)",
         }),
       ],
       project: [],
@@ -48,12 +48,12 @@ void test("renderLintFindings: unix mode emits one flat line per diagnostic in f
   assert.equal(result.summaryLine, "1 unfixed lint issue.");
 });
 
-void test("renderLintFindings: a no-unsafe-* diagnostic surfaces the weak-typings hint block (stylish mode)", () => {
-  const result = renderLintFindings(
+void test("renderFindings: a no-unsafe-* finding surfaces the weak-typings hint block (stylish mode)", () => {
+  const result = renderFindings(
     {
       file: [
-        makeResolved({
-          errorCode: "typescript-eslint(no-unsafe-member-access)",
+        makeFileFinding({
+          code: "typescript-eslint(no-unsafe-member-access)",
           message: "Unsafe member access .foo on an `any` value.",
         }),
       ],
@@ -69,13 +69,13 @@ void test("renderLintFindings: a no-unsafe-* diagnostic surfaces the weak-typing
   assert.equal(result.summaryLine, "1 unfixed lint issue.");
 });
 
-void test("renderLintFindings: a no-unsafe-* diagnostic surfaces the weak-typings hint under unix mode too", () => {
+void test("renderFindings: a no-unsafe-* finding surfaces the weak-typings hint under unix mode too", () => {
   // Hint and summary are mode-independent.
-  const result = renderLintFindings(
+  const result = renderFindings(
     {
       file: [
-        makeResolved({
-          errorCode: "typescript-eslint(no-unsafe-member-access)",
+        makeFileFinding({
+          code: "typescript-eslint(no-unsafe-member-access)",
           message: "Unsafe member access .foo on an `any` value.",
         }),
       ],
@@ -88,14 +88,28 @@ void test("renderLintFindings: a no-unsafe-* diagnostic surfaces the weak-typing
   assert.equal(result.summaryLine, "1 unfixed lint issue.");
 });
 
-void test("renderLintFindings: project-only payload populates projectBlock and leaves fileBlock empty (stylish mode)", () => {
-  const result = renderLintFindings(
+void test("renderFindings: null code never trips the weak-typings hint", () => {
+  // The unsafe-pattern matcher must guard against null code; a parse-error finding has no code
+  // and must not be treated as an unsafe-* match.
+  const result = renderFindings(
+    {
+      file: [makeFileFinding({ code: null, message: "Unexpected token." })],
+      project: [],
+    },
+    { outputMode: "stylish", check: false, weakTypingsDocPath: HINT_PATH },
+  );
+
+  assert.equal(result.weakTypingsHint, "");
+});
+
+void test("renderFindings: project-only payload populates projectBlock and leaves fileBlock empty (stylish mode)", () => {
+  const result = renderFindings(
     {
       file: [],
       project: [
-        makeProject({
+        makeProjectFinding({
           filename: "tsconfig.json",
-          errorCode: "typescript(tsconfig-error)",
+          code: "typescript(tsconfig-error)",
           message: "Cannot find type definition file for 'node'.",
         }),
       ],
@@ -112,14 +126,14 @@ void test("renderLintFindings: project-only payload populates projectBlock and l
   assert.equal(result.summaryLine, "1 unfixed lint issue.");
 });
 
-void test("renderLintFindings: project-only payload populates projectBlock under unix mode too", () => {
-  const result = renderLintFindings(
+void test("renderFindings: project-only payload populates projectBlock under unix mode too", () => {
+  const result = renderFindings(
     {
       file: [],
       project: [
-        makeProject({
+        makeProjectFinding({
           filename: "tsconfig.json",
-          errorCode: "typescript(tsconfig-error)",
+          code: "typescript(tsconfig-error)",
           message: "msg",
         }),
       ],
@@ -132,14 +146,14 @@ void test("renderLintFindings: project-only payload populates projectBlock under
   assert.equal(result.summaryLine, "1 unfixed lint issue.");
 });
 
-void test("renderLintFindings: empty filename in a project diagnostic surfaces the (project) placeholder", () => {
-  const result = renderLintFindings(
+void test("renderFindings: empty filename in a project finding surfaces the (project) placeholder", () => {
+  const result = renderFindings(
     {
       file: [],
       project: [
-        makeProject({
+        makeProjectFinding({
           filename: "",
-          errorCode: "typescript(tsconfig-error)",
+          code: "typescript(tsconfig-error)",
           message: "Cannot find type definition file for 'node'.",
         }),
       ],
@@ -154,13 +168,13 @@ void test("renderLintFindings: empty filename in a project diagnostic surfaces t
   );
 });
 
-void test("renderLintFindings: oxc parse-error placeholder renders inside [...] in the file block (stylish mode)", () => {
-  const result = renderLintFindings(
+void test("renderFindings: null code renders as parse-error inside [...] in the file block (stylish mode)", () => {
+  const result = renderFindings(
     {
       file: [
-        makeResolved({
+        makeFileFinding({
           filename: "/x.ts",
-          errorCode: "parse-error",
+          code: null,
           message: "Unexpected token.",
           startLine: 1,
           startCol: 11,
@@ -178,13 +192,13 @@ void test("renderLintFindings: oxc parse-error placeholder renders inside [...] 
   assert.equal(result.summaryLine, "1 unfixed lint issue.");
 });
 
-void test("renderLintFindings: oxc parse-error placeholder renders in unix mode too", () => {
-  const result = renderLintFindings(
+void test("renderFindings: null code renders as parse-error in unix mode too", () => {
+  const result = renderFindings(
     {
       file: [
-        makeResolved({
+        makeFileFinding({
           filename: "/x.ts",
-          errorCode: "parse-error",
+          code: null,
           message: "Unexpected token.",
           startLine: 1,
           startCol: 11,
@@ -202,14 +216,14 @@ void test("renderLintFindings: oxc parse-error placeholder renders in unix mode 
   assert.equal(result.summaryLine, "1 unfixed lint issue.");
 });
 
-void test("renderLintFindings: mixed payload populates both blocks and counts every diagnostic in the summary", () => {
-  const result = renderLintFindings(
+void test("renderFindings: mixed payload populates both blocks and counts every finding in the summary", () => {
+  const result = renderFindings(
     {
-      file: [makeResolved({ filename: "/x.ts", message: "boom" })],
+      file: [makeFileFinding({ filename: "/x.ts", message: "boom" })],
       project: [
-        makeProject({
+        makeProjectFinding({
           filename: "tsconfig.json",
-          errorCode: "typescript(tsconfig-error)",
+          code: "typescript(tsconfig-error)",
           message: "Cannot find type definition file for 'node'.",
         }),
       ],
@@ -228,18 +242,18 @@ void test("renderLintFindings: mixed payload populates both blocks and counts ev
   assert.equal(result.summaryLine, "2 unfixed lint issues.");
 });
 
-void test("renderLintFindings: --check mode drops the 'unfixed' qualifier in the summaryLine (singular)", () => {
-  const result = renderLintFindings(
-    { file: [makeResolved()], project: [] },
+void test("renderFindings: --check mode drops the 'unfixed' qualifier in the summaryLine (singular)", () => {
+  const result = renderFindings(
+    { file: [makeFileFinding()], project: [] },
     { outputMode: "stylish", check: true, weakTypingsDocPath: HINT_PATH },
   );
   assert.equal(result.summaryLine, "1 lint issue.");
 });
 
-void test("renderLintFindings: --check mode drops the 'unfixed' qualifier in the summaryLine (plural)", () => {
-  const result = renderLintFindings(
+void test("renderFindings: --check mode drops the 'unfixed' qualifier in the summaryLine (plural)", () => {
+  const result = renderFindings(
     {
-      file: [makeResolved({ filename: "/x.ts" }), makeResolved({ filename: "/y.ts" })],
+      file: [makeFileFinding({ filename: "/x.ts" }), makeFileFinding({ filename: "/y.ts" })],
       project: [],
     },
     { outputMode: "stylish", check: true, weakTypingsDocPath: HINT_PATH },

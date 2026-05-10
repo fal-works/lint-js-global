@@ -3,19 +3,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { TestContext } from "node:test";
 
-import type {
-  ResolvedDiagnostic,
-  ResolvedProjectDiagnostic,
-} from "../src/lint-diagnostics/resolve.ts";
+import type { FileFinding, ProjectFinding } from "../src/lint-diagnostics/model/finding.ts";
 
 /** Path used wherever a `weakTypingsDocPath` is required by the formatter. */
 export const HINT_PATH = "/opt/lint-js/docs/guide/weak-typings.md";
 
-/** Build a {@link ResolvedDiagnostic} fixture; pinned defaults map to a 1:1 `debugger;` span. */
-export function makeResolved(overrides: Partial<ResolvedDiagnostic> = {}): ResolvedDiagnostic {
+/** Build a {@link FileFinding} fixture; pinned defaults map to a 1:1 `debugger;` span. */
+export function makeFileFinding(overrides: Partial<FileFinding> = {}): FileFinding {
   return {
     filename: "/x.ts",
-    errorCode: "eslint(no-debugger)",
+    code: "eslint(no-debugger)",
     message: "msg",
     startLine: 1,
     startCol: 1,
@@ -26,13 +23,11 @@ export function makeResolved(overrides: Partial<ResolvedDiagnostic> = {}): Resol
   };
 }
 
-/** Build a {@link ResolvedProjectDiagnostic} fixture; defaults to a tsconfig-level entry. */
-export function makeProject(
-  overrides: Partial<ResolvedProjectDiagnostic> = {},
-): ResolvedProjectDiagnostic {
+/** Build a {@link ProjectFinding} fixture; defaults to a tsconfig-level entry. */
+export function makeProjectFinding(overrides: Partial<ProjectFinding> = {}): ProjectFinding {
   return {
     filename: "tsconfig.json",
-    errorCode: "typescript(tsconfig-error)",
+    code: "typescript(tsconfig-error)",
     message: "Cannot find type definition file for 'node'.",
     ...overrides,
   };

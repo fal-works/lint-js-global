@@ -1,18 +1,18 @@
-import type { ResolvedDiagnostic, ResolvedFindings } from "../resolve.ts";
+import type { FileFinding, Findings } from "../model/finding.ts";
 import { renderStylish } from "./stylish.ts";
 import { renderUnix } from "./unix.ts";
 
 /**
- * Pattern matching the `errorCode` of `typescript-eslint(no-unsafe-*)` diagnostics, which
- * trigger the weak-typings hint block.
+ * Pattern matching the `code` of `typescript-eslint(no-unsafe-*)` findings, which trigger the
+ * weak-typings hint block.
  */
 const UNSAFE_CODE_PATTERN = /^typescript-eslint\(no-unsafe-/;
 
 /**
- * Per-diagnostic line layout selector.
+ * Per-finding line layout selector.
  *
  * - `stylish`: per-file grouped layout.
- * - `unix`: one self-contained `<filename>:<L>:<C>: <message> [<code>]` line per diagnostic.
+ * - `unix`: one self-contained `<filename>:<L>:<C>: <message> [<code>]` line per finding.
  */
 export type LintOutputMode = "stylish" | "unix";
 
@@ -22,13 +22,13 @@ export type LintOutputMode = "stylish" | "unix";
  * Each block carries its own trailing `\n` when non-empty, or is empty when nothing applies.
  */
 export interface RenderedLintOutput {
-  /** Per-file diagnostics block; `""` when no file diagnostics apply. */
+  /** Per-file diagnostics block; `""` when no file findings apply. */
   fileBlock: string;
 
   /** Project-level diagnostics block; `""` when none apply. */
   projectBlock: string;
 
-  /** Weak-typings hint block; `""` when no `no-unsafe-*` diagnostic is present. */
+  /** Weak-typings hint block; `""` when no `no-unsafe-*` finding is present. */
   weakTypingsHint: string;
 
   /** Summary line stating how many issues remain. No trailing `\n`. */
@@ -45,19 +45,16 @@ export interface RenderOptions {
   weakTypingsDocPath: string;
 }
 
-/** Precondition: `resolved.file.length + resolved.project.length > 0`. */
-export function renderLintFindings(
-  resolved: ResolvedFindings,
-  options: RenderOptions,
-): RenderedLintOutput {
+/** Precondition: `findings.file.length + findings.project.length > 0`. */
+export function renderFindings(findings: Findings, options: RenderOptions): RenderedLintOutput {
   const blocks =
     options.outputMode === "stylish"
-      ? renderStylish(resolved.file, resolved.project)
-      : renderUnix(resolved.file, resolved.project);
-  const weakTypingsHint = hasUnsafeDiagnostic(resolved.file)
+      ? renderStylish(findings.file, findings.project)
+      : renderUnix(findings.file, findings.project);
+  const weakTypingsHint = hasUnsafeFinding(findings.file)
     ? `${renderWeakTypingsHint(options.weakTypingsDocPath).join("\n")}\n`
     : "";
-  const summaryLine = formatSummary(options.check, resolved.file.length + resolved.project.length);
+  const summaryLine = formatSummary(options.check, findings.file.length + findings.project.length);
   return {
     fileBlock: blocks.file,
     projectBlock: blocks.project,
@@ -81,6 +78,6 @@ function renderWeakTypingsHint(docPath: string): string[] {
   ];
 }
 
-function hasUnsafeDiagnostic(resolved: readonly ResolvedDiagnostic[]): boolean {
-  return resolved.some((d) => UNSAFE_CODE_PATTERN.test(d.errorCode));
+function hasUnsafeFinding(file: readonly FileFinding[]): boolean {
+  return file.some((d) => d.code !== null && UNSAFE_CODE_PATTERN.test(d.code));
 }

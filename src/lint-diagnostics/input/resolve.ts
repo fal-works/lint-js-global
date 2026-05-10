@@ -1,19 +1,7 @@
-import type { SourceCache } from "../system/source-cache.ts";
-import {
-  type ResolvedDiagnostic,
-  type ResolvedProjectDiagnostic,
-  resolveDiagnostic,
-  resolveProjectDiagnostic,
-} from "./resolve-diagnostic.ts";
+import type { SourceCache } from "../../system/source-cache.ts";
+import type { FileFinding, ProjectFinding } from "../model/finding.ts";
+import { resolveDiagnostic, resolveProjectDiagnostic } from "./resolve-diagnostic.ts";
 import type { ValidatedFileDiagnostic, ValidatedFindings } from "./schema.ts";
-
-export type { ResolvedDiagnostic, ResolvedProjectDiagnostic };
-
-/** Resolved diagnostics partitioned by source-locatability. */
-export interface ResolvedFindings {
-  file: readonly ResolvedDiagnostic[];
-  project: readonly ResolvedProjectDiagnostic[];
-}
 
 /**
  * Outcome of resolving a full validated payload through {@link resolveAll}.
@@ -24,7 +12,7 @@ export interface ResolvedFindings {
  * `reason` is human-readable and follows `failed to resolve span: filename=…, offset=…, length=…`.
  */
 export type ResolveResult =
-  | ({ kind: "ok" } & ResolvedFindings)
+  | { kind: "ok"; file: readonly FileFinding[]; project: readonly ProjectFinding[] }
   | { kind: "contract-failure"; reason: string };
 
 /**
@@ -33,7 +21,7 @@ export type ResolveResult =
  * Short-circuits on the first file diagnostic that fails to resolve.
  */
 export function resolveAll(findings: ValidatedFindings, cache: SourceCache): ResolveResult {
-  const file: ResolvedDiagnostic[] = [];
+  const file: FileFinding[] = [];
   for (const diag of findings.file) {
     const entry = resolveDiagnostic(diag, cache);
     if (entry === null) return { kind: "contract-failure", reason: formatResolveFailure(diag) };
