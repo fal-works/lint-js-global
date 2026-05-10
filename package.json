@@ -13,8 +13,6 @@
   },
   "files": [
     "dist",
-    "src",
-    "!src/**/*.test.ts",
     "cfg",
     "docs/guide"
   ],
