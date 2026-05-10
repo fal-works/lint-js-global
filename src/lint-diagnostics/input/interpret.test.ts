@@ -7,7 +7,10 @@ import { interpretOxlintOutput } from "./interpret.ts";
 
 void test("interpretOxlintOutput: no-files signal from oxlint surfaces as no-files", () => {
   const result = interpretOxlintOutput(
-    "No files found to lint. Please check your paths and ignore patterns.\n",
+    `No files found to lint. Please check your paths and ignore patterns.\n${JSON.stringify({
+      diagnostics: [],
+      number_of_files: 0,
+    })}\n`,
     "/",
   );
   assert.deepEqual(result, { kind: "no-files" });

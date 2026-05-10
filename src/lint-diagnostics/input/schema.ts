@@ -94,6 +94,16 @@ export function validatePayload(parsed: unknown): Result<ValidatedDiagnostic[], 
   return { ok: true, value: validated };
 }
 
+/** Read the `number_of_files` field as a non-negative integer. */
+export function validateNumberOfFiles(parsed: unknown): Result<number, string> {
+  if (!isObject(parsed)) return { ok: false, reason: "top-level value is not an object" };
+  const v = parsed.number_of_files;
+  if (!isNonNegativeInteger(v)) {
+    return { ok: false, reason: "`number_of_files` is missing or not a non-negative integer" };
+  }
+  return { ok: true, value: v };
+}
+
 function validateDiagnostic(diag: unknown): Result<ValidatedDiagnostic, string> {
   if (!isObject(diag)) return { ok: false, reason: "not an object" };
   if (typeof diag.filename !== "string") {
@@ -160,9 +170,7 @@ function validateLabel(label: unknown, index: number): Result<ValidatedLabel, st
 }
 
 /**
- * Accept string, null, or undefined as a valid optional-string field. A present-but-wrong-typed
- * value (e.g. a structured object from a future schema change) is rejected so caret-range
- * upstream drift surfaces as a contract failure instead of being silently coerced to null.
+ * Accept string, null, or undefined as a valid optional-string field.
  *
  * @param name - Field name, used in the failure reason.
  */

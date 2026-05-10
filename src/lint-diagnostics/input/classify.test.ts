@@ -4,17 +4,15 @@ import test from "node:test";
 import { makeStdout } from "../../../test/lint-diagnostics-helpers.ts";
 import { classifyLintRun } from "./classify.ts";
 
-void test("classifyLintRun: 'No files found to lint.' prefix routes to no-files", () => {
+void test("classifyLintRun: empty diagnostics with number_of_files=0 routes to no-files", () => {
   const result = classifyLintRun(
     'No files found to lint. Please check your paths and ignore patterns.\n{ "diagnostics": [], "number_of_files": 0 }\n',
   );
   assert.deepEqual(result, { kind: "no-files" });
 });
 
-void test("classifyLintRun: bare 'No files found to lint.' line routes to no-files", () => {
-  const result = classifyLintRun(
-    "No files found to lint. Please check your paths and ignore patterns.\n",
-  );
+void test("classifyLintRun: no-files signal works without the advisory prelude", () => {
+  const result = classifyLintRun(JSON.stringify({ diagnostics: [], number_of_files: 0 }));
   assert.deepEqual(result, { kind: "no-files" });
 });
 
@@ -22,8 +20,20 @@ void test("classifyLintRun: empty stdout routes to clean", () => {
   assert.deepEqual(classifyLintRun(""), { kind: "clean" });
 });
 
-void test("classifyLintRun: empty diagnostics array routes to clean", () => {
+void test("classifyLintRun: empty diagnostics with number_of_files>=1 routes to clean", () => {
   assert.deepEqual(classifyLintRun(makeStdout([])), { kind: "clean" });
+});
+
+void test("classifyLintRun: empty diagnostics with missing number_of_files surfaces as contract-failure", () => {
+  // Without `number_of_files` we cannot discriminate no-files from clean. Surface the drift
+  // instead of guessing a branch.
+  const raw = JSON.stringify({ diagnostics: [] });
+  const result = classifyLintRun(raw);
+
+  assert.equal(result.kind, "contract-failure");
+  if (result.kind !== "contract-failure") return;
+  assert.equal(result.rawStdout, raw);
+  assert.match(result.reason, /number_of_files/);
 });
 
 void test("classifyLintRun: broken JSON surfaces as contract-failure carrying the raw payload", () => {

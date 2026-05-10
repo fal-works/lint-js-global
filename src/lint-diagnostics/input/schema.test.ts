@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { validatePayload } from "./schema.ts";
+import { validateNumberOfFiles, validatePayload } from "./schema.ts";
 
 void test("valid payload with one diagnostic resolves to a file-kind ValidatedDiagnostic", () => {
   const result = validatePayload({
@@ -398,6 +398,44 @@ void test("entry with fractional span.length is rejected", () => {
 
   assert.equal(result.ok, false);
   assert.match(result.ok ? "" : result.reason, /length.*non-negative/);
+});
+
+void test("validateNumberOfFiles: zero is accepted (no-files signal)", () => {
+  const result = validateNumberOfFiles({ diagnostics: [], number_of_files: 0 });
+  assert.equal(result.ok, true);
+  assert.equal(result.ok ? result.value : -1, 0);
+});
+
+void test("validateNumberOfFiles: positive integer is accepted", () => {
+  const result = validateNumberOfFiles({ diagnostics: [], number_of_files: 7 });
+  assert.equal(result.ok, true);
+  assert.equal(result.ok ? result.value : -1, 7);
+});
+
+void test("validateNumberOfFiles: missing field is rejected", () => {
+  // Required for discriminating no-files from clean; absence is upstream contract drift, not
+  // a benign omission.
+  const result = validateNumberOfFiles({ diagnostics: [] });
+  assert.equal(result.ok, false);
+  assert.match(result.ok ? "" : result.reason, /number_of_files/);
+});
+
+void test("validateNumberOfFiles: non-integer (string) is rejected", () => {
+  const result = validateNumberOfFiles({ diagnostics: [], number_of_files: "0" });
+  assert.equal(result.ok, false);
+  assert.match(result.ok ? "" : result.reason, /number_of_files/);
+});
+
+void test("validateNumberOfFiles: negative integer is rejected", () => {
+  const result = validateNumberOfFiles({ diagnostics: [], number_of_files: -1 });
+  assert.equal(result.ok, false);
+  assert.match(result.ok ? "" : result.reason, /number_of_files/);
+});
+
+void test("validateNumberOfFiles: non-object input is rejected", () => {
+  const result = validateNumberOfFiles(null);
+  assert.equal(result.ok, false);
+  assert.match(result.ok ? "" : result.reason, /top-level/);
 });
 
 void test("first failing entry's index is reported", () => {

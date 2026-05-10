@@ -2,22 +2,21 @@ import {
   type ValidatedFileDiagnostic,
   type ValidatedFindings,
   type ValidatedProjectDiagnostic,
+  validateNumberOfFiles,
   validatePayload,
 } from "./schema.ts";
-
-/** Matches the signal oxlint ≥1.61 prepends to stdout when no files match the targets. */
-const OXLINT_NO_FILES_RE = /^No files found to lint\./;
 
 /**
  * Structural classification of a single oxlint invocation, derived from `capturedStdout` alone.
  *
  * Discriminated by `kind`:
- * - `no-files`: oxlint signaled that no files matched any target.
- * - `contract-failure`: stdout breached the wrapper's output contract
- * (unparseable JSON or schema mismatch).
- * - `clean`: stdout was either empty or carried an empty `diagnostics` array.
- * - `findings`: at least one diagnostic survived schema validation.
- * Invariant: `file.length + project.length > 0`.
+ *
+ * - `no-files`: oxlint had no files to lint.
+ * - `contract-failure`: stdout breached the wrapper's output contract (unparseable JSON or schema
+ *   mismatch).
+ * - `clean`: oxlint processed files and emitted no diagnostics.
+ * - `findings`: at least one diagnostic survived schema validation. Invariant: `file.length +
+ *   project.length > 0`.
  */
 export type LintRunState =
   | { kind: "no-files" }
@@ -26,22 +25,41 @@ export type LintRunState =
   | ({ kind: "findings" } & ValidatedFindings);
 
 /**
+ * Slice off any free-form advisory prelude oxlint may print before the JSON payload (e.g. the
+ * "No files found to lint." banner that prefixes a no-files run). The payload always begins
+ * with `{` at column 0; nested `{` in pretty-printed output are indented.
+ *
+ * Returns the empty string if no JSON payload is present.
+ */
+function extractJsonPayload(stdout: string): string {
+  if (stdout.startsWith("{")) return stdout;
+  const idx = stdout.indexOf("\n{");
+  return idx === -1 ? "" : stdout.slice(idx + 1);
+}
+
+/**
  * Classify the raw oxlint stdout into a {@link LintRunState}.
  */
 export function classifyLintRun(capturedStdout: string): LintRunState {
-  if (OXLINT_NO_FILES_RE.test(capturedStdout)) return { kind: "no-files" };
-
-  // oxlint normally always emits a JSON payload; an empty stdout is a benign edge case
-  // (no payload at all) and should not be escalated to a contract failure.
-  if (capturedStdout === "") return { kind: "clean" };
+  const jsonText = extractJsonPayload(capturedStdout);
+  if (jsonText === "") {
+    // oxlint normally always emits a JSON payload; an empty stdout is a benign edge case
+    // (no payload at all) and should not be escalated to a contract failure.
+    if (capturedStdout === "") return { kind: "clean" };
+    // Free-form text without any JSON payload signals a tool failure (e.g. tsgolint resolution
+    // failure, missing config). Route it through contract-failure so the wrapper boundary
+    // surfaces it as LintJsError + exit 2.
+    return {
+      kind: "contract-failure",
+      reason: "stdout has no JSON payload",
+      rawStdout: capturedStdout,
+    };
+  }
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(capturedStdout);
+    parsed = JSON.parse(jsonText);
   } catch (err) {
-    // Unparseable stdout signals a tool failure (e.g. tsgolint resolution failure, missing config),
-    // not a lint diagnostic.
-    // Route it through contract-failure so the wrapper boundary surfaces it as LintJsError + exit 2.
     const message = err instanceof Error ? err.message : String(err);
     return {
       kind: "contract-failure",
@@ -56,7 +74,17 @@ export function classifyLintRun(capturedStdout: string): LintRunState {
   }
 
   const validated = validation.value;
-  if (validated.length === 0) return { kind: "clean" };
+  if (validated.length === 0) {
+    const filesValidation = validateNumberOfFiles(parsed);
+    if (!filesValidation.ok) {
+      return {
+        kind: "contract-failure",
+        reason: filesValidation.reason,
+        rawStdout: capturedStdout,
+      };
+    }
+    return filesValidation.value === 0 ? { kind: "no-files" } : { kind: "clean" };
+  }
 
   const file: ValidatedFileDiagnostic[] = [];
   const project: ValidatedProjectDiagnostic[] = [];
