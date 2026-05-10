@@ -27,6 +27,15 @@ async function runOrThrow(params: SpawnCapturingParams): Promise<void> {
   }
 }
 
+/** Strip `npm_*` so the nested pnpm doesn't inherit the outer publish lifecycle's state. */
+function lifecycleIsolatedEnv(): NodeJS.ProcessEnv {
+  const out: NodeJS.ProcessEnv = { ...process.env };
+  for (const key of Object.keys(out)) {
+    if (key.startsWith("npm_")) delete out[key];
+  }
+  return out;
+}
+
 function maybeSandboxFailureHint(name: string, stdout: string, stderr: string): string | null {
   if (name !== "pnpm install") return null;
 
@@ -52,12 +61,14 @@ function maybeSandboxFailureHint(name: string, stdout: string, stderr: string): 
 async function preparePublishLayout(): Promise<PublishLayout> {
   const root = makeTempDir("smoke");
   const dispose = () => rmSync(root, { recursive: true, force: true });
+  const env = lifecycleIsolatedEnv();
   try {
     await runOrThrow({
       name: "pnpm pack",
       command: "pnpm",
       args: ["pack", "--pack-destination", root],
       cwd: repoRoot,
+      env,
     });
     const tarballs = readdirSync(root).filter((name) => name.endsWith(".tgz"));
     const [tarballName, ...rest] = tarballs;
@@ -89,6 +100,7 @@ async function preparePublishLayout(): Promise<PublishLayout> {
       command: "pnpm",
       args: ["install", "--store-dir", storeDir, "--ignore-workspace"],
       cwd: consumerDir,
+      env,
     });
 
     return {

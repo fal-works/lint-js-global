@@ -25,6 +25,9 @@ export interface SpawnCapturingParams {
 
   /** Working directory for the child. Defaults to the parent's cwd. */
   cwd?: string;
+
+  /** Env for the child. Defaults to inherited. */
+  env?: NodeJS.ProcessEnv;
 }
 
 /**
@@ -40,12 +43,14 @@ export async function spawnCapturing({
   command,
   args,
   cwd,
+  env,
 }: SpawnCapturingParams): Promise<CliRunResult> {
   const { result, capturedStdout, capturedStderr } = await runCommandCapturingOutput({
     name,
     command,
     args,
     cwd,
+    env,
   });
   return {
     status: result.status,
