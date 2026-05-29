@@ -37,15 +37,20 @@ void test("full pipeline: trailing fmt skipped when lint findings remain so L:C 
 
   assert.equal(exitCode, 1);
   const out = streamText(events, "out");
-  // Diagnostic head line "  L:C ..." emitted by the stylish formatter.
-  const match = out.match(/^ {2}(\d+):(\d+) /m);
+  // Stylish head line; widens to "  L:C-L:C ..." when the code slice is truncated.
+  const match = out.match(/^ {2}(\d+):(\d+)(?:-\d+:\d+)? /m);
   assert.ok(match, "expected a diagnostic head line with an L:C prefix");
   const line = Number(match[1]);
+  const col = Number(match[2]);
   const finalLines = readFileSync(join(dir, "src", "index.ts"), "utf8").split("\n");
-  assert.equal(
-    finalLines[line - 1],
-    "f();",
-    `diagnostic line ${line} must point at "f();" in the file the consumer opens next`,
+  const finalLine = finalLines[line - 1];
+  assert.ok(finalLine !== undefined, `diagnostic line ${line} must exist in the final file`);
+  // `oxlint --fix` splits the import and omits the inner space ("{ T}").
+  // The trailing fmt would restore it ("{ T }"), shifting the specifier one column right.
+  // The reported L:C stays accurate only because the trailing fmt is skipped while findings remain.
+  assert.ok(
+    finalLine.slice(col - 1).startsWith(`types.ts"`),
+    `diagnostic ${line}:${col} must point at the duplicated import specifier in the file the consumer opens next`,
   );
 });
 

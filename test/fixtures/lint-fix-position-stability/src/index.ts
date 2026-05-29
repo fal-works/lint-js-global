@@ -1,5 +1,5 @@
-debugger;
+import { val } from "./types.ts";
+import { T, other } from "./types.ts";
 
-async function f(): Promise<void> {}
-
-f();
+const x: T = { v: val + other };
+console.log(x);
