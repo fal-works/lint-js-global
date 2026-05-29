@@ -1,6 +1,6 @@
 {
   "name": "@fal-works/lint-js-global",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Globally-installed CLI that runs Oxfmt and Oxlint with type-aware linting.",
   "keywords": [
     "format",
